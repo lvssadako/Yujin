@@ -1,0 +1,35 @@
+# Variables de entorno (TOKEN)
+.env
+.env.local
+.env.*.local
+
+# Datos del bot (niveles, perfiles, etc.)
+data/
+*.json
+!package.json
+!package-lock.json
+
+# Node modules
+node_modules/
+
+# Logs
+*.log
+logs/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Backups
+*.backup.*
+backups/
+
+# Archivos temporales
+*.tmp
+temp/
