@@ -2,7 +2,12 @@ const logger = require('../../utils/logger');
 const fs = require('fs');
 const path = require('path');
 const { SlashCommandBuilder, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { createCanvas, loadImage } = require('canvas');
+let createCanvas, loadImage;
+try {
+  ({ createCanvas, loadImage } = require('@napi-rs/canvas'));
+} catch {
+  ({ createCanvas, loadImage } = require('canvas'));
+}
 const { readProfiles, ensureUser } = require('../../utils/profileStore');
 const { readConfig } = require('../../utils/configCache');
 const { normalizeExternalImageUrl } = require('../../utils/urlSafety');
