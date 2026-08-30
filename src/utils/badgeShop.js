@@ -1,7 +1,7 @@
-const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
 const { secureRandomInt } = require('./cryptoRandom');
+const { readJsonSafe, writeJsonAtomic } = require('./jsonStore');
 
 const SHOP_FILE = path.join(__dirname, '../data/badgeShop.json');
 
@@ -12,16 +12,14 @@ const DEFAULT_SHOP = {
   poolSize: 6
 };
 
+let shopRotationInterval = null;
+
 function readShop() {
-  try {
-    return JSON.parse(fs.readFileSync(SHOP_FILE, 'utf8'));
-  } catch {
-    return { ...DEFAULT_SHOP };
-  }
+  return readJsonSafe(SHOP_FILE, { ...DEFAULT_SHOP });
 }
 
 function writeShop(data) {
-  fs.writeFileSync(SHOP_FILE, JSON.stringify(data, null, 2));
+  writeJsonAtomic(SHOP_FILE, data);
 }
 
 function rotateShop(allBadges) {
@@ -74,13 +72,17 @@ function ensureRotation(allBadges) {
 
 // Programar rotación automática cada 10 min (verifica vencimiento)
 function scheduleShopRotation(getAllBadgesFn) {
+  if (shopRotationInterval) {
+    clearInterval(shopRotationInterval);
+  }
+
   try {
     ensureRotation(getAllBadgesFn());
   } catch (e) {
     logger.warn('[SHOP] Error en rotación inicial:', e.message);
   }
 
-  setInterval(() => {
+  shopRotationInterval = setInterval(() => {
     try {
       ensureRotation(getAllBadgesFn());
     } catch (e) {
@@ -89,10 +91,18 @@ function scheduleShopRotation(getAllBadgesFn) {
   }, 10 * 60 * 1000);
 }
 
+function stopShopRotation() {
+  if (shopRotationInterval) {
+    clearInterval(shopRotationInterval);
+    shopRotationInterval = null;
+  }
+}
+
 module.exports = {
   readShop,
   writeShop,
   rotateShop,
   ensureRotation,
-  scheduleShopRotation
+  scheduleShopRotation,
+  stopShopRotation
 };

@@ -1,3 +1,6 @@
+const logger = require('../utils/logger');
+const { createSuccessEmbed, createErrorEmbed } = require('../utils/embedFactory');
+
 module.exports = {
     name: 'ban',
     description: 'Banea a un usuario. Uso: ban <mención|id> [razón] [días]',
@@ -51,9 +54,13 @@ module.exports = {
                 reason: `${reason} — por ${message.author.tag}`
             });
 
-            return message.reply(`✅ Baneado: ${userToBan.tag} (${userToBan.id})\nRazón: ${reason}\nMensajes borrados: ${days} días`);
+            const embed = createSuccessEmbed(
+                '✅ Miembro Baneado',
+                `**Usuario:** ${userToBan.tag} (${userToBan.id})\n**Razón:** ${reason}\n**Mensajes borrados:** ${days} días`
+            );
+            return message.reply({ embeds: [embed] });
         } catch (err) {
-            console.error('Ban command error:', err);
+            logger.error('[prefix/ban] Error ejecutando ban:', { error: err.message, stack: err.stack });
             return message.reply('❌ Error al banear al usuario.');
         }
     }

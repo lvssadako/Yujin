@@ -217,7 +217,11 @@ function shouldTriggerHotReload(filename) {
   return true;
 }
 
+const activeWatchers = [];
+
 function enableCommandWatcher(client, options = {}) {
+  disableCommandWatcher();
+
   const commandsDir = options.commandsDir || path.join(__dirname, '..', 'commands');
   const prefixDir = options.prefixDir || path.join(__dirname, '..', 'prefixCommands');
   const sharedDir = options.sharedDir || path.join(__dirname, '..', 'commands_shared');
@@ -234,7 +238,7 @@ function enableCommandWatcher(client, options = {}) {
 
   for (const dir of watchDirs) {
     try {
-      fs.watch(dir, { recursive: true }, (eventType, filename) => {
+      const watcher = fs.watch(dir, { recursive: true }, (eventType, filename) => {
         if (!shouldTriggerHotReload(filename)) return;
 
         if (reloadTimeout) clearTimeout(reloadTimeout);
@@ -269,6 +273,7 @@ function enableCommandWatcher(client, options = {}) {
           }
         }, 350);
       });
+      activeWatchers.push(watcher);
     } catch (err) {
       logger.warn('[HotReload] No se pudo inicializar watcher en directorio', { dir, error: err.message });
     }
@@ -277,12 +282,22 @@ function enableCommandWatcher(client, options = {}) {
   logger.info('[HotReload] Watcher en tiempo real activo para comandos, servicios, constantes y utilidades (Hot Reload sin reinicio de bot).');
 }
 
+function disableCommandWatcher() {
+  while (activeWatchers.length > 0) {
+    const watcher = activeWatchers.pop();
+    try {
+      watcher.close();
+    } catch {}
+  }
+}
+
 module.exports = {
   getAllJsFiles,
   shouldTriggerHotReload,
   loadCommandRegistry,
   reloadCommandRegistry,
   enableCommandWatcher,
+  disableCommandWatcher,
   syncSlashCommands
 };
 

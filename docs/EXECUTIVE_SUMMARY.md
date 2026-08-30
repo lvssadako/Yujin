@@ -17,7 +17,10 @@
 | **Sistema de Rachas de Actividad (Streaks)** | ✅ Completado | 6 niveles de fuego, congeladores, alertas DM, tarjetas Canvas HD y estudio global |
 | **Personalización de Perfil y Rachas** | ✅ Completado | Wallpapers temáticos, colores de acento, fondos URL seguros y guardado global |
 | **Persistencia Atómica y Segura** | ✅ Completado | `writeJsonAtomic` previene corrupción en JSONs de estado (`profile.json`, `levels.json`) |
-| **Suite de Pruebas Automatizadas** | ✅ Completado | 32 tests automatizados (`node --test`) pasando al 100% de manera consistente |
+| **Capa de Base de Datos y Repositorios** | ✅ Completado | Adaptadores `src/database/` preparados para JSON y SQLite con `EconomyRepository` |
+| **Middleware de Rate Limiting** | ✅ Completado | `RateLimiter` sliding window en memoria con limpieza automática TTL y cooldowns |
+| **Ciclo de Vida y Graceful Shutdown** | ✅ Completado | Handlers `SIGINT`/`SIGTERM` con limpieza de timers, watchers y cierre ordenado |
+| **Suite de Pruebas Automatizadas** | ✅ Completado | 45 tests automatizados (`node --test`) pasando al 100% de manera consistente |
 
 ---
 
@@ -34,10 +37,14 @@
 - Sincronización REST con Discord API protegida por hash SHA-256 (`syncSlashCommands`) para evitar rate limits.
 - Comandos administrativos `/reload` y `/restart`.
 
-### 3. Seguridad, Moderación y Roles (`src/services/automod/`, `src/utils/roleValidation.js`)
+### 3. Middleware y Seguridad Operativa (`src/middleware/rateLimit.js`, `src/utils/roleValidation.js`)
+- Rate limiting sliding-window con TTL para proteger minijuegos y transacciones de economía contra abusos.
 - Validación de jerarquía estricta contra escalada de privilegios (`canBotManageRole`).
 - Moderación completa: `/ban`, `/unban`, `/kick`, `/timeout`, `/warn`, `/clear`.
 - Auditoría de mensajes borrados y editados.
+
+### 4. Capa de Base de Datos y Repositorios (`src/database/`)
+- Adaptador abstracto `BaseDatabaseAdapter`, implementación atómica `JsonDatabaseAdapter` y repositorio `EconomyRepository`.
 
 ---
 
@@ -76,5 +83,18 @@
 ✔ streak command should exist and register as a slash command
 ✔ generateStreakCard renders a valid AttachmentBuilder without errors
 ✔ generateStreakCard handles maximum tier without nextTier
-ℹ pass 32, fail 0, suites 0, total 32 tests (100% Passing)
+✔ logger module is available and exposes standard log methods
+✔ logger can emit a structured info message without throwing
+✔ config schema accepts valid config object
+✔ config schema rejects invalid roleXpBonuses values
+✔ config loader reads and validates JSON file content
+✔ economy service adds coins and returns updated balance
+✔ economy service can remove coins when enough balance exists
+✔ RateLimiter allows requests within capacity
+✔ RateLimiter check() inspects capacity without consuming points
+✔ RateLimiter reset() and clear() work correctly
+✔ RateLimiter cleanupExpired() purges expired keys
+✔ JsonDatabaseAdapter performs atomic get, set, delete operations
+✔ EconomyRepository manages balances and transactions
+ℹ pass 45, fail 0, suites 0, total 45 tests (100% Passing)
 ```

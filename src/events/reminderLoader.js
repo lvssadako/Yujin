@@ -78,13 +78,19 @@ async function executeReminder(client, reminder) {
     }
 }
 
+let reminderHourlyInterval = null;
+
 function init(client) {
+    if (reminderHourlyInterval) {
+        clearInterval(reminderHourlyInterval);
+    }
+
     const activeReminders = getActiveReminders();
     for (const reminder of activeReminders) {
         scheduleReminder(client, reminder);
     }
 
-    setInterval(() => {
+    reminderHourlyInterval = setInterval(() => {
         const active = getActiveReminders();
         for (const reminder of active) {
             if (!timers.has(reminder.id)) {
@@ -94,7 +100,19 @@ function init(client) {
     }, 60 * 60 * 1000);
 }
 
+function stop() {
+    if (reminderHourlyInterval) {
+        clearInterval(reminderHourlyInterval);
+        reminderHourlyInterval = null;
+    }
+    for (const [id, timer] of timers.entries()) {
+        clearTimeout(timer);
+    }
+    timers.clear();
+}
+
 module.exports = {
     init,
+    stop,
     scheduleReminder
 };

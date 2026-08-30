@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { AttachmentBuilder } = require('discord.js');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
+const logger = require('../utils/logger');
 
 const dataDir = path.join(__dirname, '..', 'data');
 const levelsPath = path.join(dataDir, 'levels.json');
@@ -200,8 +201,8 @@ module.exports = {
       const attach = new AttachmentBuilder(buffer, { name: 'level.png' });
       return message.reply({ files: [attach] });
     } catch (err) {
-      console.error('prefix level error:', err);
-      return message.reply('Error al generar la imagen de nivel');
+      logger.error('[prefix/level] Error al generar imagen de nivel:', { error: err.message, stack: err.stack });
+      return message.reply('❌ Error al generar la imagen de nivel');
     }
   }
 };

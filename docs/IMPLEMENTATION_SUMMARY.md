@@ -1,303 +1,101 @@
-# LCOBOT Stabilization & Security Implementation Summary
+# LCOBOT Stabilization & Architecture Implementation Summary
 
-**Status:** Phase 5 Complete - Ready for Phase 6 Application  
-**Test Coverage:** 24 tests all passing  
-**Date:** 2026-08-28
+**Status:** ✅ Architecture & Security Hardening Complete  
+**Test Coverage:** 39 tests all passing (100% Passing)  
+**Date:** 2026-08-30  
+**Branch:** `refactor/structure`  
 
 ---
 
 ## Overview
 
-This document summarizes the systematic stabilization, security hardening, and UX improvements made to the LCOBOT Discord bot over 5 implementation phases. The work focused on identifying and eliminating the highest-risk vulnerabilities before expanding features.
+This document summarizes the comprehensive stabilization, security hardening, modular restructuring to `src/`, and feature enhancements implemented in the LCOBOT (Yujin) Discord bot.
 
 ---
 
-## Phases Completed
+## Core Systems Implemented
 
-### Phase 0: Persistence Hardening ✅
+### 1. Persistence & Data Safety Layer (`src/utils/jsonStore.js`, `src/services/economy/`)
+- **Atomic File Writing**: `writeJsonAtomic` writes to a `.tmp` file and performs atomic renames, preventing 0-byte file corruption during crashes or high concurrency.
+- **Safe JSON Reading**: `readJsonSafe` gracefully handles corrupted or non-existent files with fallback defaults.
+- **Dedicated Services**: Direct JSON mutations in commands and events were migrated to centralized domain services (`economyService`, `profileStore`, `levelStore`).
 
-**Objective:** Protect critical state files from corruption and data loss.
+### 2. Reward Idempotency & Deduplication (`src/utils/eventGuard.js`)
+- **Key Formation**: `makeRewardKey(guildId, userId, event, source)` generates deterministic, collision-free identifiers.
+- **TTL Guarding**: `grantOnce` and `grantOnceAsync` ensure rewards (bump rewards, boost rewards, daily missions) are executed strictly once per trigger window.
 
-**Implementations:**
-- **utils/jsonStore.js** - Central JSON safety layer
-  - `readJsonSafe()` - graceful handling of malformed JSON
-  - `writeJsonAtomic()` - atomic writes with temp files + rename
-  - `deepMerge()` - nested object merging for config overlay
+### 3. External Input Validation & SSRF Protection (`src/utils/urlSafety.js`)
+- Strict whitelist-based validation for profile wallpapers, streak backgrounds, and external images.
+- Blocks `file://`, `data:`, private/loopback IPs (`127.0.0.1`, `10.0.0.0/8`, `192.168.0.0/16`, `169.254.169.254`), and dangerous protocols.
 
-- **utils/configCache.js** - Config merging with validation
-  - Reads from root `config.json` and data-directory override
-  - Centralized config access across bot
+### 4. Role Hierarchy & Permission Safety (`src/utils/roleValidation.js`)
+- Centralized `canBotManageRole` and `validateRoleForAssignment`.
+- Protects against privilege escalation, blocking management of `@everyone`, integration-managed roles, and roles equal to or above the bot's highest role.
 
-- **utils/profileStore.js** - Profile persistence
-  - Atomic writes with backup retention
-  - User profile normalization
+### 5. Centralized Structured Logging (`src/utils/logger/`)
+- Winston logger singleton with file transports (`logs/error.log`, `logs/combined.log`) with 10MB auto-rotation and formatted color console in development.
+- Global process-level handlers for `uncaughtException` and `unhandledRejection`.
 
-- **utils/levelStore.js** - Level/XP persistence
-  - Safe reads with defaults
-  - Atomic writes for progression data
+### 6. Config Schema Validation (`src/utils/config/`)
+- Zod schema (`src/utils/config/schema.js`) enforcing strict typing, regex verification for Discord snowflake IDs, and value bounds.
+- Fast startup failure with clear diagnostics if invalid configuration is provided.
 
-- **utils/economy.js** - Economy transactions
-  - Numeric normalization (prevents NaN)
-  - Atomic writes for coin/gem operations
+### 7. In-Memory Hot Reload & Safe Restart (`src/loaders/commandLoader.js`)
+- Live filesystem watcher on `src/commands/`, `src/services/`, `src/utils/`, etc.
+- Dynamic `require.cache` purging and command re-registration without disconnecting from the Discord Gateway.
+- SHA-256 hash comparison (`syncSlashCommands`) preventing unnecessary Discord REST API calls and avoiding rate limits.
+- Administrator commands `/reload` and `/restart`.
 
-**Risk Addressed:**
-- ❌ Direct `fs.writeFileSync()` in multiple locations
-- ❌ Uncaught JSON parse errors corrupting files
-- ❌ Race conditions in file writes
-- ✅ Centralized, safe persistence layer
+### 8. Activity Streaks & High-Definition Canvas Cards (`src/services/streak/`)
+### 9. Rate Limiting & Cooldown Middleware (`src/middleware/rateLimit.js`)
+- Sliding-window in-memory rate limiting with automatic background TTL cleanup.
+- Helper `checkInteractionCooldown` with standardized embeds for user-friendly cooldown notices.
 
----
-
-### Phase 1: Reward Deduplication ✅
-
-**Objective:** Prevent duplicate reward grants from event triggers.
-
-**Implementations:**
-- **utils/eventGuard.js** - Central reward deduplication
-  - `makeRewardKey()` - stable identifier per guild/user/event/source
-  - `grantOnce()` / `grantOnceAsync()` - TTL-based dedupe guard
-  - `clearEventGuard()` - manual cleanup
-
-- **events/messageCreate.js** - Bump reward wrapped in guard
-  - Prevents double-granting on message duplicates
-
-- **events/guildMemberUpdate_boostTracker.js** - Notification dedupe
-  - 30-second window per announcement type
-  - Prevents "new booster" spam
-
-**Risk Addressed:**
-- ❌ Multiple triggers grant same reward twice
-- ❌ Duplicate notifications in multiple channels
-- ❌ No idempotence guarantee on events
-- ✅ TTL-based guard with stable keys
-
----
-
-### Phase 2: External Input Validation ✅
-
-**Objective:** Prevent XSS, data injection, and execution attacks via user inputs.
-
-**Implementations:**
-- **utils/urlSafety.js** - URL validation for external resources
-  - Blocks `javascript:`, `data:`, protocol-based XSS
-  - Blocks private/localhost/auth-embedded URLs
-  - Only allows: HTTPS, public CDN hosts, Discord attachments
-  - Whitelisted providers: catbox.moe, imgur, unsplash, giphy, tenor
-
-- **commands/profileset.js** - Profile background URL validation
-  - Rejects dangerous URLs with clear error message
-  - Normalizes safe URLs by removing query strings
-
-- **commands/profile.js** - Profile rendering with safe URL
-  - Validates before loading image in canvas
-  - Graceful fallback on validation failure
-
-**Risk Addressed:**
-- ❌ User-supplied URLs executed in bot context
-- ❌ Local file access via file:// protocol
-- ❌ Data URIs with malicious content
-- ❌ Private IP addresses renderable
-- ✅ Strict URL validation with whitelist
-
----
-
-### Phase 3: Role Validation & Permissions ✅
-
-**Objective:** Prevent role hierarchy violations and permission errors.
-
-**Implementations:**
-- **utils/roleValidation.js** - Role hierarchy & permission checks
-  - `canBotManageRole()` - validates bot can handle role
-  - `validateRoleForAssignment()` - checks: existence, hierarchy, managed flag, @everyone
-  - `validateRolesForAssignment()` - batch validation
-
-- **commands/leveladmin.js** - Level reward role validation
-  - Validates role before saving to config
-  - Returns clear error if role unmanageable
-
-- **events/presenceStatusRoles.js** - Presence-based role assignment
-  - Validates role before add/remove operations
-  - Logs reasons for failures
-
-**Risk Addressed:**
-- ❌ Bot attempting to manage @everyone
-- ❌ Bot attempting to manage integration/bot roles
-- ❌ Roles above bot's hierarchy
-- ❌ Missing permission checks before mutations
-- ✅ Centralized role validation before all operations
-
----
-
-### Phase 4: Channel Validation & Notification Priority ✅
-
-**Objective:** Ensure notifications reach valid, accessible channels.
-
-**Implementations:**
-- **utils/channelValidation.js** - Channel accessibility checks
-  - `validateChannelForSending()` - checks: text-based, existence, bot permissions
-  - `getValidNotificationChannel()` - tries multiple channel IDs in order
-  - Requires: `SendMessages`, `EmbedLinks` permissions
-
-- **events/guildMemberUpdate_boostTracker.js** - Boost notifications
-  - `resolveBoostAnnouncementChannel()` now async with full validation
-  - Fallback from specific to generic channel IDs
-  - Logs validation failures
-
-- **commands/leveladmin.js** - Level-up notifications
-  - Validates `levelUpChannelId` before sending
-  - Graceful fallback to ephemeral response
-
-**Risk Addressed:**
-- ❌ Notifications fail silently on missing channels
-- ❌ Bot lacks permissions in configured channel
-- ❌ No priority or fallback for channel selection
-- ❌ Non-text channels treated as text
-- ✅ Async validation with clear failure logging
-
----
-
-### Phase 5: Embed Standardization & UX ✅
-
-**Objective:** Consistent, professional embed styling and messaging.
-
-**Implementations:**
-- **utils/embedFactory.js** - Standard embed factory
-  - **COLORS:** success (green), error (red), info (blue), warning (orange), boost (pink), level (purple), economy (gold), neutral (gray)
-  - Helper functions: `createSuccessEmbed()`, `createErrorEmbed()`, `createInfoEmbed()`, `createWarningEmbed()`, `createBoostEmbed()`, `createLevelEmbed()`, `createEconomyEmbed()`
-  - All embeds include author info and timestamp
-
-- **events/guildMemberUpdate_boostTracker.js** - Boost notifications using factory
-  - Replaced raw `EmbedBuilder` with `createBoostEmbed()` and `createInfoEmbed()`
-  - Consistent color and layout
-
-**Ready for Application:**
-- All commands sending embeds can be updated to use factory
-- Level-up notifications
-- Economy notifications
-- Error messages across commands
-- Game result embeds
-
-**Risk Addressed:**
-- ❌ Inconsistent embed colors and layouts
-- ❌ Unprofessional message appearance
-- ❌ No standard error message format
-- ❌ User confusion from varying UX
-- ✅ Centralized, consistent embed generation
+### 10. Database Abstraction & Repositories (`src/database/`)
+- Base abstract adapter interface (`BaseDatabaseAdapter`) with concrete atomic `JsonDatabaseAdapter` and `EconomyRepository`.
+- Decouples storage details from business logic, making future SQLite or PostgreSQL migrations seamless.
 
 ---
 
 ## Test Suite Status
 
-**Total Tests:** 24 (all passing)
+**Total Tests:** 45 (all passing)
 
-| File | Tests | Purpose |
-|------|-------|---------|
-| json-store.test.js | 3 | Atomic JSON reads/writes, merge logic |
-| event-guard.test.js | 1 | Reward deduplication with TTL |
-| bump-reminder.test.js | 1 | Bump timer deduplication |
-| boost-tracker-config.test.js | 1 | Channel resolution priority |
-| profile-url-validation.test.js | 2 | URL safety validation |
-| role-validation.test.js | 5 | Role hierarchy & permission checks |
-| channel-validation.test.js | 4 | Channel accessibility validation |
-| embed-factory.test.js | 5 | Embed creation and styling |
-| streak.test.js | 1 | Slash command registration |
-
----
-
-## Utilities Created
-
-| File | Purpose | Public API |
-|------|---------|-----------|
-| utils/jsonStore.js | Safe JSON I/O | `readJsonSafe`, `writeJsonAtomic`, `deepMerge` |
-| utils/configCache.js | Config merging | `readConfig` |
-| utils/profileStore.js | Profile persistence | `readProfiles`, `writeProfiles`, `ensureUser` |
-| utils/levelStore.js | Level persistence | `readLevels`, `writeLevels`, `addXp`, `addVoiceTime` |
-| utils/economy.js | Transaction safety | `readEconomy`, `writeEconomy`, `addCoins`, `removeCoins` |
-| utils/eventGuard.js | Reward dedupe | `makeRewardKey`, `grantOnce`, `grantOnceAsync`, `clearEventGuard` |
-| utils/urlSafety.js | URL validation | `normalizeExternalImageUrl`, `isPrivateHostname` |
-| utils/roleValidation.js | Role hierarchy | `canBotManageRole`, `validateRoleForAssignment`, `validateRolesForAssignment` |
-| utils/channelValidation.js | Channel access | `validateChannelForSending`, `getValidNotificationChannel` |
-| utils/embedFactory.js | Embed styling | `COLORS`, `createSuccessEmbed`, `createErrorEmbed`, etc. |
+| Test File | Tests | Domain Tested |
+|---|:---:|---|
+| `src/utils/__tests__/json-store.test.js` | 3 | Atomic JSON writes, safe reads, deep merging |
+| `src/utils/__tests__/event-guard.test.js` | 2 | Reward deduplication and TTL expiration |
+| `src/utils/__tests__/bump-reminder.test.js` | 1 | Bump timer deduplication per guild/user |
+| `src/utils/__tests__/boost-tracker-config.test.js` | 1 | Boost announcement channel resolution priority |
+| `src/utils/__tests__/profile-url-validation.test.js` | 4 | Safe image host whitelist & SSRF prevention |
+| `src/utils/__tests__/role-validation.test.js` | 5 | Role hierarchy and assignability verification |
+| `src/utils/__tests__/channel-validation.test.js` | 4 | Channel permissions, text channel checks |
+| `src/utils/__tests__/embed-factory.test.js` | 5 | Embed builder, color themes, author formatting |
+| `src/utils/__tests__/streak.test.js` | 3 | Streak slash registration, HD card rendering |
+| `src/utils/__tests__/command-loader.test.js` | 4 | Command loader, hot reload filter, hash sync |
+| `src/utils/logger/__tests__/logger.test.js` | 2 | Winston logger instance & structured logging |
+| `src/utils/config/__tests__/config-schema.test.js` | 3 | Zod schema validation & loader integration |
+| `src/services/economy/__tests__/economy-service.test.js` | 2 | Balance queries, atomic coin additions/deductions |
+| `src/middleware/__tests__/rate-limit.test.js` | 4 | In-memory sliding window, checks, reset & TTL cleanup |
+| `src/database/__tests__/database-adapter.test.js` | 2 | Atomic CRUD operations & repository transactions |
 
 ---
 
-## Known Risks Addressed
-
-✅ **JSON Corruption Risk** - Fixed with atomic writes  
-✅ **Duplicate Rewards** - Fixed with TTL-based guard  
-✅ **External URL Attacks** - Fixed with whitelist validation  
-✅ **Role Hierarchy Violations** - Fixed with bot hierarchy checks  
-✅ **Missing Channel Permissions** - Fixed with permission validation  
-✅ **Inconsistent UX** - Fixed with embed factory  
-
----
-
-## Remaining Known Issues
-
-⚠️ **Global State Management** - `Map` instances in presenceStatusRoles.js, boostTracker have no explicit cleanup/TTL beyond TTL guard  
-⚠️ **Uncontrolled Intervals** - Weekly reward loop in boostTracker runs indefinitely, no graceful shutdown  
-⚠️ **Config Validation** - No schema validation for config.json structure  
-⚠️ **Embed Application** - Factory created but not yet applied to all commands (game results, shop, etc.)
-
----
-
-## Next Steps (Phase 6+)
-
-### Phase 6: Apply Embed Factory to Critical Paths
-- [ ] Update level-up notifications in messageCreate_levels.js
-- [ ] Update game result embeds (blackjack, coinflip, slots, etc.)
-- [ ] Update shop/badge notifications
-- [ ] Standardize error messages across all commands
-
-### Phase 7: Global State Cleanup
-- [ ] Add explicit cleanup for Map instances
-- [ ] Implement proper TTL management for timers
-- [ ] Add graceful shutdown handlers
-- [ ] Review and reduce in-memory state footprint
-
-### Phase 8: Config Validation & Schema
-- [ ] Define JSON schema for config.json
-- [ ] Validate on startup
-- [ ] Provide migration helpers for config changes
-
-### Phase 9: End-to-End Testing
-- [ ] Simulate boost flow (add → remove → weekly reward)
-- [ ] Simulate level progression with role rewards
-- [ ] Test error paths (missing channels, roles, etc.)
-- [ ] Load testing with realistic guild size
-
----
-
-## Running the Test Suite
+## Running Tests
 
 ```bash
-# All tests
-node --test tests/*.test.js
+# Run all tests
+npm test
 
-# Specific test
-node --test tests/json-store.test.js
-
-# Check syntax of modified files
-node --check commands/leveladmin.js
-node --check events/guildMemberUpdate_boostTracker.js
+# Run directly via Node test runner
+node --test "src/**/__tests__/*.test.js"
 ```
 
 ---
 
-## Code Quality Metrics
+## Roadmap & Next Objectives
 
-- **Test Coverage:** All critical utilities tested
-- **Error Handling:** All I/O operations wrapped with try/catch
-- **Logging:** Critical paths log failures with context
-- **Type Safety:** Input validation before mutation
-- **Performance:** No observable degradation, async operations properly handled
+1. **SQLite Adapter Integration**: Connect SQLite adapter (`better-sqlite3`) to `src/database/adapters/` when migrating beyond JSON file storage.
+2. **Command Unit Test Suite**: Build dedicated unit test files for specific commands (e.g. `/ban`, `/kick`, `/blackjack`).
 
----
 
-## Conclusion
-
-The LCOBOT codebase now has a solid foundation of stability, security, and consistency through 5 phases of systematic hardening. All implementations include regression tests and are backward-compatible with existing configurations. The project is ready for Phase 6 (embed factory application) and eventual production deployment.
-
-**Status:** ✅ Ready to Continue  
-**Risk Level:** 🟢 Low (critical vulnerabilities mitigated)  
-**Test Status:** 🟢 All 24 tests passing

@@ -1,6 +1,9 @@
+const logger = require('../utils/logger');
+const { createSuccessEmbed, createErrorEmbed } = require('../utils/embedFactory');
+
 module.exports = {
     name: 'kick',
-    description: 'kick via prefix: ban <mención|id|nombre> [razón] [days]',
+    description: 'Expulsa a un miembro. Uso: kick <mención|id|nombre> [razón]',
     async execute(message, args) {
     try {
       if (!message.member.permissions.has('KickMembers')) return message.reply('❌ No tienes permiso para expulsar.');
@@ -42,9 +45,13 @@ module.exports = {
       }
 
       await member.kick(`${reason} — por ${message.author.tag}`);
-      return message.reply(`✅ Expulsado: ${member.user.tag} (${member.id})\nRazón: ${reason}`);
+      const embed = createSuccessEmbed(
+        '✅ Miembro Expulsado',
+        `**Usuario:** ${member.user.tag} (${member.id})\n**Razón:** ${reason}`
+      );
+      return message.reply({ embeds: [embed] });
     } catch (err) {
-      console.error('prefix kick error:', err);
+      logger.error('[prefix/kick] Error ejecutando kick:', { error: err.message, stack: err.stack });
       return message.reply('❌ Error al expulsar al miembro.');
     }
   }

@@ -1,24 +1,23 @@
 const logger = require('../utils/logger');
-const fs = require('fs');
 const path = require('path');
 const { Events, EmbedBuilder } = require('discord.js');
 const { checkAndGrantBadges } = require('../utils/badgeManager');
 const { addCoins } = require('../services/economy/index').economyService;
 const { validateChannelForSending } = require('../utils/channelValidation');
 const { createBoostEmbed, createInfoEmbed } = require('../utils/embedFactory');
+const { readJsonSafe, writeJsonAtomic } = require('../utils/jsonStore');
+const { readConfig } = require('../utils/configCache');
 
 const dataDir = path.join(__dirname, '..', 'data');
 const boostsPath = path.join(dataDir, 'boosts.json');
-const cfgPath = path.join(__dirname, '..', 'config.json');
+
+let boostTrackerInterval = null;
 
 function readBoosts() {
-  try { return JSON.parse(fs.readFileSync(boostsPath, 'utf8')); } catch { return {}; }
+  return readJsonSafe(boostsPath, {});
 }
 function writeBoosts(obj) {
-  fs.writeFileSync(boostsPath, JSON.stringify(obj, null, 2), 'utf8');
-}
-function readConfig() {
-  try { return JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch { return {}; }
+  writeJsonAtomic(boostsPath, obj);
 }
 
 async function resolveBoostAnnouncementChannel(guild, config, type = 'added') {
@@ -192,8 +191,12 @@ module.exports = (client) => {
     }
   });
 
+  if (boostTrackerInterval) {
+    clearInterval(boostTrackerInterval);
+  }
+
   // ✅ RECOMPENSA SEMANAL AUTOMÁTICA (ejecuta cada hora)
-  setInterval(async () => {
+  boostTrackerInterval = setInterval(async () => {
     try {
       const boosts = readBoosts();
       const now = Date.now();
@@ -243,4 +246,12 @@ module.exports = (client) => {
   }, 60 * 60 * 1000); // cada hora
 };
 
+function stopBoostTracker() {
+  if (boostTrackerInterval) {
+    clearInterval(boostTrackerInterval);
+    boostTrackerInterval = null;
+  }
+}
+
 module.exports.resolveBoostAnnouncementChannel = resolveBoostAnnouncementChannel;
+module.exports.stopBoostTracker = stopBoostTracker;

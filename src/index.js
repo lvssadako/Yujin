@@ -40,7 +40,7 @@ client.commands = new Collection();
 client.slashCommands = new Collection();
 client.prefixCommands = new Collection();
 
-const { loadCommandRegistry, enableCommandWatcher, syncSlashCommands } = require('./loaders/commandLoader');
+const { loadCommandRegistry, enableCommandWatcher, disableCommandWatcher, syncSlashCommands } = require('./loaders/commandLoader');
 const loaderPaths = {
   commandsDir: path.join(__dirname, 'commands'),
   sharedDir: path.join(__dirname, 'commands_shared'),
@@ -100,11 +100,10 @@ client.once(Events.ClientReady, async () => {
   }
 });
 
-
-
-// Cargar handler de interacciones (¡PROFESIONAL!)
+// Cargar handler de interacciones
 require('./events/interactionCreate')(client);
 require('./events/messageCreate')(client);
+
 // Cargar sistemas de Seguridad y Auditoría
 try {
   require('./events/messageCreate_automod')(client);
@@ -127,6 +126,7 @@ try {
 } catch (e) {
   logger.error('Error cargando recordatorio de rachas', { error: e.message });
 }
+
 // Cargar y reprogramar timers de bump pendientes
 require('./events/bumpTimersLoader')(client);
 require('./services/giveaways/giveawayManager').init(client);
@@ -141,26 +141,26 @@ client.on(Events.MessageCreate, async (message) => {
   const args = message.content.slice(PREFIX.length).trim().split(/ +/);
   const commandName = args.shift().toLowerCase();
 
-const command = client.prefixCommands.get(commandName);
-if (!command) {
-  logger.warn('Comando prefix no encontrado', { commandName });
-  return;
-}
-
-logger.info('Prefix usado', { commandName, userTag: message.author.tag });
-try {
-  if (typeof command.executePrefix === 'function') {
-    await command.executePrefix(message, args, client);
-  } else if (typeof command.execute === 'function') {
-    await command.execute(message, args, client);
-  } else {
-    await message.reply('❌ Este comando no tiene función ejecutable.');
+  const command = client.prefixCommands.get(commandName);
+  if (!command) {
+    logger.warn('Comando prefix no encontrado', { commandName });
+    return;
   }
-  logger.info('Comando prefix ejecutado correctamente', { commandName });
-} catch (err) {
-  logger.error('Error ejecutando comando prefix', { commandName, error: err.message, stack: err.stack });
-  await message.reply('❌ Ocurrió un error al ejecutar este comando.');
-}
+
+  logger.info('Prefix usado', { commandName, userTag: message.author.tag });
+  try {
+    if (typeof command.executePrefix === 'function') {
+      await command.executePrefix(message, args, client);
+    } else if (typeof command.execute === 'function') {
+      await command.execute(message, args, client);
+    } else {
+      await message.reply('❌ Este comando no tiene función ejecutable.');
+    }
+    logger.info('Comando prefix ejecutado correctamente', { commandName });
+  } catch (err) {
+    logger.error('Error ejecutando comando prefix', { commandName, error: err.message, stack: err.stack });
+    await message.reply('❌ Ocurrió un error al ejecutar este comando.');
+  }
 });
 
 // Cargar evento guildMemberUpdate
@@ -201,12 +201,57 @@ try {
 }
 
 // Boost tracker
+let stopBoostTrackerFn = null;
 try {
-  require('./events/guildMemberUpdate_boostTracker')(client);
+  const boostTrackerModule = require('./events/guildMemberUpdate_boostTracker');
+  boostTrackerModule(client);
+  stopBoostTrackerFn = boostTrackerModule.stopBoostTracker;
   logger.info('Boost tracker cargado');
 } catch (e) {
   logger.error('Error cargando boost tracker', { error: e.message, stack: e.stack });
 }
+
+// Graceful Shutdown
+let isShuttingDown = false;
+async function gracefulShutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  logger.info(`Señal ${signal} recibida. Iniciando apagado controlado (Graceful Shutdown)...`);
+
+  try {
+    const { stopShopRotation } = require('./utils/badgeShop');
+    stopShopRotation();
+  } catch {}
+
+  try {
+    if (stopBoostTrackerFn) stopBoostTrackerFn();
+  } catch {}
+
+  try {
+    require('./events/reminderLoader').stop();
+  } catch {}
+
+  try {
+    require('./services/streakReminder').stop();
+  } catch {}
+
+  try {
+    disableCommandWatcher();
+  } catch {}
+
+  try {
+    await client.destroy();
+    logger.info('Sesión de Discord cerrada exitosamente.');
+  } catch (err) {
+    logger.error('Error cerrando sesión de Discord:', { error: err.message });
+  }
+
+  logger.info('Apagado completado de manera segura.');
+  process.exit(0);
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 // Login
 client.login(TOKEN);

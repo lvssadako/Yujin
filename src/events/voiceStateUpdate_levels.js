@@ -1,4 +1,5 @@
 const { Events } = require('discord.js');
+const logger = require('../utils/logger');
 const { updateTopRoles } = require('../commands/utility/toproles');
 const { handleLevelRoles } = require('../utils/levelRoles');
 const { readConfig } = require('../utils/configCache');
@@ -81,7 +82,13 @@ async function awardVoice(guild, userId, member, channelId, sinceMs) {
 
   const bonusText = roleBonusPercent ? ` +${roleBonusPercent}%` : '';
   const chanText = chanMult !== 1 ? `, canal x${chanMult}` : '';
-  console.log(`[levels DEBUG] ${member?.user?.username || userId} +${gained} XP (voice ${Math.floor(elapsedSec)}s${bonusText}${chanText})`);
+  logger.debug('[levels voice] Awarded voice XP', {
+    user: member?.user?.username || userId,
+    gained,
+    elapsedSec: Math.floor(elapsedSec),
+    bonusText,
+    chanText
+  });
 
   if (leveledUp) {
     if (typeof handleLevelRoles === 'function') {
@@ -154,7 +161,7 @@ function startTimer(guild, userId) {
       s.lastAwardAt = Date.now();
       startTimer(guild, userId);
     } catch (e) {
-      console.error('[levels voice] tick error:', e?.message || e);
+      logger.error('[levels voice] tick error:', { error: e?.message || e });
       s.lastAwardAt = Date.now();
       startTimer(guild, userId);
     }
@@ -192,7 +199,7 @@ module.exports = (client) => {
         startTimer(guild, userId);
       }
     } catch (err) {
-      console.error('levels voiceStateUpdate error:', err);
+      logger.error('[levels voice] voiceStateUpdate error:', { error: err.message, stack: err.stack });
     }
   });
 };
