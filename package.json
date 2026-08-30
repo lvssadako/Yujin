@@ -5,8 +5,8 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node --watch-path=src/commands --watch-path=src/events --watch-path=src/services --watch-path=src/utils --watch-path=src/constants --watch-path=src/loaders --watch-path=src/index.js --watch-preserve-output src/index.js",
-    "watch": "node --watch-path=src --watch-preserve-output src/index.js",
+    "dev": "node --watch-path=src/index.js --watch-path=src/events --watch-path=config/default.json --watch-path=package.json --watch-path=.env --watch-preserve-output src/index.js",
+    "watch": "node src/index.js",
     "test": "node --test \"src/utils/__tests__/*.test.js\""
   },
   "dependencies": {

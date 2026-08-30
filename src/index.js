@@ -40,11 +40,14 @@ client.commands = new Collection();
 client.slashCommands = new Collection();
 client.prefixCommands = new Collection();
 
-const { loadCommandRegistry, enableCommandWatcher } = require('./loaders/commandLoader');
+const { loadCommandRegistry, enableCommandWatcher, syncSlashCommands } = require('./loaders/commandLoader');
 const loaderPaths = {
   commandsDir: path.join(__dirname, 'commands'),
   sharedDir: path.join(__dirname, 'commands_shared'),
-  prefixDir: path.join(__dirname, 'prefixCommands')
+  prefixDir: path.join(__dirname, 'prefixCommands'),
+  servicesDir: path.join(__dirname, 'services'),
+  constantsDir: path.join(__dirname, 'constants'),
+  utilsDir: path.join(__dirname, 'utils')
 };
 const registry = loadCommandRegistry(loaderPaths);
 
@@ -58,7 +61,12 @@ const commandData = registry.commandData;
 
 // Iniciar detector de cambios en caliente (Hot Reload en tiempo real)
 if (process.env.DISABLE_HOT_RELOAD !== 'true') {
-  enableCommandWatcher(client, loaderPaths);
+  enableCommandWatcher(client, {
+    ...loaderPaths,
+    token: TOKEN,
+    clientId: CLIENT_ID,
+    guildId: GUILD_ID
+  });
 }
 
 // Registrar comandos cuando el bot esté listo
@@ -79,20 +87,19 @@ client.once(Events.ClientReady, async () => {
   }
 
   try {
-    logger.info('Registrando comandos slash');
-    const rest = new REST({ version: '10' }).setToken(TOKEN);
-
-    // BORRAR comandos globales previos
-    await rest.put(Routes.applicationCommands(CLIENT_ID), { body: [] });
-    logger.info('Comandos globales eliminados');
-
-    // REGISTRAR en guild (instantáneo)
-    await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commandData });
-    logger.info('Comandos registrados en guild', { count: commandData.length });
+    logger.info('Verificando y sincronizando comandos slash');
+    await syncSlashCommands({
+      token: TOKEN,
+      clientId: CLIENT_ID,
+      guildId: GUILD_ID,
+      commandData,
+      force: false
+    });
   } catch (error) {
     logger.error('Error registrando comandos', { error: error.message, stack: error.stack });
   }
 });
+
 
 
 // Cargar handler de interacciones (¡PROFESIONAL!)

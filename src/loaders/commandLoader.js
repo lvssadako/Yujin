@@ -1,5 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const crypto = require('node:crypto');
+const { REST, Routes } = require('discord.js');
 const logger = require('../utils/logger');
 
 function getAllJsFiles(dir) {
@@ -25,6 +27,14 @@ function purgeFileCache(filePath) {
     const resolved = require.resolve(filePath);
     delete require.cache[resolved];
   } catch {}
+}
+
+function purgeDirectoryCache(dir) {
+  if (!fs.existsSync(dir)) return;
+  const files = getAllJsFiles(dir);
+  for (const f of files) {
+    purgeFileCache(f);
+  }
 }
 
 function loadCommandRegistry({
@@ -111,6 +121,14 @@ function reloadCommandRegistry(client, paths = {}) {
   const commandsDir = paths.commandsDir || path.join(__dirname, '..', 'commands');
   const sharedDir = paths.sharedDir || path.join(__dirname, '..', 'commands_shared');
   const prefixDir = paths.prefixDir || path.join(__dirname, '..', 'prefixCommands');
+  const servicesDir = paths.servicesDir || path.join(__dirname, '..', 'services');
+  const constantsDir = paths.constantsDir || path.join(__dirname, '..', 'constants');
+  const utilsDir = paths.utilsDir || path.join(__dirname, '..', 'utils');
+
+  // Purge dependencies cache so commands pick up new services/constants
+  purgeDirectoryCache(servicesDir);
+  purgeDirectoryCache(constantsDir);
+  purgeDirectoryCache(utilsDir);
 
   const registry = loadCommandRegistry({
     commandsDir,
@@ -135,45 +153,138 @@ function reloadCommandRegistry(client, paths = {}) {
   return registry;
 }
 
-function enableCommandWatcher(client, paths = {}) {
-  const commandsDir = paths.commandsDir || path.join(__dirname, '..', 'commands');
-  const prefixDir = paths.prefixDir || path.join(__dirname, '..', 'prefixCommands');
-  const sharedDir = paths.sharedDir || path.join(__dirname, '..', 'commands_shared');
+async function syncSlashCommands({ token, clientId, guildId, commandData, force = false }) {
+  if (!token || !clientId || !guildId || !Array.isArray(commandData)) {
+    return { synced: false, error: 'Missing credentials or commandData' };
+  }
 
-  const watchDirs = [commandsDir, prefixDir, sharedDir].filter(d => fs.existsSync(d));
+  const hashFile = path.join(__dirname, '..', 'data', '.commands_hash');
+  const currentHash = crypto
+    .createHash('sha256')
+    .update(JSON.stringify(commandData))
+    .digest('hex');
+
+  let cachedHash = '';
+  try {
+    if (fs.existsSync(hashFile)) {
+      cachedHash = fs.readFileSync(hashFile, 'utf8').trim();
+    }
+  } catch {}
+
+  if (!force && cachedHash === currentHash) {
+    logger.info('[SlashSync] Estructura de comandos sin cambios. Sincronización con Discord omitida para evitar rate limits.', { count: commandData.length });
+    return { synced: false, reason: 'unchanged', count: commandData.length };
+  }
+
+  try {
+    logger.info('[SlashSync] Sincronizando comandos slash con Discord API...', { count: commandData.length, force });
+    const rest = new REST({ version: '10' }).setToken(token);
+
+    await rest.put(Routes.applicationCommands(clientId), { body: [] });
+    await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: commandData });
+
+    try {
+      const dataDir = path.dirname(hashFile);
+      fs.mkdirSync(dataDir, { recursive: true });
+      fs.writeFileSync(hashFile, currentHash, 'utf8');
+    } catch {}
+
+    logger.info('[SlashSync] Comandos slash registrados en Discord con éxito.', { count: commandData.length });
+    return { synced: true, count: commandData.length };
+  } catch (error) {
+    logger.error('[SlashSync] Error registrando comandos en Discord', { error: error.message, stack: error.stack });
+    return { synced: false, error: error.message };
+  }
+}
+
+function shouldTriggerHotReload(filename) {
+  if (!filename || typeof filename !== 'string') return false;
+
+  // Only watch javascript files
+  if (!filename.endsWith('.js')) return false;
+
+  // Ignore test files and test suites
+  if (filename.endsWith('.test.js') || filename.endsWith('.spec.js') || filename.includes('__tests__')) {
+    return false;
+  }
+
+  // Ignore temporary / editor swap / lock / hidden files
+  const base = path.basename(filename);
+  if (base.startsWith('.') || base.startsWith('~') || base.startsWith('#') || base.endsWith('~') || base.endsWith('.swp')) {
+    return false;
+  }
+
+  return true;
+}
+
+function enableCommandWatcher(client, options = {}) {
+  const commandsDir = options.commandsDir || path.join(__dirname, '..', 'commands');
+  const prefixDir = options.prefixDir || path.join(__dirname, '..', 'prefixCommands');
+  const sharedDir = options.sharedDir || path.join(__dirname, '..', 'commands_shared');
+  const servicesDir = options.servicesDir || path.join(__dirname, '..', 'services');
+  const constantsDir = options.constantsDir || path.join(__dirname, '..', 'constants');
+  const utilsDir = options.utilsDir || path.join(__dirname, '..', 'utils');
+
+  const token = options.token || process.env.TOKEN;
+  const clientId = options.clientId || process.env.CLIENT_ID;
+  const guildId = options.guildId || process.env.GUILD_ID;
+
+  const watchDirs = [commandsDir, prefixDir, sharedDir, servicesDir, constantsDir, utilsDir].filter(d => fs.existsSync(d));
   let reloadTimeout = null;
 
   for (const dir of watchDirs) {
     try {
       fs.watch(dir, { recursive: true }, (eventType, filename) => {
-        if (!filename || (!filename.endsWith('.js') && !filename.endsWith('.json'))) return;
+        if (!shouldTriggerHotReload(filename)) return;
 
         if (reloadTimeout) clearTimeout(reloadTimeout);
-        reloadTimeout = setTimeout(() => {
+        reloadTimeout = setTimeout(async () => {
           try {
-            const registry = reloadCommandRegistry(client, paths);
-            logger.info('[HotReload] Comandos recargados automáticamente tras detectar cambios', {
+            const registry = reloadCommandRegistry(client, {
+              commandsDir,
+              prefixDir,
+              sharedDir,
+              servicesDir,
+              constantsDir,
+              utilsDir
+            });
+
+            logger.info('[HotReload] Código recargado automáticamente en caliente (sin reiniciar proceso)', {
               changedFile: filename,
               commandsCount: registry.commands.size,
               prefixCount: registry.prefixCommands.size
             });
+
+            if (token && clientId && guildId && registry.commandData) {
+              await syncSlashCommands({
+                token,
+                clientId,
+                guildId,
+                commandData: registry.commandData,
+                force: false
+              });
+            }
           } catch (err) {
-            logger.error('[HotReload] Error al autorecargar comandos', { error: err.message });
+            logger.error('[HotReload] Error al autorecargar código en caliente', { error: err.message, stack: err.stack });
           }
-        }, 300);
+        }, 350);
       });
     } catch (err) {
       logger.warn('[HotReload] No se pudo inicializar watcher en directorio', { dir, error: err.message });
     }
   }
 
-  logger.info('[HotReload] Watcher de comandos activo en tiempo real.');
+  logger.info('[HotReload] Watcher en tiempo real activo para comandos, servicios, constantes y utilidades (Hot Reload sin reinicio de bot).');
 }
 
 module.exports = {
   getAllJsFiles,
+  shouldTriggerHotReload,
   loadCommandRegistry,
   reloadCommandRegistry,
-  enableCommandWatcher
+  enableCommandWatcher,
+  syncSlashCommands
 };
+
+
 
