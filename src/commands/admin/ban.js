@@ -48,8 +48,13 @@ module.exports = {
             }
 
             const memberToBan = await guild.members.fetch(userToBan.id).catch(() => null);
-            if (memberToBan && memberToBan.roles.highest.position >= me.roles.highest.position) {
-                return interaction.editReply('❌ No puedo banear a ese miembro por jerarquía');
+            if (memberToBan) {
+                if (memberToBan.roles.highest.position >= me.roles.highest.position) {
+                    return interaction.editReply('❌ No puedo banear a ese miembro por jerarquía');
+                }
+                if (interaction.user.id !== guild.ownerId && memberToBan.roles.highest.position >= interaction.member.roles.highest.position) {
+                    return interaction.editReply('❌ No puedes banear a alguien con un rol igual o superior al tuyo');
+                }
             }
 
             await guild.bans.create(userToBan.id, {

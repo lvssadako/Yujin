@@ -59,6 +59,9 @@ module.exports = {
       const me = await guild.members.fetchMe();
       if (!me.permissions.has('KickMembers')) return interaction.reply({ content: '❌ No tengo permiso de expulsar', ephemeral: true });
       if (member.roles.highest.position >= me.roles.highest.position) return interaction.reply({ content: '❌ No puedo expulsar a ese miembro por jerarquía', ephemeral: true });
+      if (interaction.user.id !== guild.ownerId && member.roles.highest.position >= interaction.member.roles.highest.position) {
+        return interaction.reply({ content: '❌ No puedes expulsar a alguien con un rol igual o superior al tuyo', ephemeral: true });
+      }
 
       await member.kick(`${reason} — por ${interaction.user.tag}`);
       await interaction.reply({ content: `✅ Expulsado: ${member.user.tag} (${member.id})\nRazón: ${reason}` });

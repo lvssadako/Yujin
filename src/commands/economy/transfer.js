@@ -26,6 +26,9 @@ module.exports = {
     if (!destinatario || destinatario.id === userId) {
       return interaction.editReply('❌ Debes elegir a otro usuario como destinatario.');
     }
+    if (destinatario.bot) {
+      return interaction.editReply('❌ No puedes transferir monedas a un bot.');
+    }
     if (cantidad == null || cantidad < 1) {
       return interaction.editReply('❌ La cantidad debe ser mayor a 0.');
     }
@@ -75,6 +78,9 @@ module.exports = {
     }
     if (!targetUser || targetUser.id === message.author.id) {
       return message.reply('❌ Debes elegir a otro usuario como destinatario.');
+    }
+    if (targetUser.bot) {
+      return message.reply('❌ No puedes transferir monedas a un bot.');
     }
     if (isNaN(cantidad) || cantidad < 1) {
       return message.reply('❌ La cantidad debe ser mayor a 0.');
