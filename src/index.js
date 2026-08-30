@@ -108,6 +108,12 @@ try {
 } catch (e) {
   logger.error('Error cargando recordatorios', { error: e.message });
 }
+
+try {
+  require('./services/streakReminder').init(client);
+} catch (e) {
+  logger.error('Error cargando recordatorio de rachas', { error: e.message });
+}
 // Cargar y reprogramar timers de bump pendientes
 require('./events/bumpTimersLoader')(client);
 require('./services/giveaways/giveawayManager').init(client);
