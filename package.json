@@ -10,9 +10,9 @@
     "test": "node --test \"src/utils/__tests__/*.test.js\""
   },
   "dependencies": {
-    "@napi-rs/canvas": "^0.1.81",
+    "@napi-rs/canvas": "^1.0.8",
     "discord.js": "^14.11.0",
-    "dotenv": "^16.4.5",
+    "dotenv": "^17.4.2",
     "winston": "^3.19.0",
     "zod": "^4.4.3"
   }
