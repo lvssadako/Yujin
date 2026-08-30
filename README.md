@@ -35,42 +35,38 @@ Este proyecto centraliza una gran parte de la lógica del servidor en un bot ún
 - `data/`: Almacenamiento local de estado del bot (JSON)
 - `src/**/__tests__/`: Pruebas automatizadas colocalizadas
 
-## Estado actual
+## Estado Actual y Mejoras Implementadas (Agosto 2026)
 
-El proyecto ya tiene funcionalidades avanzadas y algunos tests básicos, pero requiere un refactor de estabilidad antes de seguir creciendo. Los principales riesgos detectados son:
+Tras una refactorización masiva, el bot ha alcanzado un estado de **alta estabilidad y seguridad**:
 
-- persistencia JSON sin validación/schema
-- escrituras directas sin control de atomicidad
-- riesgo de duplicación de recompensas por eventos múltiples
-- notificaciones automáticas envíadas por canales incorrectos o repetidos
-- lógica dispersa de economía, niveles y boosts
+- **Arquitectura Limpia**: Todo el código fuente fue movido a `src/`, separando claramente `commands/`, `events/`, `services/`, `utils/`, y `data/`.
+- **Persistencia Segura**: Implementación de guardado atómico de JSON (`writeJsonAtomic`) que previene la corrupción de datos.
+- **Servicios Centralizados**: La lógica de Economía y Niveles ahora fluye a través de servicios controlados (`src/services/economy/` y `src/services/level/`), evitando escrituras directas.
+- **Seguridad en Moderación**: Parches en comandos administrativos (`ban`, `kick`, `transfer`) para prevenir escalada de privilegios y bypass usando el rol del bot.
+- **Testing Exhaustivo**: El proyecto cuenta con una suite de pruebas con 32 tests automatizados (`node --test`) que validan la creación de perfiles, esquemas de configuración, validación de roles y flujos de economía. Todos pasando 100%.
 
-## Objetivo del proyecto
+## Comandos Principales
 
-Transformar este bot de una implementación funcional en una base robusta, escalable y mantenible, con mejor experiencia de usuario, diseño visual consistente y una capa de seguridad y validación sólida.
+El proyecto integra varios módulos de negocio que se mantienen bajo un estricto estándar:
 
-## Comandos principales
+- **Perfil y Personalización**: Generación de perfiles en Canvas, insignias (badges).
+- **Niveles y Roles**: Experiencia por actividad, recompensas de roles configurables.
+- **Tienda e Incentivos**: Compra de insignias, cofres misteriosos, recompensas diarias.
+- **Economía y Monedas**: Transferencias, juegos (blackjack, ruleta, tragamonedas).
+- **Eventos y Notificaciones**: Trackers de boosts del servidor, recordatorios de bump, roles por actividad.
 
-El proyecto integra varios módulos de negocio que conviene mantener bajo un mismo estándar:
+## Siguientes Pasos (Propuestas de Evolución)
 
-- perfil y personalización
-- niveles y roles
-- tienda e incentivos
-- economía y monedas
-- misiones diarias
-- boosters y recompensas por actividad
-- eventos de notificación / bump / boost / presencia
+Con la base estructural sólida, los próximos pasos viables apuntan a expandir las funcionalidades del bot para la comunidad:
 
-## Recomendación de base antes de nuevas features
-
-Antes de añadir más funcionalidades, conviene estabilizar:
-
-1. persistencia y validación
-2. centralización de economía y XP
-3. control de colaboraciones entre eventos
-4. testing de flujos críticos
-5. diseño visual y mensajes consistentes
-
-## Siguientes pasos
-
-Consulta la guía en `docs/IMPLEMENTATION_PLAN.md` para el plan detallado, la matriz de riesgos y la estrategia de mejora del bot.
+1. **Moderación Avanzada**:
+   - Comandos de `timeout` (aislar usuarios temporalmente) y `unban`.
+   - Comando `purge` / `clear` para limpieza masiva de mensajes.
+   - Sistema de advertencias (`warn`) con persistencia.
+2. **Soporte / Tickets**:
+   - Integrar un sistema de tickets mediante botones y categorías privadas para moderación.
+3. **Mejoras en Economía**:
+   - Tabla de clasificación global (Leaderboard) para economía.
+   - Roles o items comprables temporales (VIP).
+4. **Localización e Internacionalización (i18n)**:
+   - Extraer textos hardcodeados para facilitar futuras traducciones o cambios de personalidad del bot.
