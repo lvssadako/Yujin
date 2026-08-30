@@ -122,10 +122,15 @@ function getUserStreakStatus(guildId, userId) {
     daysToNext = nextTier.minDays - streakDays;
   }
 
-  // Resolver fondo global
-  let effectiveBgUrl = g.streakBgUrl || '';
-  if (!effectiveBgUrl && g.streakTemplate && STREAK_TEMPLATES[g.streakTemplate]) {
-    effectiveBgUrl = STREAK_TEMPLATES[g.streakTemplate].url;
+  // Resolver fondo global dinámicamente
+  let effectiveBgUrl = '';
+  const tplKey = g.streakTemplate || 'inferno';
+  if (tplKey === 'none') {
+    effectiveBgUrl = '';
+  } else if (STREAK_TEMPLATES[tplKey]) {
+    effectiveBgUrl = STREAK_TEMPLATES[tplKey].url;
+  } else if (tplKey === 'custom' || g.streakBgUrl) {
+    effectiveBgUrl = g.streakBgUrl || '';
   }
 
   return {
@@ -144,7 +149,7 @@ function getUserStreakStatus(guildId, userId) {
     streakBgUrl: effectiveBgUrl,
     streakBgOpacity: typeof g.streakBgOpacity === 'number' ? g.streakBgOpacity : 0.65,
     streakAccent: g.streakAccent || '',
-    streakTemplate: g.streakTemplate || 'inferno'
+    streakTemplate: tplKey
   };
 }
 
@@ -154,15 +159,16 @@ function setGlobalStreakCustomization(userId, updates = {}) {
 
   if (typeof updates.streakTemplate === 'string') {
     g.streakTemplate = updates.streakTemplate;
-    if (updates.streakTemplate === 'none') {
+    if (updates.streakTemplate !== 'custom') {
       g.streakBgUrl = '';
-    } else if (STREAK_TEMPLATES[updates.streakTemplate]) {
-      g.streakBgUrl = STREAK_TEMPLATES[updates.streakTemplate].url;
     }
   }
 
   if (typeof updates.streakBgUrl === 'string') {
     g.streakBgUrl = updates.streakBgUrl;
+    if (updates.streakBgUrl) {
+      g.streakTemplate = 'custom';
+    }
   }
 
   if (typeof updates.streakAccent === 'string') {

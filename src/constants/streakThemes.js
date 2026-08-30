@@ -37,7 +37,7 @@ const STREAK_TEMPLATES = {
   },
   'sakura_blaze': {
     name: '🌸 Sakura Flame',
-    url: 'https://images.unsplash.com/photo-1528164344705-475426879c0d?q=80&w=1000',
+    url: 'https://images.unsplash.com/photo-1522383225653-ed111181a951?q=80&w=1000',
     accent: '#FF78AE',
     description: 'Pétalos de cerezo con mística suave'
   }
