@@ -1,0 +1,39 @@
+const { calculateRiskScore } = require('../utils/policyEngine');
+const anomaly = require('../utils/anomalyDetector');
+const { requestMFA } = require('../utils/mfa');
+const { sendToLogChannel, sendToAlertChannel } = require('../utils/logUtils');
+
+async function onCriticalAction(ctx) {
+  ctx.isUnusualHour = anomaly.isUnusualHour(ctx.user, ctx.time);
+  ctx.isFirstTimeAction = anomaly.isFirstTimeAction(ctx.user, ctx.action);
+  ctx.isUnusualDay = anomaly.isUnusualDay(ctx.user, ctx.time);
+  ctx.isAnomalousSpeed = anomaly.isAnomalousSpeed(ctx.user, ctx.recentActions);
+
+  const score = calculateRiskScore(ctx);
+
+  // Loguea toda acción crítica
+  await sendToLogChannel(ctx.bot, `🔔 Acción crítica: ${ctx.action} por ${ctx.user.user?.tag || ctx.user.tag} (score: ${score})`);
+
+  if (score > 50) {
+    await sendToAlertChannel(ctx.bot, `🚨 Auto-ban ejecutado para ${ctx.user.user?.tag || ctx.user.tag} (score: ${score})`);
+    // Aquí deberías ejecutar el auto-ban real si aplica
+    if (ctx.bot.ban) {
+      await ctx.bot.ban(ctx.user.id, 'Riesgo extremo detectado');
+    }
+    return;
+  }
+  if (score > 25) {
+    const approved = await requestMFA(ctx.bot, ctx.user, ctx.action, score, ctx.config.mfaChannelId);
+    if (!approved) {
+      await sendToLogChannel(ctx.bot, `⛔ Acción bloqueada por MFA para ${ctx.user.user?.tag || ctx.user.tag} (score: ${score})`);
+      return;
+    }
+    await sendToLogChannel(ctx.bot, `✅ Acción aprobada por MFA para ${ctx.user.user?.tag || ctx.user.tag} (score: ${score})`);
+  }
+  if (score > 15) {
+    await sendToLogChannel(ctx.bot, `🟠 Logging intensivo para ${ctx.user.user?.tag || ctx.user.tag} (score: ${score})`);
+  }
+  await ctx.executeAction();
+}
+
+module.exports = { onCriticalAction };

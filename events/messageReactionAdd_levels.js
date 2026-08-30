@@ -1,10 +1,13 @@
+const logger = require('../src/utils/logger');
 const { Events } = require('discord.js');
 const { handleLevelRoles } = require('../utils/levelRoles');
 const { updateTopRoles } = require('../commands/toproles');
 const { readConfig } = require('../utils/configCache');
 const { readLevels, writeLevels, ensureUserData } = require('../utils/levelStore');
+const { updateMissionProgress } = require('../utils/dailyMissions');
+const { addCoins } = require('../utils/economy');
 
-function xpToNext(level) { return 100 * Math.pow(level + 1, 2); }
+function xpToNext(level) { return Math.round(200 * Math.pow(level + 1, 1.4)); }
 
 function resolveLevelUpCfg(cfg) {
   const group = cfg.levelUp || cfg.levels || {};
@@ -50,24 +53,26 @@ module.exports = (client) => {
       const last = reactionCooldowns.get(key) || 0;
       if (now - last < 60_000) return;
 
-      const base = Math.floor(Math.random() * 3) + 2;
+      const base = Math.floor(Math.random() * 6) + 5;
 
       const cfg = readConfig();
       const bonuses = cfg.roleXpBonuses || {};
       const member = await message.guild.members.fetch(user.id).catch(() => null);
 
-      let totalBonusPercent = 0;
+      let totalBonusDecimal = 0; // ✅ Cambiar de totalBonusPercent
+      
       if (member?.roles?.cache?.size) {
         for (const [roleId] of member.roles.cache) {
-          const b = bonuses[roleId];
-          if (b !== undefined && b !== null) {
-            const n = Number(b);
-            if (!isNaN(n) && n > 0) totalBonusPercent += n;
-          }
+          if (!(roleId in bonuses)) continue;
+          let b = Number(bonuses[roleId]);
+          if (isNaN(b) || b <= 0) continue;
+          // ✅ Convertir si es porcentaje
+          if (b > 1) b = b / 100;
+          totalBonusDecimal += b;
         }
       }
 
-      const multiplier = 1 + (totalBonusPercent / 100);
+      const multiplier = 1 + totalBonusDecimal; // ✅ Ya no dividir por 100
       const gained = Math.round(base * multiplier);
 
       const levels = readLevels();
@@ -78,16 +83,30 @@ module.exports = (client) => {
       const oldLevel = data.level;
       data.xp += gained;
 
-      let leveledUp = false;
+      updateMissionProgress(message.guild, user.id, 'reactions', 1);
+      updateMissionProgress(message.guild, user.id, 'xp_gain', gained);
+
+      let leveledUpCount = 0; // ✅ Cambiar a contador
       while (data.xp >= xpToNext(data.level)) {
+        data.xp -= xpToNext(data.level);
         data.level++;
-        leveledUp = true;
+        leveledUpCount++;
+      }
+      const leveledUp = leveledUpCount > 0;
+
+      // ✅ Premio de monedas por nivel
+      if (leveledUpCount > 0) {
+        addCoins(message.guildId, user.id, 1000 * leveledUpCount);
       }
 
       await writeLevels(levels);
       reactionCooldowns.set(key, now);
 
-      console.log(`[levels DEBUG] ${user.username} +${gained} XP (reaction, base ${base}${totalBonusPercent ? ` +${totalBonusPercent}%` : ''})`);
+      const bonusPct = Math.round(totalBonusDecimal * 100); // ✅ Para el log
+      logger.info(
+        `[reaction] ${user.username} +${gained} XP ` +
+        `(base ${base}${bonusPct > 0 ? ` +${bonusPct}% roles` : ''} = x${multiplier.toFixed(2)})`
+      );
 
       if (leveledUp && typeof handleLevelRoles === 'function') {
         try {
@@ -107,10 +126,25 @@ module.exports = (client) => {
         const levelRewards = cfg.levelRewards || {};
         const rewardRoleId = levelRewards[data.level];
         let rewardRole = null;
-        
         if (rewardRoleId) {
           rewardRole = await message.guild.roles.fetch(rewardRoleId).catch(() => null);
+          if (rewardRole && member) {
+            try {
+              await member.roles.add(rewardRole.id).catch(() => {});
+              if (cfg.levelRewardsExclusive) {
+                const allRewardIds = new Set(Object.values(levelRewards).filter(Boolean));
+                for (const rid of allRewardIds) {
+                  if (rid !== rewardRoleId && member.roles.cache.has(rid)) {
+                    await member.roles.remove(rid).catch(() => {});
+                  }
+                }
+              }
+            } catch (e) {
+              logger.warn('[levels reaction] No se pudo asignar rol de recompensa:', e?.message || e);
+            }
+          }
         }
+
 
         const ctx = {
           mention: lu.mention ? `<@${uid}>` : user.username,
@@ -127,16 +161,20 @@ module.exports = (client) => {
         let text;
         if (rewardRole) {
           const rewardMsg = cfg.levelRewardMessage || 
-            '🎉 {mention} alcanzó el nivel **{level}** y desbloqueó el rol {role}!';
+            '<a:Lco:1244072847551238244> {mention} alcanzó el nivel **{level}** y desbloqueó el rol {role}!';
           text = formatTemplate(rewardMsg, ctx);
         } else {
           text = formatTemplate(lu.message, ctx);
         }
 
         try {
-          await target.send({ content: text });
+          await target.send({
+            content: text,
+            // ✅ Ping solo al usuario (uid), sin ping a roles
+            allowedMentions: { users: [userId] }
+          });
         } catch (e) {
-          console.error('[levels reaction] Error enviando anuncio de level up:', e?.message || e);
+          logger.error('[levels reaction] Error enviando anuncio de level up:', e?.message || e);
         }
       }
 
@@ -144,7 +182,7 @@ module.exports = (client) => {
         try { await updateTopRoles(message.guild); } catch {}
       }
     } catch (err) {
-      console.error('[REACTION] Error:', err);
+      logger.error('[REACTION] Error:', err);
     }
   });
 };

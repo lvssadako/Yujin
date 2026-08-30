@@ -1,3 +1,4 @@
+const logger = require('../src/utils/logger');
 // ...existing code...
 const fs = require('fs');
 const path = require('path');
@@ -19,7 +20,7 @@ module.exports = (client) => {
           const colorIds = Object.values(cfg.colors).map(c => c.roleId).filter(Boolean);
           if (colorIds.length > 0) {
             await newMember.roles.remove(colorIds).catch(() => {});
-            console.log(`Removed color roles from ${newMember.user.tag} after losing VIP.`);
+            logger.info(`Removed color roles from ${newMember.user.tag} after losing VIP.`);
           }
         }
       }
@@ -36,7 +37,7 @@ module.exports = (client) => {
         // Determinar cuál id usar según el evento
         const targetId = (!hadBoost && hasBoost) ? addedId : (hadBoost && !hasBoost) ? removedId : null;
         if (!targetId) {
-          console.warn('[guildMemberUpdate] No hay canal de log de boost configurado en config.json');
+          logger.warn('[guildMemberUpdate] No hay canal de log de boost configurado en config.json');
           return;
         }
 
@@ -46,7 +47,7 @@ module.exports = (client) => {
           logChannel = await newMember.guild.channels.fetch(targetId).catch(() => null);
         }
         if (!logChannel) {
-          console.warn(`[guildMemberUpdate] Canal de log de boost no encontrado: ${targetId}`);
+          logger.warn(`[guildMemberUpdate] Canal de log de boost no encontrado: ${targetId}`);
           return;
         }
 
@@ -81,12 +82,12 @@ module.exports = (client) => {
         }
 
         await logChannel.send({ embeds: [embed] }).catch(err => {
-          console.error('Error enviando log de boost:', err);
+          logger.error('Error enviando log de boost:', err);
         });
       }
 
     } catch (err) {
-      console.error('guildMemberUpdate handler error:', err);
+      logger.error('guildMemberUpdate handler error:', err);
     }
   });
 };

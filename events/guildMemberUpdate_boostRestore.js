@@ -1,3 +1,4 @@
+const logger = require('../src/utils/logger');
 const { Events } = require('discord.js');
 const { readProfiles, writeProfiles, ensureUser } = require('../utils/profileStore');
 
@@ -15,7 +16,7 @@ module.exports = (client) => {
 
       // Perdió el boost
       if (wasBooster && !isBooster) {
-        console.log(`[boostRestore] ${newMember.user.tag} perdió boost, guardando perfil personalizado`);
+        logger.info(`[boostRestore] ${newMember.user.tag} perdió boost, guardando perfil personalizado`);
         
         // Guardar la configuración actual en un backup
         user.boosterBackup = {
@@ -43,11 +44,11 @@ module.exports = (client) => {
 
       // Ganó/recuperó el boost
       if (!wasBooster && isBooster) {
-        console.log(`[boostRestore] ${newMember.user.tag} ganó boost`);
+        logger.info(`[boostRestore] ${newMember.user.tag} ganó boost`);
         
         // Restaurar backup si existe
         if (user.boosterBackup) {
-          console.log(`[boostRestore] Restaurando perfil personalizado de ${newMember.user.tag}`);
+          logger.info(`[boostRestore] Restaurando perfil personalizado de ${newMember.user.tag}`);
           
           user.title = user.boosterBackup.title || '';
           user.accent = user.boosterBackup.accent || '#e94560';
@@ -69,7 +70,7 @@ module.exports = (client) => {
         }
       }
     } catch (err) {
-      console.error('[boostRestore] Error:', err);
+      logger.error('[boostRestore] Error:', err);
     }
   });
 };

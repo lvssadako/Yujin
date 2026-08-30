@@ -1,3 +1,4 @@
+const logger = require('../src/utils/logger');
 const fs = require('fs');
 const path = require('path');
 
@@ -47,7 +48,7 @@ async function handleLevelRoles(member, currentLevel) {
         // Remove all current level roles
         if (memberLevelRoles.size > 0) {
             await member.roles.remove(memberLevelRoles);
-            console.log(`[ROLES] Removed ${memberLevelRoles.size} level roles from ${member.user.tag}`);
+            logger.info(`[ROLES] Removed ${memberLevelRoles.size} level roles from ${member.user.tag}`);
         }
 
         // Add new role if they qualify
@@ -55,12 +56,12 @@ async function handleLevelRoles(member, currentLevel) {
             const role = await member.guild.roles.fetch(highestQualifiedRoleId);
             if (role) {
                 await member.roles.add(role);
-                console.log(`[ROLES] Added level ${currentLevel} role to ${member.user.tag}`);
+                logger.info(`[ROLES] Added level ${currentLevel} role to ${member.user.tag}`);
             }
         }
 
     } catch (err) {
-        console.error('[ROLES] Error managing level roles:', err);
+        logger.error('[ROLES] Error managing level roles:', err);
     }
 }
 

@@ -1,0 +1,323 @@
+const { SlashCommandBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, ComponentType } = require('discord.js');
+const { readProfiles, writeProfiles, ensureUser } = require('../../../utils/profileStore');
+const { readConfig } = require('../../../utils/configCache');
+const { getBalance, addCoins } = require('../../../utils/economy');
+const { getDaily, claimDaily } = require('../../../utils/dailyMissions');
+const { readLevels, writeLevels, ensureUserData, xpToNext } = require('../../../utils/levelStore');
+
+function bar10(progress, target) {
+  const pct = target > 0 ? Math.floor((progress / target) * 100) : 0;
+  const filled = Math.min(10, Math.floor(pct / 10));
+  return `[${'█'.repeat(filled)}${'░'.repeat(10 - filled)}] ${pct}%`;
+}
+
+function calcTotalRewards(missions) {
+  const totals = { coins: 0, xp: 0, gems: 0 };
+  for (const m of missions) {
+    if (m.reward.coins) totals.coins += m.reward.coins;
+    if (m.reward.xp) totals.xp += m.reward.xp;
+    if (m.reward.gems) totals.gems += m.reward.gems;
+  }
+  return totals;
+}
+
+function fmtTime(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${sec}s`;
+  return `${sec}s`;
+}
+
+module.exports = {
+  data: new SlashCommandBuilder()
+    .setName('daily')
+    .setDescription('Reclama tu recompensa diaria y revisa tus misiones diarias'),
+  async execute(interaction) {
+    // Usar flags: 64 para mensajes efímeros (evita warning de deprecated)
+    await (interaction.deferReply?.({ flags: 64 }) || interaction.deferReply?.());
+    const cfg = readConfig();
+    const tz = cfg.timezone || 0;
+
+    // ✅ Calcular "hoy" y próximo reset con la misma lógica
+    const now = Date.now();
+    const today = Math.floor((now + tz * 3600000) / 86400000);
+    const nextDayStart = (today + 1) * 86400000 - tz * 3600000;
+    const msLeft = Math.max(0, nextDayStart - now);
+
+    // Perfil y racha
+    const profiles = readProfiles();
+    const p = ensureUser(profiles, interaction.guildId, interaction.user.id);
+    const lastDay = p.lastDailyDay || 0;
+    const isConsecutive = lastDay === today - 1;
+    const canClaimDaily = lastDay !== today;
+
+    // Misiones (y se generan si no hay)
+    const missions = getDaily(interaction.guild, interaction.user.id, tz);
+
+    // Balance
+    const bal = getBalance(interaction.guildId, interaction.user.id);
+
+    // Encabezado "Daily"
+    const dailyStatus = canClaimDaily
+      ? '✅ **Daily: disponible ahora**'
+      : `⏳ **Daily: disponible en ${fmtTime(msLeft)}**`;
+    const missionsStatus = `🗓️ **Se renuevan en ${fmtTime(msLeft)}**`;
+    const totalRewards = calcTotalRewards(missions);
+    const rewardsText = [
+      totalRewards.coins > 0 ? `${totalRewards.coins} 🪙` : '',
+      totalRewards.xp > 0 ? `${totalRewards.xp} XP` : '',
+      totalRewards.gems > 0 ? `${totalRewards.gems} 💎` : ''
+    ].filter(r => r).join(' • ');
+
+    // Cuerpo de misiones
+    let missionsText = '';
+    let completed = 0;
+    for (const m of missions) {
+      const done = m.completed;
+      completed += done ? 1 : 0;
+      const check = done ? '✅' : '⏳';
+      const progress = `${m.progress || 0}/${m.target}`;
+      const rewards = Object.entries(m.reward)
+        .map(([k, v]) => (k === 'coins' ? `${v} 🪙` : k === 'xp' ? `${v} XP` : k === 'gems' ? `${v} 💎` : `${v} ${k}`))
+        .join(' • ');
+
+      missionsText += `${check} **${m.desc}** ${bar10(m.progress || 0, m.target)} ${progress}\n└─ 💰 ${rewards}\n`;
+    }
+
+    // Embed final mejorado
+    const embed = new EmbedBuilder()
+      .setColor(canClaimDaily ? 0xf8b500 : 0x5865f2)
+      .setTitle('📅 Daily Panel')
+      .addFields(
+        { name: dailyStatus, value: `Balance: **${bal.coins} 🪙**`, inline: false },
+        { name: `📋 Misiones (${completed}/${missions.length} completadas)`, value: missionsText || 'Cargando...', inline: false },
+        { name: '🎁 Recompensas Totales', value: rewardsText || 'Sin recompensas', inline: false },
+        { name: missionsStatus, value: '━━━━━━━━━━━━━━━━━━', inline: false }
+      )
+      .setTimestamp();
+
+    // Botones: reclamar daily + reclamar misiones listas
+    const buttons = [];
+
+    buttons.push(
+      new ButtonBuilder()
+        .setCustomId('daily_claim')
+        .setLabel('Reclamar Daily')
+        .setStyle(canClaimDaily ? ButtonStyle.Primary : ButtonStyle.Secondary)
+        .setDisabled(!canClaimDaily)
+    );
+
+    const claimables = missions.filter(m => m.completed && !m.claimed).slice(0, 4);
+    for (const m of claimables) {
+      buttons.push(
+        new ButtonBuilder()
+          .setCustomId(`dclaim_${m.id}`)
+          .setLabel(`Reclamar ${m.icon || '🎁'}`)
+          .setStyle(ButtonStyle.Success)
+      );
+    }
+
+    const rows = buttons.length ? [new ActionRowBuilder().addComponents(buttons)] : [];
+
+    // Solo responde una vez: si ya está respondido usa editReply, si no, reply
+    let msg;
+    if (interaction.replied || interaction.deferred) {
+      msg = await interaction.editReply({ embeds: [embed], components: rows });
+    } else {
+      msg = await interaction.reply({ embeds: [embed], components: rows });
+    }
+
+    // Collector de botones
+    if (!rows.length) return;
+    const collector = msg.createMessageComponentCollector
+      ? msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 240000 })
+      : null;
+    if (!collector) return;
+
+collector.on('collect', async i => {
+    if (i.user.id !== interaction.user.id) {
+      try {
+        await i.reply({ content: 'Solo tú puedes usar estos botones.', flags: 64 });
+      } catch (err) {
+        if (err.code === 10062 && i.followUp) {
+          await i.followUp({ content: 'Solo tú puedes usar estos botones.', flags: 64 });
+        }
+      }
+      return;
+    }
+
+    let shouldUpdate = true;
+
+    // Reclamar Daily
+    if (i.customId === 'daily_claim') {
+      const todayNow = Math.floor((Date.now() + tz * 3600000) / 86400000);
+      if (p.lastDailyDay === todayNow) {
+        try {
+          await i.reply({ content: 'Ya reclamaste el daily hoy.', flags: 64 });
+        } catch (err) {
+          if (err.code === 10062 && i.followUp) {
+            await i.followUp({ content: 'Ya reclamaste el daily hoy.', flags: 64 });
+          }
+        }
+        shouldUpdate = false;
+      } else {
+        // FIX: preservar streak existente si es primera reclamación
+        const wasConsecutive = p.lastDailyDay === todayNow - 1;
+
+        if (!p.lastDailyDay || p.lastDailyDay === 0) {
+          p.dailyStreak = 1;
+        } else if (wasConsecutive) {
+          p.dailyStreak = (p.dailyStreak || 0) + 1;
+        } else {
+          p.dailyStreak = 1;
+        }
+
+        p.lastDailyDay = todayNow;
+        writeProfiles(profiles);
+
+        const base = cfg.dailyCoins || 250;
+        const bonus = Math.min(1000, Math.max(0, (p.dailyStreak - 1) * 10));
+        addCoins(interaction.guildId, interaction.user.id, base + bonus);
+
+        const newBal = getBalance(interaction.guildId, interaction.user.id);
+        const bonusText = bonus > 0 ? ` (+${bonus} por racha ${p.dailyStreak})` : '';
+        try {
+          await i.reply({ content: `✅ Daily: ${base} 🪙${bonusText}\nRacha: ${p.dailyStreak} 🔥\nBalance: ${newBal.coins} 🪙`, flags: 64 });
+        } catch (err) {
+          if (err.code === 10062 && i.followUp) {
+            await i.followUp({ content: `✅ Daily: ${base} 🪙${bonusText}\nRacha: ${p.dailyStreak} 🔥\nBalance: ${newBal.coins} 🪙`, flags: 64 });
+          }
+        }
+      }
+    }
+
+    // Reclamar misión
+    if (i.customId.startsWith('dclaim_')) {
+      const id = i.customId.replace('dclaim_', '');
+      const reward = claimDaily(interaction.guild, interaction.user.id, id);
+      if (!reward) {
+        try {
+          await i.reply({ content: 'No disponible o ya reclamado.', flags: 64 });
+        } catch (err) {
+          if (err.code === 10062 && i.followUp) {
+            await i.followUp({ content: 'No disponible o ya reclamado.', flags: 64 });
+          }
+        }
+        shouldUpdate = false;
+      } else {
+        if (reward.coins) addCoins(interaction.guildId, interaction.user.id, reward.coins);
+        if (reward.xp) {
+          const levels = readLevels();
+          const u = ensureUserData(levels, interaction.guildId, interaction.user.id);
+          u.xp = (u.xp || 0) + reward.xp;
+          while (u.xp >= xpToNext(u.level)) { u.xp -= xpToNext(u.level); u.level++; }
+          writeLevels(levels);
+        }
+        try {
+          await i.reply({
+            content: `🎁 Recompensa: ${reward.coins ? `${reward.coins} 🪙 ` : ''}${reward.xp ? `${reward.xp} XP` : ''}${reward.gems ? ` ${reward.gems} 💎` : ''}`,
+            flags: 64
+          });
+        } catch (err) {
+          if (err.code === 10062 && i.followUp) {
+            await i.followUp({
+              content: `🎁 Recompensa: ${reward.coins ? `${reward.coins} 🪙 ` : ''}${reward.xp ? `${reward.xp} XP` : ''}${reward.gems ? ` ${reward.gems} 💎` : ''}`,
+              flags: 64
+            });
+          }
+        }
+      }
+    }
+
+  // Solo refresca el embed si no hubo un reply de error
+  if (shouldUpdate) {
+    const now2 = Date.now();
+    const today2 = Math.floor((now2 + tz * 3600000) / 86400000);
+    const nextDay2 = (today2 + 1) * 86400000 - tz * 3600000;
+    const msLeft2 = Math.max(0, nextDay2 - now2);
+
+    const updatedMissions = getDaily(interaction.guild, interaction.user.id, tz);
+    const bal2 = getBalance(interaction.guildId, interaction.user.id);
+    const totalRewards2 = calcTotalRewards(updatedMissions);
+    const rewardsText2 = [
+      totalRewards2.coins > 0 ? `${totalRewards2.coins} 🪙` : '',
+      totalRewards2.xp > 0 ? `${totalRewards2.xp} XP` : '',
+      totalRewards2.gems > 0 ? `${totalRewards2.gems} 💎` : ''
+    ].filter(r => r).join(' • ');
+
+    let missionsText2 = '';
+    let completed2 = 0;
+    for (const m of updatedMissions) {
+      completed2 += m.completed ? 1 : 0;
+      const check = m.completed ? '✅' : '⏳';
+      const progress = `${m.progress || 0}/${m.target}`;
+      const rewards = Object.entries(m.reward)
+        .map(([k, v]) => (k === 'coins' ? `${v} 🪙` : k === 'xp' ? `${v} XP` : k === 'gems' ? `${v} 💎` : `${v} ${k}`))
+        .join(' • ');
+      missionsText2 += `${check} **${m.desc}** ${bar10(m.progress || 0, m.target)} ${progress}\n└─ 💰 ${rewards}\n`;
+    }
+
+    const canClaim2 = (p.lastDailyDay !== today2);
+    const dailyStatus2 = canClaim2
+      ? '✅ **Daily: disponible ahora**'
+      : `⏳ **Daily: disponible en ${fmtTime(msLeft2)}**`;
+    const missionsStatus2 = `🗓️ **Se renuevan en ${fmtTime(msLeft2)}**`;
+
+    const embed2 = new EmbedBuilder()
+      .setColor(canClaim2 ? 0xf8b500 : 0x5865f2)
+      .setTitle('📅 Daily Panel')
+      .addFields(
+        { name: dailyStatus2, value: `Balance: **${bal2.coins} 🪙**`, inline: false },
+        { name: `📋 Misiones (${completed2}/${updatedMissions.length} completadas)`, value: missionsText2 || 'Cargando...', inline: false },
+        { name: '🎁 Recompensas Totales', value: rewardsText2 || 'Sin recompensas', inline: false },
+        { name: missionsStatus2, value: '━━━━━━━━━━━━━━━━━━', inline: false }
+      )
+      .setTimestamp();
+
+    const newButtons = [];
+    newButtons.push(
+      new ButtonBuilder()
+        .setCustomId('daily_claim')
+        .setLabel('Reclamar Daily')
+        .setStyle((p.lastDailyDay !== today2) ? ButtonStyle.Primary : ButtonStyle.Secondary)
+        .setDisabled(p.lastDailyDay === today2)
+    );
+    const claimables2 = updatedMissions.filter(m => m.completed && !m.claimed).slice(0, 4);
+    for (const m of claimables2) {
+      newButtons.push(new ButtonBuilder().setCustomId(`dclaim_${m.id}`).setLabel(`Reclamar ${m.icon || '🎁'}`).setStyle(ButtonStyle.Success));
+    }
+    const rows2 = newButtons.length ? [new ActionRowBuilder().addComponents(newButtons)] : [];
+
+    // Solo actualiza si no se ha respondido a la interacción
+    if (!i.replied && !i.deferred) {
+      await i.update({ embeds: [embed2], components: rows2 });
+    }
+  }
+});
+  },
+  // --- Permite uso con prefijo ---
+  async executePrefix(message, args, client) {
+    // Solo permite en servidores y si todo está definido
+    if (!message.guild || !message.member || !message.author || !message.guild.id) {
+      return message.reply('❌ Este comando solo puede usarse en servidores.');
+    }
+    const fakeInteraction = {
+      guild: message.guild,
+      guildId: message.guild.id,
+      user: message.author,
+      deferReply: async () => {},
+      editReply: async (data) => message.reply(data),
+      reply: async (data) => message.reply(data),
+      channel: message.channel,
+      member: message.member,
+    };
+    // Validar que user.id existe antes de ejecutar
+    if (!fakeInteraction.user || !fakeInteraction.user.id) {
+      return message.reply('❌ No se pudo obtener tu usuario correctamente.');
+    }
+    await module.exports.execute(fakeInteraction, client);
+  }
+};

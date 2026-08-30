@@ -3,200 +3,133 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { Client, Collection, GatewayIntentBits, REST, Routes, Events } = require('discord.js');
-const { readConfig } = require('./utils/configCache');
+const logger = require('./src/utils/logger');
+const { loadAndValidateConfig } = require('./src/utils/config/loader');
+const { scheduleShopRotation } = require('./utils/badgeShop');
+const { readProfiles, writeProfiles } = require('./utils/profileStore');
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
 if (!TOKEN || !CLIENT_ID || !GUILD_ID) {
-  console.error('Falta TOKEN, CLIENT_ID o GUILD_ID en .env');
+  logger.error('Falta TOKEN, CLIENT_ID o GUILD_ID en .env');
   process.exit(1);
 }
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMessageReactions, GatewayIntentBits.GuildVoiceStates],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMessageReactions,
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildPresences
+  ],
 });
 
-// ✅ Asegúrate de inicializar esto antes de usarlo
 client.commands = new Collection();
 client.slashCommands = new Collection();
 client.prefixCommands = new Collection();
 
+const { loadCommandRegistry } = require('./src/loaders/commandLoader');
+const registry = loadCommandRegistry({
+  commandsDir: path.join(__dirname, 'src', 'commands'),
+  sharedDir: path.join(__dirname, 'commands_shared'),
+  prefixDir: path.join(__dirname, 'prefixCommands')
+});
 
-// Cargar comandos (CommonJS require)
-const commandsPath = path.join(__dirname, 'commands');
-const commandFiles = fs.existsSync(commandsPath) ? fs.readdirSync(commandsPath).filter(f => f.endsWith('.js')) : [];
-const commandData = [];
-for (const file of commandFiles) {
-  const cmd = require(path.join(commandsPath, file));
-  if (cmd && cmd.data && cmd.execute) {
-    client.commands.set(cmd.data.name, cmd);
-    commandData.push(cmd.data.toJSON());
-  } else {
-    console.warn(`Comando mal exportado: ${file}`);
-  }
+for (const [name, cmd] of registry.commands.entries()) {
+  client.commands.set(name, cmd);
 }
-
-// Cargar comandos compartidos (slash + prefix)
-const sharedPath = path.join(__dirname, 'commands_shared');
-if (fs.existsSync(sharedPath)) {
-  const sharedFiles = fs.readdirSync(sharedPath).filter(f => f.endsWith('.js'));
-  for (const file of sharedFiles) {
-    const cmd = require(path.join(sharedPath, file));
-    if (cmd && cmd.data && cmd.executeSlash && cmd.name && cmd.executePrefix) {
-      // slash
-      client.commands.set(cmd.data.name, {
-        data: cmd.data,
-        execute: cmd.executeSlash
-      });
-      commandData.push(cmd.data.toJSON());
-      // prefix
-      client.prefixCommands.set(cmd.name, { execute: cmd.executePrefix });
-    } else {
-      console.warn(`Comando compartido mal exportado: ${file}`);
-    }
-  }
+for (const [name, cmd] of registry.prefixCommands.entries()) {
+  client.prefixCommands.set(name, cmd);
 }
+const commandData = registry.commandData;
 
-// Registrar comandos (guild — rápido)
-const rest = new REST({ version: '10' }).setToken(TOKEN);
-(async () => {
+// Registrar comandos cuando el bot esté listo
+client.once(Events.ClientReady, async () => {
+  // Programar rotación de tienda
+  scheduleShopRotation(() => {
+    const profiles = readProfiles();
+    return profiles.badges || {};
+  });
+  logger.info('Bot listo', { tag: client.user.tag });
+
+  // Backup diario de economía
   try {
-    console.log('Registrando comandos en guild...');
+    require('./tools/economyBackupDaily').backupEconomyDaily();
+    logger.info('Backup diario de economía ejecutado');
+  } catch (err) {
+    logger.error('Error en backup diario de economía', { error: err.message, stack: err.stack });
+  }
+
+  try {
+    logger.info('Registrando comandos slash');
+    const rest = new REST({ version: '10' }).setToken(TOKEN);
+
+    // BORRAR comandos globales previos
+    await rest.put(Routes.applicationCommands(CLIENT_ID), { body: [] });
+    logger.info('Comandos globales eliminados');
+
+    // REGISTRAR en guild (instantáneo)
     await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commandData });
-    console.log('Comandos registrados.');
-  } catch (err) {
-    console.error('Error registrando comandos:', err);
-  }
-})();
-
-client.once(Events.ClientReady, () => {
-  console.log(`✅ Bot listo: ${client.user.tag}`);
-});
-
-// Manejo de interacciones (slash + selects)
-client.on(Events.InteractionCreate, async (interaction) => {
-  try {
-    if (interaction.isChatInputCommand()) {
-      console.log(`🔹 Slash usado: ${interaction.commandName} por ${interaction.user.tag}`);
-      const cmd = client.commands.get(interaction.commandName);
-      if (!cmd) {
-        console.log('⚠️ Comando no encontrado en colección.');
-        return interaction.reply({ content: 'Comando no encontrado', flags: 64 });
-      }
-      console.log('✅ Ejecutando comando slash...');
-      await cmd.execute(interaction, client);
-      console.log('✅ Comando ejecutado con éxito.');
-
-    } else if (interaction.isStringSelectMenu()) {
-      // Select handler for color menu
-      if (interaction.customId === 'lco_color_menu') {
-        await interaction.deferReply({ flags: 64  });
-        // read config fresh
-        const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
-        const vipRoleId = cfg.vipRoleId;
-        if (!vipRoleId) return interaction.editReply({ content: '❌ No hay rol requerido configurado.' });
-
-        const member = interaction.member;
-        const guild = interaction.guild;
-        const vipRole = guild.roles.cache.get(vipRoleId);
-        if (!vipRole || !member.roles.cache.has(vipRoleId)) {
-          const mention = vipRole ? `<@&${vipRoleId}>` : 'el rol requerido';
-          return interaction.editReply({ content: `❌ Necesitas el rol ${mention} para usar este menú.` });
-        }
-
-        const val = interaction.values[0];
-        // remove all color roles first
-        const colorEntries = Object.entries(cfg.colors || {});
-        const colorRoleIds = colorEntries.map(([k, v]) => v.roleId);
-        try {
-          await member.roles.remove(colorRoleIds.filter(Boolean)).catch(() => {});
-        } catch (err) { console.error('Error removiendo roles previos:', err); }
-
-        if (val === 'remove_color') {
-          return interaction.editReply({ content: '🎨 Has quitado tu color.' });
-        }
-
-        // val is key
-        const item = cfg.colors && cfg.colors[val];
-        if (!item) return interaction.editReply({ content: '⚠️ Opción inválida.' });
-
-        try {
-          await member.roles.add(item.roleId);
-          return interaction.editReply({ content: `✅ Tu color fue cambiado a **${item.name}**.` });
-        } catch (err) {
-          console.error('Error asignando rol:', err);
-          return interaction.editReply({ content: '⚠️ Error al asignar el rol (missing perms o posición de roles).' });
-        }
-      }
-    }
-  } catch (err) {
-    console.error('Error InteractionCreate:', err);
-    try {
-      if (interaction.deferred || interaction.replied) await interaction.editReply({ content: '❌ Error interno.' });
-      else await interaction.reply({ content: '❌ Error interno.', flags: 64  });
-    } catch {}
+    logger.info('Comandos registrados en guild', { count: commandData.length });
+  } catch (error) {
+    logger.error('Error registrando comandos', { error: error.message, stack: error.stack });
   }
 });
 
-// Prefijo de comandos (puedes cambiarlo si quieres)
+
+// Cargar handler de interacciones (¡PROFESIONAL!)
+require('./events/interactionCreate')(client);
+require('./events/messageCreate')(client);
+// Cargar y reprogramar timers de bump pendientes
+require('./events/bumpTimersLoader')(client);
+
+// Prefijo de comandos
 const PREFIX = '&';
-
-// Colección para comandos con prefijo
-client.prefixCommands = new Collection();
-
-// Cargar comandos con prefijo
-const prefixPath = path.join(__dirname, 'prefixCommands');
-if (fs.existsSync(prefixPath)) {
-  const prefixFiles = fs.readdirSync(prefixPath).filter(f => f.endsWith('.js'));
-  for (const file of prefixFiles) {
-    const cmd = require(path.join(prefixPath, file));
-    if (cmd && cmd.name && cmd.execute) {
-      client.prefixCommands.set(cmd.name, cmd);
-    } else {
-      console.warn(`Comando prefix mal exportado: ${file}`);
-    }
-  }
-}
 
 // Escuchar mensajes con prefijo
 client.on(Events.MessageCreate, async (message) => {
-  // Ignorar bots o mensajes sin prefijo
   if (message.author.bot || !message.content.startsWith(PREFIX)) return;
 
-  // Obtener comando y argumentos
   const args = message.content.slice(PREFIX.length).trim().split(/ +/);
   const commandName = args.shift().toLowerCase();
 
 const command = client.prefixCommands.get(commandName);
 if (!command) {
-  console.log(`⚠️ Comando prefix no encontrado: ${commandName}`);
+  logger.warn('Comando prefix no encontrado', { commandName });
   return;
 }
 
-console.log(`🔹 Prefix usado: ${commandName} por ${message.author.tag}`);
+logger.info('Prefix usado', { commandName, userTag: message.author.tag });
 try {
-  await command.execute(message, args, client);
-  console.log(`✅ Comando prefix ejecutado correctamente.`);
+  if (typeof command.executePrefix === 'function') {
+    await command.executePrefix(message, args, client);
+  } else if (typeof command.execute === 'function') {
+    await command.execute(message, args, client);
+  } else {
+    await message.reply('❌ Este comando no tiene función ejecutable.');
+  }
+  logger.info('Comando prefix ejecutado correctamente', { commandName });
 } catch (err) {
-  console.error(`❌ Error ejecutando comando prefix ${commandName}:`, err);
+  logger.error('Error ejecutando comando prefix', { commandName, error: err.message, stack: err.stack });
   await message.reply('❌ Ocurrió un error al ejecutar este comando.');
 }
-
 });
 
-
-// Cargar  guildMemberUpdate (auto-removal)
+// Cargar evento guildMemberUpdate
 const eventFile = path.join(__dirname, 'events', 'guildMemberUpdate.js');
 if (fs.existsSync(eventFile)) {
   const handler = require(eventFile);
   if (handler && typeof handler === 'function') handler(client);
 }
 
-// Forzar carga del config ANTES de cargar eventos
-console.log('🔧 Cargando configuración...');
-const initialConfig = readConfig();
-console.log('✅ Config cargado con', Object.keys(initialConfig.roleXpBonuses || {}).length, 'bonus de roles');
+// Forzar carga del config
+logger.info('Cargando configuración');
+const initialConfig = loadAndValidateConfig(path.join(__dirname, 'config', 'default.json'));
+logger.info('Config cargado', { roleBonusCount: Object.keys(initialConfig.roleXpBonuses || {}).length });
 
 // Cargar eventos de niveles
 const levelEvents = [
@@ -208,19 +141,28 @@ const levelEvents = [
 for (const file of levelEvents) {
   try {
     const eventLoader = require(file);
-    eventLoader(client); // ← Debe llamarse como función
-    console.log(`✅ Evento cargado: ${file}`);
+    eventLoader(client);
+    logger.info('Evento cargado', { file });
   } catch (err) {
-    console.error(`❌ Error cargando ${file}:`, err);
+    logger.error('Error cargando evento', { file, error: err.message, stack: err.stack });
   }
 }
-// registrar el tracker de boosts (evento guildmemberupdateboosttracker)
+
+// Evento de status/roles
 try {
-  require('./events/guildMemberUpdate_boostTracker')(client);
-  console.log('✅ Boost tracker cargado');
+  require('./events/presenceStatusRoles')(client);
+  logger.info('Evento de status/roles cargado');
 } catch (e) {
-  console.error('⚠️ Error cargando boost tracker:', e);
+  logger.error('Error cargando presenceStatusRoles', { error: e.message, stack: e.stack });
 }
 
-// login
-client.login(process.env.TOKEN);
+// Boost tracker
+try {
+  require('./events/guildMemberUpdate_boostTracker')(client);
+  logger.info('Boost tracker cargado');
+} catch (e) {
+  logger.error('Error cargando boost tracker', { error: e.message, stack: e.stack });
+}
+
+// Login
+client.login(TOKEN);

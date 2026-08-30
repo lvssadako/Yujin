@@ -1,0 +1,693 @@
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const crypto = require('crypto');
+const { getBalance, addCoins, removeCoins } = require('../utils/economy');
+const { readProfiles, writeProfiles, ensureUser } = require('../utils/profileStore');
+
+const COOLDOWN_MS = 10_000;
+const MIN_BET = 100;
+const MAX_BET = 10_000;
+const DAILY_LOSS_CAP = 100_000; // límite de pérdidas por día
+const RAKE = 0.03; // 3% comisión sobre ganancias
+
+function todayUtcDay() {
+  return Math.floor(Date.now() / 86400000);
+}
+
+function canBet(u, amount) {
+  const day = todayUtcDay();
+  if (!u.gambleStats) u.gambleStats = { lastAt: 0, day, lossesToday: 0, wins: 0, losses: 0 };
+  if (u.gambleStats.day !== day) { u.gambleStats.day = day; u.gambleStats.lossesToday = 0; }
+  return DAILY_LOSS_CAP - (u.gambleStats.lossesToday || 0) >= amount;
+}
+
+// --- Exportar funciones de blackjack para uso externo (botones) ---
+module.exports = {
+  data: new SlashCommandBuilder()
+    .setName('gamble')
+    .setDescription('Apuestas con monedas')
+    .addSubcommand(s => s
+      .setName('coinflip')
+      .setDescription('Cara o cruz')
+      .addIntegerOption(o => o
+        .setName('apuesta')
+        .setDescription('Cantidad a apostar')
+        .setRequired(true)
+        .setMinValue(MIN_BET)
+        .setMaxValue(MAX_BET))
+      .addStringOption(o => o
+        .setName('lado')
+        .setDescription('Elige')
+        .addChoices(
+          { name: 'cara', value: 'cara' },
+          { name: 'cruz', value: 'cruz' }
+        )
+        .setRequired(true)))
+    .addSubcommand(s => s
+      .setName('slots')
+      .setDescription('Tragamonedas x3')
+      .addIntegerOption(o => o
+        .setName('apuesta')
+        .setDescription('Cantidad a apostar')
+        .setRequired(true)
+        .setMinValue(MIN_BET)
+        .setMaxValue(MAX_BET)))
+    .addSubcommand(s => s
+      .setName('crash')
+      .setDescription('Multiplicador que sube - retírate antes de que explote')
+      .addIntegerOption(o => o
+        .setName('apuesta')
+        .setDescription('Cantidad a apostar')
+        .setRequired(true)
+        .setMinValue(MIN_BET)
+        .setMaxValue(MAX_BET))
+      .addNumberOption(o => o
+        .setName('objetivo')
+        .setDescription('Multiplicador objetivo (ej: 2.0)')
+        .setRequired(true)
+        .setMinValue(1.01)
+        .setMaxValue(100)))
+    .addSubcommand(s => s
+      .setName('stats')
+      .setDescription('Ver tus estadísticas de apuestas'))
+    // --- Nuevos minijuegos ---
+    .addSubcommand(s => s
+      .setName('blackjack')
+      .setDescription('Juega al blackjack contra el bot')
+      .addIntegerOption(o => o
+        .setName('apuesta')
+        .setDescription('Cantidad a apostar')
+        .setRequired(true)
+        .setMinValue(MIN_BET)
+        .setMaxValue(MAX_BET)))
+    .addSubcommand(s => s
+      .setName('carrera')
+      .setDescription('Apuesta a una carrera de animales')
+      .addIntegerOption(o => o
+        .setName('apuesta')
+        .setDescription('Cantidad a apostar')
+        .setRequired(true)
+        .setMinValue(MIN_BET)
+        .setMaxValue(MAX_BET))
+      .addStringOption(o => o
+        .setName('animal')
+        .setDescription('Elige tu animal')
+        .addChoices(
+          { name: '🐢 Tortuga', value: 'tortuga' },
+          { name: '🐇 Liebre', value: 'liebre' },
+          { name: '🐎 Caballo', value: 'caballo' },
+          { name: '🦔 Erizo', value: 'erizo' }
+        )
+        .setRequired(true)))
+    .addSubcommand(s => s
+      .setName('ruleta')
+      .setDescription('Apuesta en la ruleta')
+      .addIntegerOption(o => o
+        .setName('apuesta')
+        .setDescription('Cantidad a apostar')
+        .setRequired(true)
+        .setMinValue(MIN_BET)
+        .setMaxValue(MAX_BET))
+      .addStringOption(o => o
+        .setName('apuesta_a')
+        .setDescription('Apuesta a color o número')
+        .addChoices(
+          { name: 'Rojo', value: 'rojo' },
+          { name: 'Negro', value: 'negro' },
+          { name: 'Verde', value: 'verde' },
+          { name: 'Número (0-36)', value: 'numero' }
+        )
+        .setRequired(true))
+      .addIntegerOption(o => o
+        .setName('numero')
+        .setDescription('Número del 0 al 36 (si aplica)')
+        .setMinValue(0)
+        .setMaxValue(36)
+        .setRequired(false)))
+    .addSubcommand(s => s
+      .setName('pvp')
+      .setDescription('Apuesta PvP contra otro usuario')
+      .addIntegerOption(o => o
+        .setName('apuesta')
+        .setDescription('Cantidad a apostar')
+        .setRequired(true)
+        .setMinValue(MIN_BET)
+        .setMaxValue(MAX_BET))
+      .addUserOption(o => o
+        .setName('retador')
+        .setDescription('Usuario a retar')
+        .setRequired(true)))
+    .setDMPermission(false),
+
+  async execute(interaction) {
+    await interaction.deferReply({ ephemeral: true });
+    const sub = interaction.options.getSubcommand();
+    const guildId = interaction.guildId;
+    const userId = interaction.user.id;
+
+    const profiles = readProfiles();
+    const u = ensureUser(profiles, guildId, userId);
+
+    // Stats: sin cooldown ni validación de apuesta
+    if (sub === 'stats') {
+      if (!u.gambleStats) u.gambleStats = { wins: 0, losses: 0, lossesToday: 0 };
+      const stats = u.gambleStats;
+      const total = (stats.wins || 0) + (stats.losses || 0);
+      const winrate = total > 0 ? ((stats.wins / total) * 100).toFixed(1) : '0.0';
+
+      const statsEmbed = new EmbedBuilder()
+        .setColor(0x2b2d31)
+        .setTitle('📊 Tus Estadísticas de Gambling')
+        .addFields(
+          { name: '✅ Victorias', value: String(stats.wins || 0), inline: true },
+          { name: '❌ Derrotas', value: String(stats.losses || 0), inline: true },
+          { name: '📈 Winrate', value: `${winrate}%`, inline: true },
+          { name: '💸 Pérdidas hoy', value: `${stats.lossesToday || 0} 🪙`, inline: true },
+          { name: '🚫 Límite restante', value: `${Math.max(0, DAILY_LOSS_CAP - (stats.lossesToday || 0))} 🪙`, inline: true }
+        )
+        .setFooter({ text: `Límite diario: ${DAILY_LOSS_CAP} 🪙 • Rake: ${Math.round(RAKE * 100)}%` })
+        .setTimestamp();
+      return interaction.editReply({ embeds: [statsEmbed] });
+    }
+
+    // Solo juegos: aplicar cooldown y validar apuesta
+    const juegosPermitidos = ['coinflip', 'slots', 'crash', 'blackjack', 'carrera', 'ruleta', 'pvp'];
+    if (!juegosPermitidos.includes(sub)) {
+      return interaction.editReply('❌ Subcomando inválido.');
+    }
+
+    const now = Date.now();
+    if (!u.gambleStats) u.gambleStats = { lastAt: 0, day: todayUtcDay(), lossesToday: 0, wins: 0, losses: 0 };
+    if (u.gambleStats.day !== todayUtcDay()) { u.gambleStats.day = todayUtcDay(); u.gambleStats.lossesToday = 0; }
+    const left = COOLDOWN_MS - (now - (u.gambleStats.lastAt || 0));
+    if (left > 0) {
+      const sec = Math.ceil(left / 1000);
+      return interaction.editReply(`⏳ Espera ${sec}s para volver a apostar.`);
+    }
+
+    const bet = interaction.options.getInteger('apuesta');
+    if (bet == null || bet < MIN_BET || bet > MAX_BET) {
+      return interaction.editReply(`❌ Apuesta permitida: ${MIN_BET}–${MAX_BET}.`);
+    }
+
+    const { coins } = getBalance(guildId, userId);
+    if (coins < bet) return interaction.editReply(`❌ Fondos insuficientes. Tienes ${coins} 🪙.`);
+    if (!canBet(u, bet)) return interaction.editReply(`🚫 Alcanzaste el límite diario de pérdidas (${DAILY_LOSS_CAP} 🪙).`);
+    if (!removeCoins(guildId, userId, bet)) return interaction.editReply('❌ No se pudo procesar la apuesta.');
+
+    // --- BLACKJACK VS BOT Y PVP ---
+    if (sub === 'blackjack') {
+      const retador = interaction.options.getUser && interaction.options.getUser('retador');
+      if (retador && retador.id !== userId) {
+        // PvP: crear partida y esperar aceptación
+        const partidas = global.gambleBlackjackPvP = global.gambleBlackjackPvP || {};
+        if (partidas[userId] || partidas[retador.id]) {
+          return interaction.editReply('❌ Tú o el retador ya están en una partida de blackjack PvP.');
+        }
+        partidas[userId] = { rival: retador.id, estado: 'pendiente', apuesta: bet, jugadores: [userId, retador.id], manos: {}, turno: 0, tiempo: Date.now(), channelId: interaction.channelId };
+        partidas[retador.id] = partidas[userId];
+        const embed = new EmbedBuilder()
+          .setColor(0x5865f2)
+          .setTitle('♠️ Blackjack PvP')
+          .setDescription(`<@${retador.id}>, ¿aceptas el reto de <@${userId}> por **${bet} 🪙**? Usa /gamble blackjack para aceptar o rechazar.`)
+          .setFooter({ text: 'Tienes 30s para aceptar.' });
+        setTimeout(() => {
+          if (partidas[userId] && partidas[userId].estado === 'pendiente') {
+            delete partidas[userId];
+            delete partidas[retador.id];
+            interaction.editReply('⏰ El reto expiró.');
+          }
+        }, 30000);
+        return interaction.editReply({ embeds: [embed] });
+      }
+      // Si el usuario fue retado y acepta
+      const partidas = global.gambleBlackjackPvP = global.gambleBlackjackPvP || {};
+      const partida = partidas[userId];
+      if (partida && partida.estado === 'pendiente' && partida.rival === userId) {
+        partida.estado = 'jugando';
+        partida.manos[partida.jugadores[0]] = blackjack.nuevaMano();
+        partida.manos[partida.jugadores[1]] = blackjack.nuevaMano();
+        partida.turno = 0;
+        partida.tiempo = Date.now();
+        await blackjack.mostrarTurnoPvP(interaction, partida);
+        return;
+      }
+      // Si el usuario está en partida activa
+      if (partida && partida.estado === 'jugando') {
+        return await blackjack.mostrarTurnoPvP(interaction, partida);
+      }
+      // --- Blackjack vs Bot interactivo ---
+      const partidasBot = global.gambleBlackjackBot = global.gambleBlackjackBot || {};
+      if (partidasBot[userId]) {
+        // Si ya hay una partida activa, mostrar turno actual
+        return await blackjack.mostrarTurnoBot(interaction, partidasBot[userId]);
+      }
+      // Nueva partida vs bot
+      const manoJugador = blackjack.nuevaMano();
+      const manoBot = blackjack.nuevaMano();
+      partidasBot[userId] = {
+        estado: 'jugando',
+        apuesta: bet,
+        manoJugador,
+        manoBot,
+        terminado: false,
+        channelId: interaction.channelId,
+        userId,
+        guildId,
+        uId: userId,
+        tiempo: Date.now(),
+        accionEnCurso: false,
+        turnTimeout: null
+      };
+      return await blackjack.mostrarTurnoBot(interaction, partidasBot[userId]);
+    }
+    const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+
+    async function blackjackMostrarTurnoPvP(interaction, partida) {
+      const jugador = partida.jugadores[partida.turno % 2];
+      const mano = partida.manos[jugador];
+      const embed = new EmbedBuilder()
+        .setColor(0x5865f2)
+        .setTitle('♠️ Blackjack PvP')
+        .setDescription(`Turno de <@${jugador}>\nTus cartas: **${blackjackManoTexto(mano)}**\nValor: **${blackjackValor(mano)}**\n\n(Usa los botones para jugar tu turno)`)
+        .setFooter({ text: 'Tienes 20s para jugar.' });
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('blackjack_hit').setLabel('Pedir carta').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('blackjack_stand').setLabel('Plantarse').setStyle(ButtonStyle.Secondary)
+      );
+      await interaction.editReply({ embeds: [embed], components: [row] });
+      // Aquí deberías esperar la interacción del botón y manejar el turno (esto requiere un listener global en tu bot principal)
+    }
+    let resultEmbed;
+
+
+// --- BLOQUE DE BLACKJACK (MOVER ANTES DE module.exports Y DE LAS FUNCIONES QUE LO USAN) ---
+const blackjack = {
+  nuevaMano: function () {
+    return [blackjack.carta(), blackjack.carta()];
+  },
+  carta: function () {
+    const palos = ['♠️', '♥️', '♦️', '♣️'];
+    const valores = [2, 3, 4, 5, 6, 7, 8, 9, 10, 'J', 'Q', 'K', 'A'];
+    const palo = palos[Math.floor(Math.random() * palos.length)];
+    const valor = valores[Math.floor(Math.random() * valores.length)];
+    return { palo, valor };
+  },
+  valor: function (mano) {
+    let total = 0, ases = 0;
+    for (const c of mano) {
+      if (typeof c.valor === 'number') total += c.valor;
+      else if (c.valor === 'A') { total += 11; ases++; }
+      else total += 10;
+    }
+    while (total > 21 && ases > 0) { total -= 10; ases--; }
+    return total;
+  },
+  manoTexto: function (mano, ocultarPrimera = false) {
+    return mano.map((c, i) => ocultarPrimera && i === 0 ? '🂠' : `${c.valor}${c.palo}`).join(' ');
+  },
+  async mostrarTurnoPvP(interaction, partida) {
+    const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+    const jugador = partida.jugadores[partida.turno % 2];
+    const mano = partida.manos[jugador];
+    const embed = new EmbedBuilder()
+      .setColor(0x5865f2)
+      .setTitle('♠️ Blackjack PvP')
+      .setDescription(`Turno de <@${jugador}>\nTus cartas: **${blackjack.manoTexto(mano)}**\nValor: **${blackjack.valor(mano)}**\n\n(Usa los botones para jugar tu turno)`)
+      .setFooter({ text: 'Tienes 20s para jugar.' });
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('blackjack_hit').setLabel('Pedir carta').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('blackjack_stand').setLabel('Plantarse').setStyle(ButtonStyle.Secondary)
+    );
+    await interaction.editReply({ embeds: [embed], components: [row] });
+  },
+  async mostrarTurnoBot(interaction, partida) {
+    const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+    if (partida.terminado) {
+      const valJ = blackjack.valor(partida.manoJugador);
+      const valB = blackjack.valor(partida.manoBot);
+      let resultado = '';
+      let color = 0x5865f2;
+      const { readProfiles, writeProfiles, ensureUser } = require('../utils/profileStore');
+      const { addCoins } = require('../utils/economy');
+      const profiles = readProfiles();
+      const u = ensureUser(profiles, partida.guildId, partida.userId);
+      if (valJ > 21) { resultado = 'Te pasaste. ¡Perdiste!'; color = 0xdd2e44; u.gambleStats.losses = (u.gambleStats.losses || 0) + 1; u.gambleStats.lossesToday = (u.gambleStats.lossesToday || 0) + partida.apuesta; }
+      else if (valB > 21 || valJ > valB) { resultado = '¡Ganaste!'; color = 0x43b581; addCoins(partida.guildId, partida.userId, Math.floor(partida.apuesta * (2 - 0.03))); u.gambleStats.wins = (u.gambleStats.wins || 0) + 1; }
+      else if (valJ === valB) { resultado = 'Empate. Recuperas tu apuesta.'; color = 0xffc107; addCoins(partida.guildId, partida.userId, partida.apuesta); }
+      else { resultado = 'El bot gana. ¡Perdiste!'; color = 0xdd2e44; u.gambleStats.losses = (u.gambleStats.losses || 0) + 1; u.gambleStats.lossesToday = (u.gambleStats.lossesToday || 0) + partida.apuesta; }
+      writeProfiles(profiles);
+      const embed = new EmbedBuilder()
+        .setColor(color)
+        .setTitle('♠️ Blackjack - Resultado')
+        .setDescription(`Tus cartas: **${blackjack.manoTexto(partida.manoJugador)}** (${valJ})\nCartas del bot: **${blackjack.manoTexto(partida.manoBot)}** (${valB})\n\n${resultado}`)
+        .setFooter({ text: 'Blackjack vs Bot' });
+      await interaction.editReply({ embeds: [embed], components: [] });
+      delete global.gambleBlackjackBot[partida.userId];
+      return;
+    }
+    // Mostrar turno actual
+    const embed = new EmbedBuilder()
+      .setColor(0x5865f2)
+      .setTitle('♠️ Blackjack vs Bot')
+      .setDescription(`Tus cartas: **${blackjack.manoTexto(partida.manoJugador)}**\nValor: **${blackjack.valor(partida.manoJugador)}**\n\nCartas del bot: **${blackjack.manoTexto(partida.manoBot, true)}**\n\n¿Quieres pedir carta o plantarte?`)
+      .setFooter({ text: 'Usa los botones para jugar tu turno.' });
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('blackjackbot_hit').setLabel('Pedir carta').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('blackjackbot_stand').setLabel('Plantarse').setStyle(ButtonStyle.Secondary)
+    );
+    await interaction.editReply({ embeds: [embed], components: [row] });
+  }
+};
+
+// ...existing code...
+
+// Exportar el comando y las funciones auxiliares de blackjack en un solo objeto (al final del archivo)
+module.exports = {
+  data,
+  execute,
+  executePrefix,
+  blackjack
+};
+    // --- Mostrar turno interactivo para blackjack vs bot ---
+    async function blackjackMostrarTurnoBot(interaction, partida) {
+      const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+      if (partida.terminado) {
+        // Mostrar resultado final
+        const valJ = blackjackValor(partida.manoJugador);
+        const valB = blackjackValor(partida.manoBot);
+        let resultado = '';
+        let color = 0x5865f2;
+        const profiles = readProfiles();
+        const u = ensureUser(profiles, partida.guildId, partida.userId);
+        if (valJ > 21) { resultado = 'Te pasaste. ¡Perdiste!'; color = 0xdd2e44; u.gambleStats.losses = (u.gambleStats.losses || 0) + 1; u.gambleStats.lossesToday = (u.gambleStats.lossesToday || 0) + partida.apuesta; }
+        else if (valB > 21 || valJ > valB) { resultado = '¡Ganaste!'; color = 0x43b581; addCoins(partida.guildId, partida.userId, Math.floor(partida.apuesta * (2 - RAKE))); u.gambleStats.wins = (u.gambleStats.wins || 0) + 1; }
+        else if (valJ === valB) { resultado = 'Empate. Recuperas tu apuesta.'; color = 0xffc107; addCoins(partida.guildId, partida.userId, partida.apuesta); }
+        else { resultado = 'El bot gana. ¡Perdiste!'; color = 0xdd2e44; u.gambleStats.losses = (u.gambleStats.losses || 0) + 1; u.gambleStats.lossesToday = (u.gambleStats.lossesToday || 0) + partida.apuesta; }
+        writeProfiles(profiles);
+        const embed = new EmbedBuilder()
+          .setColor(color)
+          .setTitle('♠️ Blackjack - Resultado')
+          .setDescription(`Tus cartas: **${blackjackManoTexto(partida.manoJugador)}** (${valJ})\nCartas del bot: **${blackjackManoTexto(partida.manoBot)}** (${valB})\n\n${resultado}`)
+          .setFooter({ text: 'Blackjack vs Bot' });
+        await interaction.editReply({ embeds: [embed], components: [] });
+        delete global.gambleBlackjackBot[partida.userId];
+        return;
+      }
+      // Mostrar turno actual
+      const embed = new EmbedBuilder()
+        .setColor(0x5865f2)
+        .setTitle('♠️ Blackjack vs Bot')
+        .setDescription(`Tus cartas: **${blackjackManoTexto(partida.manoJugador)}**\nValor: **${blackjackValor(partida.manoJugador)}**\n\nCartas del bot: **${blackjackManoTexto(partida.manoBot, true)}**\n\n¿Quieres pedir carta o plantarte?`)
+        .setFooter({ text: 'Usa los botones para jugar tu turno.' });
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('blackjackbot_hit').setLabel('Pedir carta').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('blackjackbot_stand').setLabel('Plantarse').setStyle(ButtonStyle.Secondary)
+      );
+      await interaction.editReply({ embeds: [embed], components: [row] });
+    }
+
+    if (sub === 'coinflip') {
+      const pick = interaction.options.getString('lado');
+      const flip = crypto.randomInt(0, 2) === 0 ? 'cara' : 'cruz';
+      const win = pick === flip;
+
+      // Animación flip
+      const flipping = new EmbedBuilder()
+        .setColor(0xffc107)
+        .setTitle('🪙 Coinflip')
+        .setDescription('🔄 Girando la moneda...')
+        .setFooter({ text: `Apuesta: ${bet} 🪙 | Elegiste: ${pick}` });
+      await interaction.editReply({ embeds: [flipping] });
+      await new Promise(r => setTimeout(r, 1200));
+
+      if (win) {
+        const profit = Math.max(0, Math.floor(bet * (1 - RAKE)));
+        const payout = bet + profit;
+        addCoins(guildId, userId, payout);
+        u.gambleStats.wins = (u.gambleStats.wins || 0) + 1;
+        resultEmbed = new EmbedBuilder()
+          .setColor(0x43b581)
+          .setTitle('🪙 Coinflip - ¡GANASTE!')
+          .setDescription(
+            `🎯 Elegiste: **${pick}**\n` +
+            `🪙 Salió: **${flip}**\n\n` +
+            `💰 Ganancia: **+${payout} 🪙**\n` +
+            `*(incluye apuesta, rake ${Math.round(RAKE * 100)}%)*`
+          );
+      } else {
+        u.gambleStats.losses = (u.gambleStats.losses || 0) + 1;
+        u.gambleStats.lossesToday = (u.gambleStats.lossesToday || 0) + bet;
+        resultEmbed = new EmbedBuilder()
+          .setColor(0xdd2e44)
+          .setTitle('🪙 Coinflip - Perdiste')
+          .setDescription(
+            `🎯 Elegiste: **${pick}**\n` +
+            `🪙 Salió: **${flip}**\n\n` +
+            `💸 Perdiste: **-${bet} 🪙**`
+          );
+      }
+    }
+
+    if (sub === 'slots') {
+      const symbols = [
+        { k: '🍒', w: 35, x3: 5,  x2: 1 },
+        { k: '🍋', w: 25, x3: 8,  x2: 2 },
+        { k: '🍇', w: 18, x3: 12, x2: 3 },
+        { k: '🔔', w: 12, x3: 20, x2: 5 },
+        { k: '⭐', w: 7,  x3: 35, x2: 10 },
+        { k: '💎', w: 3,  x3: 75, x2: 20 }
+      ];
+      const bag = [];
+      symbols.forEach(s => { for (let i = 0; i < s.w; i++) bag.push(s); });
+      const pull = () => bag[crypto.randomInt(0, bag.length)];
+
+      const r1 = pull(), r2 = pull(), r3 = pull();
+
+      // Animación "girando"
+      const spinning = new EmbedBuilder()
+        .setColor(0xffc107)
+        .setTitle('🎰 Slots')
+        .setDescription('🔄 Girando...\n❓ | ❓ | ❓')
+        .setFooter({ text: 'Apuesta: ' + bet + ' 🪙' });
+      await interaction.editReply({ embeds: [spinning] });
+      await new Promise(r => setTimeout(r, 1500));
+
+      let lines = `${r1.k} | ${r2.k} | ${r3.k}`;
+      let won = 0;
+
+      if (r1.k === r2.k && r2.k === r3.k) {
+        won = bet * (r1.x3 || 0);
+      } else if (r1.k === r2.k || r2.k === r3.k || r1.k === r3.k) {
+        const sym = r1.k === r2.k ? r1 : (r2.k === r3.k ? r2 : r1);
+        won = bet * (sym.x2 || 0);
+      }
+
+      if (won > 0) {
+        const profit = Math.floor(won * (1 - RAKE));
+        addCoins(guildId, userId, profit);
+        u.gambleStats.wins = (u.gambleStats.wins || 0) + 1;
+        resultEmbed = new EmbedBuilder()
+          .setColor(0x43b581)
+          .setTitle('🎰 Slots - ¡GANASTE!')
+          .setDescription(`${lines}\n\n💰 Ganancia: **+${profit} 🪙**\n*(rake ${Math.round(RAKE * 100)}%)*`);
+      } else {
+        u.gambleStats.losses = (u.gambleStats.losses || 0) + 1;
+        u.gambleStats.lossesToday = (u.gambleStats.lossesToday || 0) + bet;
+        resultEmbed = new EmbedBuilder()
+          .setColor(0xdd2e44)
+          .setTitle('🎰 Slots - Perdiste')
+          .setDescription(`${lines}\n\n💸 Perdiste: **-${bet} 🪙**`);
+      }
+    }
+
+    if (sub === 'crash') {
+      const target = interaction.options.getNumber('objetivo'); // ej: 2.5x
+      // Crash point aleatorio
+      const rand = Math.random();
+      const crashPoint = Math.max(1.0, 1 / (1 - rand));
+      const actualCrash = Math.min(100, Math.round(crashPoint * 100) / 100);
+      const won = target <= actualCrash;
+
+      // Animación ascendente
+      const frames = [1.0, 1.2, 1.5, 1.8, 2.0, 2.5, 3.0, 4.0, 5.0, 10.0];
+      const relevantFrames = frames.filter(f => f <= Math.max(target, actualCrash) + 0.5);
+
+      const animEmbed = new EmbedBuilder()
+        .setColor(0xffc107)
+        .setTitle('💥 Crash')
+        .setDescription('🚀 Despegando...\n**1.00x**')
+        .setFooter({ text: `Apuesta: ${bet} 🪙 | Objetivo: ${target.toFixed(2)}x` });
+      await interaction.editReply({ embeds: [animEmbed] });
+
+      for (const frame of relevantFrames) {
+        if (frame > actualCrash) break;
+        await new Promise(r => setTimeout(r, 400));
+        const color = frame >= target ? 0x43b581 : 0xffc107;
+        animEmbed.setColor(color).setDescription(`🚀 Subiendo...\n**${frame.toFixed(2)}x**`);
+        await interaction.editReply({ embeds: [animEmbed] });
+      }
+
+      await new Promise(r => setTimeout(r, 600));
+
+      if (won) {
+        const gross = Math.floor(bet * target);
+        const profit = Math.floor(gross * (1 - RAKE));
+        addCoins(guildId, userId, profit);
+        u.gambleStats.wins = (u.gambleStats.wins || 0) + 1;
+        resultEmbed = new EmbedBuilder()
+          .setColor(0x43b581)
+          .setTitle('💥 Crash - ¡GANASTE!')
+          .setDescription(
+            `🎯 Tu objetivo: **${target.toFixed(2)}x**\n` +
+            `💥 Explotó en: **${actualCrash.toFixed(2)}x**\n\n` +
+            `💰 Ganancia: **+${profit} 🪙**\n` +
+            `*(rake ${Math.round(RAKE * 100)}%)*`
+          );
+      } else {
+        u.gambleStats.losses = (u.gambleStats.losses || 0) + 1;
+        u.gambleStats.lossesToday = (u.gambleStats.lossesToday || 0) + bet;
+        resultEmbed = new EmbedBuilder()
+          .setColor(0xdd2e44)
+          .setTitle('💥 Crash - Explotó antes')
+          .setDescription(
+            `🎯 Tu objetivo: **${target.toFixed(2)}x**\n` +
+            `💥 Explotó en: **${actualCrash.toFixed(2)}x**\n\n` +
+            `💸 Perdiste: **-${bet} 🪙**`
+          );
+      }
+    }
+
+    // Post juego: persistencia y salida
+    u.gambleStats.lastAt = now;
+    writeProfiles(profiles);
+
+    const bal = getBalance(guildId, userId).coins;
+    if (resultEmbed) {
+      resultEmbed.addFields(
+        { name: 'Balance', value: `${bal} 🪙`, inline: true },
+        { name: 'Límite pérdidas hoy', value: `${Math.max(0, DAILY_LOSS_CAP - (u.gambleStats.lossesToday || 0))} 🪙`, inline: true }
+      ).setFooter({ text: `CD: ${Math.floor(COOLDOWN_MS / 1000)}s • Rake: ${Math.round(RAKE * 100)}%` });
+      return interaction.editReply({ embeds: [resultEmbed] });
+    }
+
+    return interaction.editReply('❌ Error interno.');
+  },
+
+  async executePrefix(message, args, client) {
+    if (!message.guild || !message.member) {
+      return message.reply('❌ Este comando solo puede usarse en servidores.');
+    }
+
+    const sub = (args[0] || '').toLowerCase();
+
+    // --- Stats (puede ser de otro usuario) ---
+    if (sub === 'stats') {
+      let targetUser = message.author;
+      if (message.mentions.users.size > 0) {
+        targetUser = message.mentions.users.first();
+      } else if (args.length > 1) {
+        const arg = args[1].replace(/[<@!>]/g, '');
+        let user = message.guild.members.cache.get(arg)?.user;
+        if (!user) {
+          user = message.guild.members.cache.find(m =>
+            m.user.username.toLowerCase() === arg.toLowerCase() ||
+            m.user.tag.toLowerCase() === arg.toLowerCase()
+          )?.user;
+        }
+        if (user) targetUser = user;
+      }
+      const profiles = readProfiles();
+      const u = ensureUser(profiles, message.guild.id, targetUser.id);
+      if (!u.gambleStats) u.gambleStats = { wins: 0, losses: 0, lossesToday: 0 };
+      const stats = u.gambleStats;
+      const total = (stats.wins || 0) + (stats.losses || 0);
+      const winrate = total > 0 ? ((stats.wins / total) * 100).toFixed(1) : '0.0';
+
+      const statsEmbed = new EmbedBuilder()
+        .setColor(0x2b2d31)
+        .setTitle(`📊 Estadísticas de Gambling de ${targetUser.username}`)
+        .addFields(
+          { name: '✅ Victorias', value: String(stats.wins || 0), inline: true },
+          { name: '❌ Derrotas', value: String(stats.losses || 0), inline: true },
+          { name: '📈 Winrate', value: `${winrate}%`, inline: true },
+          { name: '💸 Pérdidas hoy', value: `${stats.lossesToday || 0} 🪙`, inline: true },
+          { name: '🚫 Límite restante', value: `${Math.max(0, DAILY_LOSS_CAP - (stats.lossesToday || 0))} 🪙`, inline: true }
+        )
+        .setFooter({ text: `Límite diario: ${DAILY_LOSS_CAP} 🪙 • Rake: ${Math.round(RAKE * 100)}%` })
+        .setTimestamp();
+      return message.reply({ embeds: [statsEmbed] });
+    }
+
+    // --- Juegos ---
+    if (['coinflip', 'slots', 'crash'].includes(sub)) {
+      // Enviar mensaje inicial y editarlo después
+      const sent = await message.reply('⏳ Procesando...');
+      let fakeInteraction;
+      if (sub === 'coinflip') {
+        const bet = parseInt(args[1], 10);
+        const pick = (args[2] || '').toLowerCase();
+        if (isNaN(bet) || bet < MIN_BET || bet > MAX_BET) {
+          return sent.edit(`❌ Apuesta permitida: ${MIN_BET}–${MAX_BET}.`);
+        }
+        if (!['cara', 'cruz'].includes(pick)) {
+          return sent.edit('❌ Debes elegir "cara" o "cruz".');
+        }
+        fakeInteraction = {
+          guildId: message.guild.id,
+          user: message.author,
+          options: {
+            getSubcommand: () => 'coinflip',
+            getInteger: () => bet,
+            getString: () => pick,
+          },
+          deferReply: async () => {},
+          editReply: async (data) => sent.edit(data),
+          reply: async (data) => sent.edit(data),
+        };
+      }
+      if (sub === 'slots') {
+        const bet = parseInt(args[1], 10);
+        if (isNaN(bet) || bet < MIN_BET || bet > MAX_BET) {
+          return sent.edit(`❌ Apuesta permitida: ${MIN_BET}–${MAX_BET}.`);
+        }
+        fakeInteraction = {
+          guildId: message.guild.id,
+          user: message.author,
+          options: {
+            getSubcommand: () => 'slots',
+            getInteger: () => bet,
+          },
+          deferReply: async () => {},
+          editReply: async (data) => sent.edit(data),
+          reply: async (data) => sent.edit(data),
+        };
+      }
+      if (sub === 'crash') {
+        const bet = parseInt(args[1], 10);
+        const objetivo = parseFloat(args[2]);
+        if (isNaN(bet) || bet < MIN_BET || bet > MAX_BET) {
+          return sent.edit(`❌ Apuesta permitida: ${MIN_BET}–${MAX_BET}.`);
+        }
+        if (isNaN(objetivo) || objetivo < 1.01 || objetivo > 100) {
+          return sent.edit('❌ Objetivo debe ser un número entre 1.01 y 100.');
+        }
+        fakeInteraction = {
+          guildId: message.guild.id,
+          user: message.author,
+          options: {
+            getSubcommand: () => 'crash',
+            getInteger: () => bet,
+            getNumber: () => objetivo,
+          },
+          deferReply: async () => {},
+          editReply: async (data) => sent.edit(data),
+          reply: async (data) => sent.edit(data),
+        };
+      }
+      return module.exports.execute(fakeInteraction);
+    }
+
+    // Ayuda
+    return message.reply('❌ Uso: &gamble [coinflip <apuesta> <cara|cruz> | slots <apuesta> | crash <apuesta> <objetivo> | stats [@usuario]]');
+  }
+};
