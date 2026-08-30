@@ -1,10 +1,10 @@
 // index.js
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const fs = require('fs');
 const path = require('path');
 const { Client, Collection, GatewayIntentBits, REST, Routes, Events } = require('discord.js');
-const logger = require('./src/utils/logger');
-const { loadAndValidateConfig } = require('./src/utils/config/loader');
+const logger = require('./utils/logger');
+const { loadAndValidateConfig } = require('./utils/config/loader');
 const { scheduleShopRotation } = require('./utils/badgeShop');
 const { readProfiles, writeProfiles } = require('./utils/profileStore');
 
@@ -32,9 +32,9 @@ client.commands = new Collection();
 client.slashCommands = new Collection();
 client.prefixCommands = new Collection();
 
-const { loadCommandRegistry } = require('./src/loaders/commandLoader');
+const { loadCommandRegistry } = require('./loaders/commandLoader');
 const registry = loadCommandRegistry({
-  commandsDir: path.join(__dirname, 'src', 'commands'),
+  commandsDir: path.join(__dirname, 'commands'),
   sharedDir: path.join(__dirname, 'commands_shared'),
   prefixDir: path.join(__dirname, 'prefixCommands')
 });
@@ -128,7 +128,7 @@ if (fs.existsSync(eventFile)) {
 
 // Forzar carga del config
 logger.info('Cargando configuración');
-const initialConfig = loadAndValidateConfig(path.join(__dirname, 'config', 'default.json'));
+const initialConfig = loadAndValidateConfig(path.join(__dirname, '..', 'config', 'default.json'));
 logger.info('Config cargado', { roleBonusCount: Object.keys(initialConfig.roleXpBonuses || {}).length });
 
 // Cargar eventos de niveles
