@@ -6,6 +6,7 @@ const { readConfig } = require('../utils/configCache');
 const { readLevels, writeLevels, ensureUserData } = require('../services/level').levelService;
 const { updateMissionProgress } = require('../utils/dailyMissions');
 const { addCoins } = require('../services/economy').economyService;
+const { secureRandomInt } = require('../utils/cryptoRandom');
 
 function xpToNext(level) { return Math.round(200 * Math.pow(level + 1, 1.4)); }
 
@@ -53,26 +54,25 @@ module.exports = (client) => {
       const last = reactionCooldowns.get(key) || 0;
       if (now - last < 60_000) return;
 
-      const base = Math.floor(Math.random() * 6) + 5;
+      const base = secureRandomInt(5, 10);
 
       const cfg = readConfig();
       const bonuses = cfg.roleXpBonuses || {};
       const member = await message.guild.members.fetch(user.id).catch(() => null);
 
-      let totalBonusDecimal = 0; // ✅ Cambiar de totalBonusPercent
+      let totalBonusDecimal = 0;
       
       if (member?.roles?.cache?.size) {
         for (const [roleId] of member.roles.cache) {
           if (!(roleId in bonuses)) continue;
           let b = Number(bonuses[roleId]);
           if (isNaN(b) || b <= 0) continue;
-          // ✅ Convertir si es porcentaje
           if (b > 1) b = b / 100;
           totalBonusDecimal += b;
         }
       }
 
-      const multiplier = 1 + totalBonusDecimal; // ✅ Ya no dividir por 100
+      const multiplier = 1 + totalBonusDecimal;
       const gained = Math.round(base * multiplier);
 
       const levels = readLevels();
@@ -86,7 +86,7 @@ module.exports = (client) => {
       updateMissionProgress(message.guild, user.id, 'reactions', 1);
       updateMissionProgress(message.guild, user.id, 'xp_gain', gained);
 
-      let leveledUpCount = 0; // ✅ Cambiar a contador
+      let leveledUpCount = 0;
       while (data.xp >= xpToNext(data.level)) {
         data.xp -= xpToNext(data.level);
         data.level++;
@@ -94,7 +94,7 @@ module.exports = (client) => {
       }
       const leveledUp = leveledUpCount > 0;
 
-      // ✅ Premio de monedas por nivel
+      // Premio de monedas por nivel
       if (leveledUpCount > 0) {
         addCoins(message.guildId, user.id, 1000 * leveledUpCount);
       }
@@ -102,7 +102,7 @@ module.exports = (client) => {
       await writeLevels(levels);
       reactionCooldowns.set(key, now);
 
-      const bonusPct = Math.round(totalBonusDecimal * 100); // ✅ Para el log
+      const bonusPct = Math.round(totalBonusDecimal * 100);
       logger.info(
         `[reaction] ${user.username} +${gained} XP ` +
         `(base ${base}${bonusPct > 0 ? ` +${bonusPct}% roles` : ''} = x${multiplier.toFixed(2)})`
@@ -145,7 +145,6 @@ module.exports = (client) => {
           }
         }
 
-
         const ctx = {
           mention: lu.mention ? `<@${uid}>` : user.username,
           username: user.username,
@@ -157,7 +156,6 @@ module.exports = (client) => {
           role: rewardRole ? `<@&${rewardRole.id}>` : ''
         };
 
-        // Mensaje especial si hay recompensa de rol
         let text;
         if (rewardRole) {
           const rewardMsg = cfg.levelRewardMessage || 
@@ -170,8 +168,7 @@ module.exports = (client) => {
         try {
           await target.send({
             content: text,
-            // ✅ Ping solo al usuario (uid), sin ping a roles
-            allowedMentions: { users: [userId] }
+            allowedMentions: { users: [uid] }
           });
         } catch (e) {
           logger.error('[levels reaction] Error enviando anuncio de level up:', e?.message || e);
