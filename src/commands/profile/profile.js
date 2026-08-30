@@ -1,7 +1,7 @@
 const logger = require('../../utils/logger');
 const fs = require('fs');
 const path = require('path');
-const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
+const { SlashCommandBuilder, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { createCanvas, loadImage } = require('canvas');
 const { readProfiles, ensureUser } = require('../../utils/profileStore');
 const { readConfig } = require('../../utils/configCache');
@@ -173,15 +173,11 @@ module.exports = {
       const profiles = readProfiles();
       const userProfile = ensureUser(profiles, interaction.guildId, targetUser.id);
 
-      const boosterRole = interaction.guild.roles.premiumSubscriberRole;
-      const isBooster = Boolean(member.premiumSince) ||
-        (boosterRole && member.roles.cache.has(boosterRole.id));
-
-      const profileData = isBooster ? userProfile : {
-        title: '',
-        accent: '#e94560',
-        bgUrl: '',
-        bgOpacity: 0.7,
+      const profileData = {
+        title: userProfile.title || '',
+        accent: userProfile.accent || '#e94560',
+        bgUrl: userProfile.bgUrl || '',
+        bgOpacity: typeof userProfile.bgOpacity === 'number' ? userProfile.bgOpacity : 0.7,
         equippedBadges: userProfile.equippedBadges || [],
         earnedBadges: userProfile.earnedBadges || [],
         streakDays: userProfile.streakDays || 0,
@@ -557,7 +553,22 @@ module.exports = {
 
       const buffer = canvas.toBuffer('image/png');
       const attach = new AttachmentBuilder(buffer, { name: 'profile.png' });
-      return interaction.editReply({ files: [attach] });
+
+      const isSelf = targetUser.id === (interaction.user?.id || interaction.author?.id);
+      const components = [];
+      if (isSelf) {
+        components.push(
+          new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId('profile_open_customizer')
+              .setLabel('Personalizar Perfil')
+              .setEmoji('🎨')
+              .setStyle(ButtonStyle.Primary)
+          )
+        );
+      }
+
+      return interaction.editReply({ files: [attach], components });
     } catch (err) {
       logger.error('profile command error:', err);
       return interaction.editReply({ content: 'Error al generar el perfil' });

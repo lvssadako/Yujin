@@ -20,6 +20,12 @@ module.exports = (client) => {
         return;
       }
 
+      if (interaction.customId?.startsWith('profile_')) {
+        const { handleProfileInteraction } = require('../services/profile/profileCustomizer');
+        await handleProfileInteraction(interaction);
+        return;
+      }
+
       // BOTONES
       if (interaction.isButton()) {
                 // Botón de compra de boost XP en /shop
