@@ -212,3 +212,14 @@ Para realizar cambios en el proyecto:
 2. Verifica que las pruebas sigan pasando con `npm test`.
 3. Comprueba la sintaxis de JavaScript antes de desplegar con `node --check src/index.js`.
 
+---
+
+## 🔒 Licencia y Términos de Uso
+
+**Propietario y Confidencial (All Rights Reserved)**
+
+Este proyecto es de **uso estrictamente privado y propietario**. Queda terminantemente prohibido su uso, copia, reproducción, modificación, distribución, sublicenciamiento o despliegue para cualquier fin (comercial o no comercial) sin la autorización previa y por escrito del autor.
+
+Para más detalles, consulta el archivo [`LICENSE`](./LICENSE).
+
+
