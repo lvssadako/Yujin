@@ -31,6 +31,7 @@ async function checkStreaks() {
 
       const lastReminded = Number(profile.lastStreakReminderDay) || 0;
       if (lastReminded === today) continue; // Ya fue notificado hoy
+      if (profile.streakAlertsDisabled) continue; // Usuario desactivó alertas voluntariamente
 
       try {
         const member = await guild.members.fetch(userId).catch(() => null);

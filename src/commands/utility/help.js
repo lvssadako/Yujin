@@ -15,10 +15,10 @@ const COMMAND_MAP = {
   ban: 'admin', kick: 'admin', timeout: 'admin', clear: 'admin', unban: 'admin',
   balance: 'economy', chest: 'economy', daily: 'economy', shop: 'economy', transfer: 'economy', ecotop: 'economy',
   blackjack: 'games', coinflip: 'games', crash: 'games', reactduel: 'games', ruleta: 'games', slots: 'games',
-  level: 'level', streak: 'level', streaks: 'level', leaderboard: 'level', badge: 'level', profile: 'level', profileset: 'level',
+  level: 'level', leaderboard: 'level', badge: 'level', profile: 'level', profileset: 'level',
   boosters: 'boost', boostxp: 'boost',
   leveladdchannel: 'config', leveladmin: 'config', levellistchannels: 'config', levelremovechannel: 'config', levelrewards: 'config', menuconfig: 'config', setboostchannel: 'config', setbumpreminder: 'config', setchannel: 'config',
-  bumpreminderinfo: 'utility', help: 'utility', manage: 'utility', toproles: 'utility', info: 'utility', ping: 'utility', racha: 'utility', reminder: 'utility'
+  bumpreminderinfo: 'utility', help: 'utility', manage: 'utility', toproles: 'utility', info: 'utility', ping: 'utility', racha: 'utility', streak: 'utility', streaks: 'utility', reminder: 'utility'
 };
 
 // Generador automático de ejemplos estéticos para comandos populares

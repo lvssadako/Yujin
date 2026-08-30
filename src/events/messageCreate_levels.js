@@ -436,12 +436,26 @@ module.exports = (client) => {
 
       // Streak diaria por actividad de mensajes
       const streakResult = recordMessageActivity(guildId, userId);
-      if (streakResult.updated && streakResult.wasReset && streakResult.previousStreak >= 7 && cfg.notifyStreakLost) {
-        try {
-          await message.author.send(
-            `💔 Tu racha de actividad de **${streakResult.previousStreak} días** en **${message.guild.name}** se ha perdido. ¡Comienza una nueva hoy enviando mensajes!`
-          );
-        } catch {}
+      if (streakResult.updated) {
+        if (streakResult.savedByFreeze) {
+          try {
+            await message.author.send(
+              `🧊 ¡Tu **Congelador de Racha** fue utilizado automáticamente! Salvaste tu racha de **${streakResult.streakDays} días** en **${message.guild.name}**.`
+            );
+          } catch {}
+        } else if (streakResult.tierUpgraded && streakResult.coinsRewarded > 0) {
+          try {
+            await message.author.send(
+              `🔥 ¡Felicidades! Has alcanzado el nivel **${streakResult.tier.emoji} ${streakResult.tier.name}** con **${streakResult.streakDays} días** de racha en **${message.guild.name}**.\n🎁 **Recompensa por hito:** ¡Has recibido **+${streakResult.coinsRewarded.toLocaleString()} 🪙** en tu billetera!`
+            );
+          } catch {}
+        } else if (streakResult.wasReset && streakResult.previousStreak >= 7 && cfg.notifyStreakLost) {
+          try {
+            await message.author.send(
+              `💔 Tu racha de actividad de **${streakResult.previousStreak} días** en **${message.guild.name}** se ha perdido. ¡Comienza una nueva hoy enviando mensajes!`
+            );
+          } catch {}
+        }
       }
 
       // Guardar niveles (mensajes + posible XP)
