@@ -178,7 +178,16 @@ module.exports = {
 
       if (template) {
         updates.streakTemplate = template;
-        changes.push(`🖼️ **Plantilla:** ${STREAK_TEMPLATES[template]?.name || 'Por defecto'}`);
+        if (template === 'none') {
+          updates.streakBgUrl = '';
+          updates.streakAccent = '';
+          changes.push('🖼️ **Plantilla:** Fondo base oscuro restablecido');
+        } else if (STREAK_TEMPLATES[template]) {
+          if (!hex) {
+            updates.streakAccent = STREAK_TEMPLATES[template].accent;
+          }
+          changes.push(`🖼️ **Plantilla y Tema:** ${STREAK_TEMPLATES[template].name}`);
+        }
       }
 
       if (bgUrl) {

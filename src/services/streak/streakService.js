@@ -122,13 +122,17 @@ function getUserStreakStatus(guildId, userId) {
     daysToNext = nextTier.minDays - streakDays;
   }
 
-  // Resolver fondo global dinámicamente
+  // Resolver fondo global y tema de acento dinámicamente
   let effectiveBgUrl = '';
-  const tplKey = g.streakTemplate || 'inferno';
+  let effectiveAccent = g.streakAccent || '';
+  const tplKey = g.streakTemplate || 'none';
   if (tplKey === 'none') {
     effectiveBgUrl = '';
   } else if (STREAK_TEMPLATES[tplKey]) {
     effectiveBgUrl = STREAK_TEMPLATES[tplKey].url;
+    if (!effectiveAccent) {
+      effectiveAccent = STREAK_TEMPLATES[tplKey].accent;
+    }
   } else if (tplKey === 'custom' || g.streakBgUrl) {
     effectiveBgUrl = g.streakBgUrl || '';
   }
@@ -148,7 +152,7 @@ function getUserStreakStatus(guildId, userId) {
     // Personalización global
     streakBgUrl: effectiveBgUrl,
     streakBgOpacity: typeof g.streakBgOpacity === 'number' ? g.streakBgOpacity : 0.65,
-    streakAccent: g.streakAccent || '',
+    streakAccent: effectiveAccent,
     streakTemplate: tplKey
   };
 }

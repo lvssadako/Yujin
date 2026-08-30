@@ -11,10 +11,10 @@ test('normalizeExternalImageUrl accepts safe public image hosts', () => {
 });
 
 test('normalizeExternalImageUrl preserves essential query params for Unsplash and Discord CDN', () => {
-  const unsplashUrl = 'https://images.unsplash.com/photo-1527489377706-5bf97e608852?q=80&w=1000#section';
+  const unsplashUrl = 'https://images.unsplash.com/photo-1517594422361-5eeb8ae275a9?q=80&w=1000#section';
   assert.equal(
     normalizeExternalImageUrl(unsplashUrl),
-    'https://images.unsplash.com/photo-1527489377706-5bf97e608852?q=80&w=1000'
+    'https://images.unsplash.com/photo-1517594422361-5eeb8ae275a9?q=80&w=1000'
   );
 
   const discordUrl = 'https://cdn.discordapp.com/attachments/123/456/sample.png?ex=6600&is=6500&hm=deadbeef#fragment';

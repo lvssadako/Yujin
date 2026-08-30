@@ -40,12 +40,15 @@ function buildStreakCustomizationPanel(guildId, userId, member) {
     currentBgLabel = `[Wallpaper Personalizado](${g.streakBgUrl})`;
   }
 
+  const tpl = g.streakTemplate && STREAK_TEMPLATES[g.streakTemplate];
+  const activeColor = g.streakAccent || tpl?.accent || '#FF4500';
+
   const embed = new EmbedBuilder()
     .setAuthor({
       name: `🔥 Estudio Global de Racha: ${member.user.username}`,
       iconURL: member.user.displayAvatarURL({ dynamic: true })
     })
-    .setColor(g.streakAccent || '#FF4500')
+    .setColor(activeColor)
     .setDescription('Personaliza el aspecto de tu **Tarjeta de Racha**. Tu diseño se guardará de forma **GLOBAL** y se mostrará en todos los servidores donde uses el bot.')
     .addFields(
       {
@@ -55,7 +58,7 @@ function buildStreakCustomizationPanel(guildId, userId, member) {
       },
       {
         name: '🎨 Color de Acento / Llama',
-        value: g.streakAccent ? `> \`${g.streakAccent}\`` : '> *Automático según tu Nivel de Fuego*',
+        value: g.streakAccent ? `> \`${g.streakAccent}\`` : (tpl?.accent ? `> \`${tpl.accent}\` *(Tema: ${tpl.name})*` : '> *Automático según tu Nivel de Fuego*'),
         inline: true
       },
       {
@@ -130,14 +133,18 @@ async function handleStreakCustomizerInteraction(interaction) {
     return interaction.reply({ embeds: [panel.embed], components: panel.components, ephemeral: true });
   }
 
-  // 2. Select Menu: Plantilla de fondo
+  // 2. Select Menu: Plantilla de fondo y tema
   if (interaction.isStringSelectMenu() && interaction.customId === 'streak_select_template') {
     const selected = interaction.values[0];
     if (selected === 'st_none') {
-      setGlobalStreakCustomization(userId, { streakTemplate: 'none', streakBgUrl: '' });
+      setGlobalStreakCustomization(userId, { streakTemplate: 'none', streakBgUrl: '', streakAccent: '' });
     } else {
       const templateKey = selected.replace('st_', '');
-      setGlobalStreakCustomization(userId, { streakTemplate: templateKey });
+      const tpl = STREAK_TEMPLATES[templateKey];
+      setGlobalStreakCustomization(userId, {
+        streakTemplate: templateKey,
+        streakAccent: tpl?.accent || ''
+      });
     }
     const panel = buildStreakCustomizationPanel(guildId, userId, member);
     return interaction.update({ embeds: [panel.embed], components: panel.components });
@@ -222,7 +229,7 @@ async function handleStreakCustomizerInteraction(interaction) {
 
   // 7. Botón: Reset
   if (interaction.isButton() && interaction.customId === 'streak_btn_reset') {
-    setGlobalStreakCustomization(userId, { streakTemplate: 'inferno', streakBgUrl: '', streakAccent: '', streakBgOpacity: 0.65 });
+    setGlobalStreakCustomization(userId, { streakTemplate: 'none', streakBgUrl: '', streakAccent: '', streakBgOpacity: 0.65 });
     const panel = buildStreakCustomizationPanel(guildId, userId, member);
     return interaction.update({ embeds: [panel.embed], components: panel.components });
   }

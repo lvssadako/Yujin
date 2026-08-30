@@ -130,12 +130,12 @@ module.exports = {
         .setRequired(false)
         .addChoices(
           { name: '⚡ Ciberpunk Cyan', value: 'cyberpunk' },
-          { name: '🔥 Fuego Carmesí', value: 'crimson' },
+          { name: '🔥 Fuego Infernal', value: 'crimson' },
+          { name: '👑 Fénix Dorado', value: 'royal_gold' },
+          { name: '🖤 Obsidiana Minimal', value: 'dark_minimal' },
           { name: '💜 Neón Violeta', value: 'purple_neon' },
           { name: '🌿 Esmeralda', value: 'emerald' },
-          { name: '👑 Oro Imperial', value: 'royal_gold' },
           { name: '🌸 Sakura Rosa', value: 'cherry_blossom' },
-          { name: '🖤 Sombra Minimal', value: 'dark_minimal' },
           { name: '📟 Matrix Code', value: 'matrix' }
         )
     )
@@ -145,11 +145,13 @@ module.exports = {
         .setDescription('Elige un wallpaper predefinido')
         .setRequired(false)
         .addChoices(
+          { name: '🔥 Fuego Infernal', value: 'inferno' },
+          { name: '👑 Fénix Dorado', value: 'phoenix_gold' },
+          { name: '🖤 Obsidiana Minimal', value: 'dark_obsidian' },
           { name: '🌆 Synthwave Sunset', value: 'synthwave' },
           { name: '🌌 Nebulosa Cósmica', value: 'galaxy' },
           { name: '🏙️ Cyberpunk City', value: 'cybercity' },
           { name: '🌸 Noche de Sakura', value: 'sakura_night' },
-          { name: '⬛ Geometría Oscura', value: 'dark_abstract' },
           { name: '❌ Quitar Fondo', value: 'none' }
         )
     )

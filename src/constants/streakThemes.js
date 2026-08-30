@@ -1,7 +1,7 @@
 const STREAK_TEMPLATES = {
   'inferno': {
     name: '🔥 Fuego Infernal',
-    url: 'https://images.unsplash.com/photo-1527489377706-5bf97e608852?q=80&w=1000',
+    url: 'https://images.unsplash.com/photo-1517594422361-5eeb8ae275a9?q=80&w=1000',
     accent: '#FF4500',
     description: 'Llamas y brasas ardientes de alta intensidad'
   },
@@ -25,13 +25,13 @@ const STREAK_TEMPLATES = {
   },
   'phoenix_gold': {
     name: '👑 Fénix Dorado',
-    url: 'https://images.unsplash.com/photo-1507608869274-d3177c8bb4c7?q=80&w=1000',
+    url: 'https://images.unsplash.com/photo-1516541196182-6bdb0516ed27?q=80&w=1000',
     accent: '#FFA502',
-    description: 'Aura dorada resplandeciente'
+    description: 'Aura dorada resplandeciente con destellos ardientes'
   },
   'dark_obsidian': {
     name: '🖤 Obsidiana Minimal',
-    url: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=1000',
+    url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000',
     accent: '#747D8C',
     description: 'Geometría oscura sobria y moderna'
   },

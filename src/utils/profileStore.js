@@ -78,12 +78,14 @@ function ensureGlobalUser(profiles, userId) {
       streakBgUrl: '',
       streakBgOpacity: 0.65,
       streakAccent: '',
-      streakTemplate: 'inferno'
+      streakTemplate: 'none'
     };
   }
   const g = profiles.globalUsers[userId];
   if (typeof g.streakBgOpacity !== 'number') g.streakBgOpacity = 0.65;
-  if (typeof g.streakTemplate !== 'string') g.streakTemplate = 'inferno';
+  if (typeof g.streakTemplate !== 'string') g.streakTemplate = 'none';
+  if (typeof g.streakBgUrl !== 'string') g.streakBgUrl = '';
+  if (typeof g.streakAccent !== 'string') g.streakAccent = '';
   return g;
 }
 

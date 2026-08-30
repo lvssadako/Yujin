@@ -118,12 +118,18 @@ async function generateStreakCard(user, status, botName = 'Bot') {
         ctx.save();
         roundRect(ctx, 0, 0, width, height, 24);
         ctx.clip();
-        drawImageCover(ctx, bgImg, 0, 0, width, height);
-
-        // Capa oscura translúcida para garantizar legibilidad perfecta
+        // Dibujar wallpaper con opacidad y gradiente oscuro de alto contraste
         const opacity = typeof streakBgOpacity === 'number' ? streakBgOpacity : 0.65;
-        const tintAlpha = Math.min(0.9, Math.max(0.2, 1 - opacity));
-        ctx.fillStyle = `rgba(12, 13, 20, ${tintAlpha.toFixed(2)})`;
+        ctx.globalAlpha = Math.min(1.0, Math.max(0.1, opacity));
+        drawImageCover(ctx, bgImg, 0, 0, width, height);
+        ctx.globalAlpha = 1.0;
+
+        // Capa de gradiente oscuro para garantizar legibilidad perfecta de textos e iconos
+        const overlayGrad = ctx.createLinearGradient(0, 0, 0, height);
+        overlayGrad.addColorStop(0, 'rgba(10, 11, 18, 0.35)');
+        overlayGrad.addColorStop(0.7, 'rgba(10, 11, 18, 0.55)');
+        overlayGrad.addColorStop(1, 'rgba(8, 9, 15, 0.80)');
+        ctx.fillStyle = overlayGrad;
         ctx.fillRect(0, 0, width, height);
         ctx.restore();
       }
