@@ -59,5 +59,58 @@ module.exports = {
       const emb = new EmbedBuilder().setColor(0xED4245).setDescription(`🚨 ¡Te atrapó la policía intentando robar a **${target.tag}**! Pagas una multa de **${fine} 🪙**.`);
       await interaction.reply({ embeds: [emb] });
     }
+  },
+  async executePrefix(message, args) {
+    const guildId = message.guild.id;
+    const userId = message.author.id;
+    const target = message.mentions.users.first();
+    
+    if (!target) return message.reply('❌ Debes mencionar a un usuario para robar (ej: `&rob @usuario`).');
+    if (target.bot || target.id === userId) return message.reply('❌ No puedes robarte a ti mismo ni a un bot.');
+    
+    const profiles = readProfiles();
+    const user = ensureUser(profiles, guildId, userId);
+    
+    const now = Date.now();
+    const cooldown = 12 * 60 * 60 * 1000;
+    const lastRob = user.lastRob || 0;
+    
+    if (now - lastRob < cooldown) {
+      const left = Math.ceil((cooldown - (now - lastRob)) / 3600000);
+      return message.reply(`🚓 Estás siendo buscado. Escóndete por **${left} horas** antes de volver a robar.`);
+    }
+    
+    const targetBal = getBalance(guildId, target.id).coins;
+    if (targetBal < 500) {
+      return message.reply(`❌ **${target.tag}** es demasiado pobre en su billetera (menos de 500 🪙). ¡Busca a alguien más rico!`);
+    }
+    
+    user.lastRob = now;
+    writeProfiles(profiles);
+    
+    const targetInv = getInventory(guildId, target.id);
+    if (targetInv['escudo'] && targetInv['escudo'] > 0) {
+      removeItem(guildId, target.id, 'escudo', 1);
+      const fine = 500;
+      removeCoins(guildId, userId, fine);
+      
+      const emb = new EmbedBuilder().setColor(0xED4245)
+        .setDescription(`🛡️ ¡Intentaste robar a **${target.tag}** pero tenía un **Escudo Anti-Robo**!\\nTu ataque fue bloqueado, su escudo se rompió, y tú pagas una multa de **${fine} 🪙**.`);
+      return message.reply({ embeds: [emb] });
+    }
+    
+    const success = Math.random() > 0.55;
+    if (success) {
+      const stolen = Math.floor(targetBal * (Math.random() * 0.15 + 0.05));
+      removeCoins(guildId, target.id, stolen);
+      addCoins(guildId, userId, stolen);
+      const emb = new EmbedBuilder().setColor(0x57F287).setDescription(`🥷 ¡Lograste robarle **${stolen} 🪙** a **${target.tag}** sin ser detectado!`);
+      await message.reply({ embeds: [emb] });
+    } else {
+      const fine = 250;
+      removeCoins(guildId, userId, fine);
+      const emb = new EmbedBuilder().setColor(0xED4245).setDescription(`🚨 ¡Te atrapó la policía intentando robar a **${target.tag}**! Pagas una multa de **${fine} 🪙**.`);
+      await message.reply({ embeds: [emb] });
+    }
   }
 };

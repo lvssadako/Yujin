@@ -39,5 +39,39 @@ module.exports = {
       const emb = new EmbedBuilder().setColor(0xF1C40F).setDescription(`🏦 Has retirado **${amount.toLocaleString()} 🪙** de tu banco a la billetera.`);
       await interaction.reply({ embeds: [emb] });
     }
+  },
+  async executePrefix(message, args) {
+    if (args.length < 2) return message.reply('❌ Uso correcto: `&bank deposit <cantidad>` o `&bank withdraw <cantidad>`. Usa `all` para todo.');
+    const sub = args[0].toLowerCase();
+    const qtyStr = args[1].toLowerCase();
+    const guildId = message.guild.id;
+    const userId = message.author.id;
+    
+    const bal = getBalance(guildId, userId);
+    
+    if (sub === 'deposit' || sub === 'dep') {
+      let amount = qtyStr === 'all' ? bal.coins : parseInt(qtyStr);
+      if (isNaN(amount) || amount <= 0) return message.reply('❌ Cantidad inválida.');
+      if (amount > bal.coins) return message.reply(`❌ No tienes suficientes monedas en la billetera. (Tienes ${bal.coins})`);
+      
+      removeCoins(guildId, userId, amount);
+      addBank(guildId, userId, amount);
+      
+      const emb = new EmbedBuilder().setColor(0x57F287).setDescription(`🏦 Has depositado **${amount.toLocaleString()} 🪙** en el banco.\\n*Tus fondos ahora están seguros de robos.*`);
+      await message.reply({ embeds: [emb] });
+    } 
+    else if (sub === 'withdraw' || sub === 'with') {
+      let amount = qtyStr === 'all' ? bal.bank : parseInt(qtyStr);
+      if (isNaN(amount) || amount <= 0) return message.reply('❌ Cantidad inválida.');
+      if (amount > bal.bank) return message.reply(`❌ No tienes esa cantidad en el banco. (Tienes ${bal.bank})`);
+      
+      removeBank(guildId, userId, amount);
+      addCoins(guildId, userId, amount);
+      
+      const emb = new EmbedBuilder().setColor(0xF1C40F).setDescription(`🏦 Has retirado **${amount.toLocaleString()} 🪙** de tu banco a la billetera.`);
+      await message.reply({ embeds: [emb] });
+    } else {
+      return message.reply('❌ Subcomando no válido. Usa `deposit` o `withdraw`.');
+    }
   }
 };

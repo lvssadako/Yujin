@@ -31,5 +31,24 @@ module.exports = {
       .setTitle('🛍️ Compra Exitosa')
       .setDescription(`Has comprado **${item.name}** por **${item.price} 🪙**.\\n> *${item.desc}*`);
     await interaction.reply({ embeds: [emb] });
+  },
+  async executePrefix(message, args) {
+    if (!args[0]) return message.reply('❌ Debes especificar un objeto (ej. `&buy escudo` o `&buy cana`).');
+    const itemId = args[0].toLowerCase();
+    const item = ITEMS[itemId];
+    if (!item) return message.reply('❌ Objeto no válido. Opciones: `escudo`, `cana`.');
+    
+    const bal = getBalance(message.guild.id, message.author.id);
+    if (bal.coins < item.price) {
+      return message.reply(`❌ No tienes suficientes monedas en la billetera. Cuesta **${item.price} 🪙**.`);
+    }
+    
+    removeCoins(message.guild.id, message.author.id, item.price);
+    addItem(message.guild.id, message.author.id, item.id, 1);
+    
+    const emb = new EmbedBuilder().setColor(0x57F287)
+      .setTitle('🛍️ Compra Exitosa')
+      .setDescription(`Has comprado **${item.name}** por **${item.price} 🪙**.\\n> *${item.desc}*`);
+    await message.reply({ embeds: [emb] });
   }
 };
