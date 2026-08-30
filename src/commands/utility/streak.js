@@ -100,7 +100,8 @@ module.exports = {
       await interaction.deferReply();
       const target = interaction.options.getUser('usuario') || interaction.user;
       const status = getUserStreakStatus(guild.id, target.id);
-      const attachment = await generateStreakCard(target, status);
+      const botName = interaction.guild?.members?.me?.displayName || interaction.client?.user?.username || 'Bot';
+      const attachment = await generateStreakCard(target, status, botName);
       return interaction.editReply({ files: [attachment] });
     }
 
@@ -167,7 +168,8 @@ module.exports = {
     }
 
     const status = getUserStreakStatus(guild.id, target.id);
-    const attachment = await generateStreakCard(target, status);
+    const botName = message.guild?.members?.me?.displayName || message.client?.user?.username || 'Bot';
+    const attachment = await generateStreakCard(target, status, botName);
     return message.reply({ files: [attachment] });
   },
 

@@ -60,7 +60,7 @@ function drawFlameIcon(ctx, x, y, size, mainColor = '#FF4500') {
   ctx.restore();
 }
 
-async function generateStreakCard(user, status) {
+async function generateStreakCard(user, status, botName = 'Bot') {
   const width = 900;
   const height = 400;
   const canvas = createCanvas(width, height);
@@ -263,7 +263,8 @@ async function generateStreakCard(user, status) {
   ctx.font = '14px "Segoe UI", sans-serif';
   ctx.fillText(nextText, barX, barY + 42);
 
-  const footerRight = 'LCO Bot · Chatea a diario para mantener tu fuego';
+  const nameDisplay = botName || 'Bot';
+  const footerRight = `${nameDisplay} · Chatea a diario para mantener tu fuego`;
   ctx.font = '13px "Segoe UI", sans-serif';
   const frW = ctx.measureText(footerRight).width;
   ctx.fillStyle = '#55586D';
