@@ -42,8 +42,14 @@ module.exports = {
       rolesDisplay = roleMentions.length ? roleMentions.join(', ') + (extra ? ` (+${extra} más)` : '') : 'Sin roles';
     }
 
-    const createdAt = `<t:${Math.floor(user.createdTimestamp / 1000)}:R>`;
-    const joinedAt = member?.joinedTimestamp ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : 'N/A';
+    const createdTs = Math.floor(user.createdTimestamp / 1000);
+    const createdAt = `<t:${createdTs}:F>\\n(<t:${createdTs}:R>)`;
+    
+    let joinedAt = 'N/A';
+    if (member?.joinedTimestamp) {
+      const joinedTs = Math.floor(member.joinedTimestamp / 1000);
+      joinedAt = `<t:${joinedTs}:F>\\n(<t:${joinedTs}:R>)`;
+    }
 
     let color = 0x5865F2;
     if (member?.displayHexColor && member.displayHexColor !== '#000000') {
@@ -64,13 +70,17 @@ module.exports = {
     const nextXp = xpToNext(lvlData.level);
 
     const emb = new EmbedBuilder()
-      .setAuthor({ name: `Perfil de ${user.tag}`, iconURL: user.displayAvatarURL({ dynamic: true }) })
+      .setAuthor({ name: `Información de ${user.tag}`, iconURL: user.displayAvatarURL({ dynamic: true }) })
       .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 1024 }))
       .setColor(color)
       .addFields(
-        { name: '👤 Identidad', value: `**ID:** \`${user.id}\`\\n**Creación:** ${createdAt}\\n**Entrada:** ${joinedAt}`, inline: false },
-        { name: '📊 Actividad', value: `**Nivel:** ${lvlData.level} (Rank #${rank})\\n**XP:** ${lvlData.xp} / ${nextXp}\\n**Mensajes:** ${lvlData.messages}`, inline: true },
-        { name: '💰 Economía', value: `**Billetera:** ${bal.coins.toLocaleString()} 🪙\\n**Banco:** ${bal.bank.toLocaleString()} 🪙\\n**Mochila:** ${invCount} ítems`, inline: true },
+        { name: '👤 Información de Usuario', value: `**ID:** \`${user.id}\`\\n**Mención:** <@${user.id}>`, inline: true },
+        { name: '🔰 Información de Miembro', value: `**Apodo:** ${member?.nickname || 'Ninguno'}\\n**Rol más alto:** ${member ? member.roles.highest.toString() : 'N/A'}`, inline: true },
+        { name: '\\u200b', value: '\\u200b', inline: true }, // Spacer
+        { name: '📅 Creación de la cuenta', value: createdAt, inline: true },
+        { name: '📥 Ingreso al servidor', value: joinedAt, inline: true },
+        { name: '\\u200b', value: '\\u200b', inline: true }, // Spacer
+        { name: '📊 Servidor (LCO)', value: `**Nivel:** ${lvlData.level} (#${rank})\\n**XP:** ${lvlData.xp}/${nextXp}\\n**Monedas:** ${(bal.coins + bal.bank).toLocaleString()} 🪙`, inline: false },
         { name: `🏷️ Roles (${member ? Math.max(0, member.roles.cache.size - 1) : 0})`, value: rolesDisplay, inline: false }
       )
       .setFooter({ text: `Solicitado por ${author.tag}` })
