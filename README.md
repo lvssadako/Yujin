@@ -78,17 +78,35 @@ Bot integral de Discord para gestión comunitaria avanzada, diseñado con arquit
 
 ---
 
-### 💰 5. Economía, Casino y Recompensas
-- **Monedas y Transacciones**: Consulta de balance (`/balance`, `/bal`), transferencias entre usuarios (`/pay`), ranking económico (`/leaderboard`).
-- **Juegos de Casino**:
-  - `/blackjack` (`&blackjack`): Juego interactivo de Blackjack con botones.
-  - `/ruleta` (`&ruleta`): Apuestas clásicas por color o número.
-  - `/slots` (`&slots`): Máquina tragamonedas con multiplicadores especiales.
-  - `/coinflip` (`&coinflip`): Lanzamiento de moneda doble o nada.
-  - `/crash` (`&crash`): Multiplicador ascendente en tiempo real.
+### 💰 5. Economía, Préstamos y Recompensas
+- **Monedas y Transacciones**: Consulta de balance (`/balance`, `/bal`), transferencias entre usuarios (`/transfer`), ranking económico (`/ecotop`), compras en tienda (`/buy`, `/shop`) y sistema bancario con depósito y retiro (`/bank deposit`, `/bank withdraw`).
+- **🏦 Sistema de Préstamos Bancarios (`/loan` & `&loan`)**:
+  - **Solicitud Inmediata (`/loan take <cantidad>`)**: Préstamos de 500 a 100,000 monedas depositados al instante en la billetera.
+  - **Amortización Flexible (`/loan repay <cantidad|all>`)**: Pagos parciales o liquidación total (`all`) con recálculo atómico de deuda.
+  - **Consulta de Estado (`/loan status`)**: Información de monto principal, saldo pendiente con intereses, tasa diaria actual, días acumulados y advertencias de penalización.
+  - **Tasa de Interés Escalonada Diaria**:
+    - Días 1 a 3: **5%** diario (inicio accesible).
+    - Días 4 a 6: **8%** diario (primer incremento).
+    - Días 7 a 10: **12%** diario (urgencia).
+    - Día 11+: **18%** diario (tasa máxima acumulativa).
+  - **Sistema de Penalizaciones Automáticas**:
+    - **Nivel 1** (Deuda $\ge 2\times$): Advertencia visual en perfil y balance.
+    - **Nivel 2** (Deuda $\ge 3\times$): Reducción del **50% en ganancias** de `/work` y `/fish`.
+    - **Nivel 3** (Deuda $\ge 5\times$): Reducción del **75% en ganancias** de `/work` y `/fish`.
+  - **Scheduler Automático de 24 Horas**: Aplica intereses y actualiza penalizaciones de forma desatendida con arranque seguro y *graceful shutdown*.
+- **Trabajo y Actividades**:
+  - `/work` (`&work`): Trabajo remunerado cada 4 horas (con mensajes aleatorios y penalización por mora).
+  - `/fish` (`&fish`): Pesca deportiva cada 1 hora con caña de pescar adquirible en `/buy`.
+- **Juegos de Casino y Duelos**:
+  - `/reactduel` (`&reactduel`): Duelo interactivo de reflejos 1v1 con botones de confirmación, retardo aleatorio y medición en milisegundos.
+  - `/blackjack` (`&blackjack`): Blackjack vs Bot con botones interactivos y soporte híbrido slash/prefijo.
+  - `/ruleta` (`&ruleta`): Ruleta europea con animación por color (rojo/negro/verde) o número exacto (x36).
+  - `/slots` (`&slots`): Tragamonedas clásico con combinaciones y multiplicadores especiales.
+  - `/coinflip` (`&coinflip`): Cara o cruz con animación en tiempo real.
+  - `/crash` (`&crash`): Multiplicador ascendente con retiro en tiempo real y selector de objetivo.
 - **Recompensas e Incentivos**:
-  - `/daily`: Recompensa diaria con multiplicador de racha.
-  - Misiones diarias (`daily_missions.json`) y cofres misteriosos (`chests.json`).
+  - `/daily`: Recompensa diaria con multiplicador por racha y panel interactivo de misiones.
+  - Cofres misteriosos con insignias aleatorias (`/chest buy`, `/chest open`, `/chest balance`).
   - Tienda de insignias y boosts (`/shop`, `/badgeshop`).
 
 ---

@@ -55,11 +55,27 @@ This document summarizes the comprehensive stabilization, security hardening, mo
 - Base abstract adapter interface (`BaseDatabaseAdapter`) with concrete atomic `JsonDatabaseAdapter` and `EconomyRepository`.
 - Decouples storage details from business logic, making future SQLite or PostgreSQL migrations seamless.
 
+### 11. Bank Loan System & Escalating Interest Engine (`src/services/economy/loanService.js`, `src/services/economy/loanScheduler.js`)
+- **Centralized Loan Lifecycle**: `takeLoan`, `repayLoan`, `getLoan`, `applyInterestTick`, and `getUserLoanSummary`.
+- **Progressive Interest Rate Escalation**:
+  - Days 1–3: **5%** daily.
+  - Days 4–6: **8%** daily.
+  - Days 7–10: **12%** daily.
+  - Days 11+: **18%** daily maximum rate.
+- **Graduated Penalty Enforcement**:
+  - Automatically penalizes `/work` and `/fish` earnings (Level 2: -50%, Level 3: -75%) when debt escalates beyond $3\times$ and $5\times$ the initial principal.
+- **Automated Daily Scheduler**: Runs every 24 hours to process active loans across all connected guilds, with startup catch-up and graceful shutdown lifecycle hooks.
+
+### 12. Interactive Reaction Duel Engine (`src/commands/games/reactduel.js`)
+- Full two-player 1v1 reaction duel with interactive Discord button challenge flow (Accept / Decline).
+- Anti-spam randomized countdown delays (2.5s to 6.5s) preventing pre-clicking.
+- Real-time reaction timing down to the millisecond with automatic pot collection and payout.
+
 ---
 
 ## Test Suite Status
 
-**Total Tests:** 47 (all passing)
+**Total Tests:** 49 (all passing)
 
 | Test File | Tests | Domain Tested |
 |---|:---:|---|
@@ -75,7 +91,8 @@ This document summarizes the comprehensive stabilization, security hardening, mo
 | `src/utils/__tests__/command-loader.test.js` | 4 | Command loader, hot reload filter, hash sync |
 | `src/utils/logger/__tests__/logger.test.js` | 2 | Winston logger instance & structured logging |
 | `src/utils/config/__tests__/config-schema.test.js` | 3 | Zod schema validation & loader integration |
-| `src/services/economy/__tests__/economy-service.test.js` | 2 | Balance queries, atomic coin additions/deductions |
+| `src/services/economy/__tests__/economy-service.test.js` | 3 | Balance queries, atomic coin additions, subtractions, bank & gems |
+| `src/services/economy/__tests__/loan-service.test.js` | 1 | Loan lifecycle, interest ticks, rate escalation & penalty repayment |
 | `src/services/level/__tests__/level-service.test.js` | 2 | Balanced voice/text XP & daily/weekly leaderboards |
 | `src/middleware/__tests__/rate-limit.test.js` | 4 | In-memory sliding window, checks, reset & TTL cleanup |
 | `src/database/__tests__/database-adapter.test.js` | 2 | Atomic CRUD operations & repository transactions |
