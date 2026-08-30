@@ -1,4 +1,4 @@
-const logger = require('./utils/logger');
+const logger = require('./logger');
 const fs = require('fs');
 const path = require('path');
 const { readJsonSafe, writeJsonAtomic } = require('./jsonStore');

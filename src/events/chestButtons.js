@@ -1,6 +1,6 @@
 const logger = require('../utils/logger');
 const { Events } = require('discord.js');
-const { handleChestOpen } = require('../commands/chest.js');
+const { handleChestOpen } = require('../commands/economy/chest.js');
 
 module.exports = (client) => {
   client.on(Events.InteractionCreate, async interaction => {

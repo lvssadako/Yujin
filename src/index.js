@@ -69,7 +69,6 @@ if (process.env.DISABLE_HOT_RELOAD !== 'true') {
   });
 }
 
-// Registrar comandos cuando el bot esté listo
 client.once(Events.ClientReady, async () => {
   // Programar rotación de tienda
   scheduleShopRotation(() => {
@@ -84,6 +83,15 @@ client.once(Events.ClientReady, async () => {
     logger.info('Backup diario de economía ejecutado');
   } catch (err) {
     logger.error('Error en backup diario de economía', { error: err.message, stack: err.stack });
+  }
+
+  // Iniciar scheduler de intereses de préstamos
+  try {
+    const { startLoanInterestScheduler } = require('./services/economy/loanScheduler');
+    startLoanInterestScheduler(client);
+    logger.info('Scheduler de intereses de préstamos iniciado.');
+  } catch (err) {
+    logger.error('Error iniciando scheduler de préstamos', { error: err.message, stack: err.stack });
   }
 
   try {
@@ -221,6 +229,11 @@ async function gracefulShutdown(signal) {
   try {
     const { stopShopRotation } = require('./utils/badgeShop');
     stopShopRotation();
+  } catch {}
+
+  try {
+    const { stopLoanInterestScheduler } = require('./services/economy/loanScheduler');
+    stopLoanInterestScheduler();
   } catch {}
 
   try {

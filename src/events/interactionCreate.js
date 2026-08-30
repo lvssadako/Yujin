@@ -36,55 +36,20 @@ module.exports = (client) => {
       if (interaction.isButton()) {
                 // Botón de compra de boost XP en /shop
                 if (interaction.customId.startsWith('shop_buy_')) {
-                  const shop = require('../commands/shop.js');
+                  const shop = require('../commands/economy/shop.js');
                   await shop.handleButton(interaction);
                   return;
                 }
-        // --- Blackjack vs Bot Buttons ---
+        // --- Blackjack vs Bot Buttons (legacy, delegated to unified handler) ---
         if (interaction.customId === 'blackjackbot_hit' || interaction.customId === 'blackjackbot_stand') {
-          const partidas = global.gambleBlackjackBot = global.gambleBlackjackBot || {};
-          const partida = partidas[interaction.user.id];
-          if (!partida || partida.estado !== 'jugando') {
-            return interaction.reply({ content: '❌ No tienes una partida activa de blackjack vs bot.', ephemeral: true });
-          }
-          const { blackjack } = require('../commands/gamble.js');
-          // Prevención de doble click
-          if (partida.accionEnCurso) {
-            return interaction.reply({ content: '⏳ Espera a que se procese tu jugada anterior.', ephemeral: true });
-          }
-          partida.accionEnCurso = true;
-          // Timeout de turno
-          if (partida.turnTimeout) clearTimeout(partida.turnTimeout);
-          partida.turnTimeout = setTimeout(async () => {
-            const { addCoins, readProfiles, writeProfiles, ensureUser } = require('../services/economy').economyService;
-            const profiles = require('../utils/profileStore').readProfiles();
-            const u = require('../utils/profileStore').ensureUser(profiles, partida.guildId, partida.userId);
-            addCoins(partida.guildId, partida.userId, partida.apuesta);
-            require('../utils/profileStore').writeProfiles(profiles);
-            await interaction.followUp({ content: null, embeds: [{ title: '♠️ Blackjack vs Bot - Timeout', description: '⏰ Tiempo agotado. Recuperas tu apuesta.', color: 0xdd2e44 }], components: [], ephemeral: false });
-            delete partidas[interaction.user.id];
-          }, 30000);
-          // Acción del jugador
-          if (interaction.customId === 'blackjackbot_hit') {
-            partida.manoJugador.push(blackjack.carta());
-            if (blackjack.valor(partida.manoJugador) > 21) {
-              partida.terminado = true;
-            }
-          } else if (interaction.customId === 'blackjackbot_stand') {
-            // Turno del bot
-            while (blackjack.valor(partida.manoBot) < 17) {
-              partida.manoBot.push(blackjack.carta());
-            }
-            partida.terminado = true;
-          }
-          partida.accionEnCurso = false;
-          await blackjack.mostrarTurnoBot(interaction, partida);
+          const blackjackCmd = require('../commands/games/blackjack.js');
+          await blackjackCmd.handleButton(interaction);
           return;
         }
         // Botón de abrir otros X cofres
         if (interaction.customId.startsWith('chest_open_more_')) {
           const cantidad = parseInt(interaction.customId.split('_').pop(), 10);
-          const { handleChestOpen } = require('../commands/chest.js');
+          const { handleChestOpen } = require('../commands/economy/chest.js');
           await handleChestOpen(interaction, cantidad, true);
           return;
         }
@@ -130,7 +95,7 @@ module.exports = (client) => {
         if (isNaN(amount) || amount < 1 || amount > 20) {
           return interaction.reply({ content: 'Cantidad inválida. Debe ser entre 1 y 20.', ephemeral: true });
         }
-        const { handleChestBuy } = require('../commands/chest.js');
+        const { handleChestBuy } = require('../commands/economy/chest.js');
         await handleChestBuy(interaction, amount);
         return;
       }
@@ -138,7 +103,7 @@ module.exports = (client) => {
       // Select menus
       if (interaction.isStringSelectMenu()) {
         if (interaction.customId === 'booster_select') {
-          const boosters = require('../commands/boosters.js');
+          const boosters = require('../commands/boost/boosters.js');
           await boosters.handleSelect(interaction);
           return;
         }
@@ -182,7 +147,7 @@ module.exports = (client) => {
 
       // Botón de retroceder en boosters
       if (interaction.isButton() && interaction.customId === 'booster_back') {
-        const boosters = require('../commands/boosters.js');
+        const boosters = require('../commands/boost/boosters.js');
         await boosters.handleBack(interaction);
         return;
       }

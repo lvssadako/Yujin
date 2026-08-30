@@ -24,8 +24,24 @@ async function handleWork(guildId, userId) {
     const left = Math.ceil((cooldown - (now - lastWork)) / 60000);
     return { error: `⏳ Estás muy cansado. Vuelve a trabajar en **${left} minutos**.` };
   }
-  
-  const coins = secureRandomInt(100, 400);
+
+  // ── Penalización por préstamo activo ──────────────────────────────────────
+  let incomeMultiplier = 1.0;
+  let penaltyLevel = 0;
+  try {
+    const { getLoan } = require('../../services/economy/loanService');
+    const loanData = getLoan(guildId, userId);
+    if (loanData && loanData.active) {
+      penaltyLevel = loanData.penaltyLevel || 0;
+      if (penaltyLevel >= 3) incomeMultiplier = 0.25;
+      else if (penaltyLevel >= 2) incomeMultiplier = 0.50;
+    }
+  } catch {}
+  // ──────────────────────────────────────────────────────────────────────────
+
+  let coins = secureRandomInt(100, 400);
+  coins = Math.max(1, Math.floor(coins * incomeMultiplier));
+
   user.lastWork = now;
   writeProfiles(profiles);
   addCoins(guildId, userId, coins);
@@ -34,7 +50,7 @@ async function handleWork(guildId, userId) {
   const bal = getBalance(guildId, userId);
   
   const embed = new EmbedBuilder()
-    .setColor(0x57F287)
+    .setColor(incomeMultiplier < 1 ? 0xE67E22 : 0x57F287)
     .setAuthor({ name: '💼 Trabajo Completado' })
     .addFields(
       { name: '💰 Ganancias', value: `> ${msg}`, inline: false },
@@ -42,9 +58,19 @@ async function handleWork(guildId, userId) {
     )
     .setFooter({ text: 'Vuelve en 4 horas para trabajar de nuevo' })
     .setTimestamp();
+
+  if (penaltyLevel >= 2) {
+    const penDescs = ['', '', 'Ingresos al 50% por préstamo en mora', 'Ingresos al 25% por préstamo en mora grave'];
+    embed.addFields({
+      name: `${penaltyLevel >= 3 ? '🔴' : '🔶'} Penalización Activa`,
+      value: `> ${penDescs[penaltyLevel]} — Usa \`/loan repay\` para reducir tu deuda.`,
+      inline: false
+    });
+  }
     
   return { embed };
 }
+
 
 module.exports = {
   data: new SlashCommandBuilder()

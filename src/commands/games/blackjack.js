@@ -347,5 +347,9 @@ module.exports = {
       }
     }, 60000);
   },
+  async executePrefix(message, args, client) {
+    const prefixCmd = require('../../prefixCommands/blackjack');
+    return prefixCmd.execute(message, args, client);
+  },
   handleButton
 };

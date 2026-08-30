@@ -108,10 +108,40 @@ function createEconomyService(options = {}) {
     return true;
   }
 
+
+  function subtractCoins(guildId, userId, amount) {
+    const data = readEconomy();
+    const user = ensureUserEconomy(data, guildId, userId);
+    const value = Math.max(0, asSafeNumber(amount, 0));
+    if (user.coins < value) return false;
+    user.coins -= value;
+    writeEconomy(data);
+    return true;
+  }
+
+  function addGems(guildId, userId, amount) {
+    const data = readEconomy();
+    const user = ensureUserEconomy(data, guildId, userId);
+    user.gems += Math.max(0, asSafeNumber(amount, 0));
+    writeEconomy(data);
+    return user.gems;
+  }
+
+  function removeGems(guildId, userId, amount) {
+    const data = readEconomy();
+    const user = ensureUserEconomy(data, guildId, userId);
+    const value = Math.max(0, asSafeNumber(amount, 0));
+    if (user.gems < value) return false;
+    user.gems -= value;
+    writeEconomy(data);
+    return true;
+  }
+
   return {
     readEconomy, writeEconomy, ensureUserEconomy,
-    getBalance, addCoins, removeCoins,
+    getBalance, addCoins, removeCoins, subtractCoins,
     addBank, removeBank,
+    addGems, removeGems,
     getInventory, addItem, removeItem
   };
 }
