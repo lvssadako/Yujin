@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { Events, EmbedBuilder } = require('discord.js');
 const { checkAndGrantBadges } = require('../utils/badgeManager');
-const { addCoins } = require('../utils/economy');
+const { addCoins } = require('../src/services/economy').economyService;
 const { validateChannelForSending } = require('../utils/channelValidation');
 const { createBoostEmbed, createInfoEmbed } = require('../utils/embedFactory');
 

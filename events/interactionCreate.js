@@ -44,7 +44,7 @@ module.exports = (client) => {
           // Timeout de turno
           if (partida.turnTimeout) clearTimeout(partida.turnTimeout);
           partida.turnTimeout = setTimeout(async () => {
-            const { addCoins, readProfiles, writeProfiles, ensureUser } = require('../utils/economy');
+            const { addCoins, readProfiles, writeProfiles, ensureUser } = require('../src/services/economy').economyService;
             const profiles = require('../utils/profileStore').readProfiles();
             const u = require('../utils/profileStore').ensureUser(profiles, partida.guildId, partida.userId);
             addCoins(partida.guildId, partida.userId, partida.apuesta);

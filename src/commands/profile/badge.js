@@ -3,7 +3,7 @@ const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ButtonBuilder, A
 const { readProfiles, writeProfiles, ensureUser } = require('../../../utils/profileStore');
 const { readLevels } = require('../../../utils/levelStore');
 const { readShop, writeShop, rotateShop, ensureRotation } = require('../../../utils/badgeShop');
-const { getBalance, removeCoins } = require('../../../utils/economy');
+const { getBalance, removeCoins } = require('../../../services/economy').economyService;
 const { readConfig } = require('../../../utils/configCache');
 
 const RARITIES = {

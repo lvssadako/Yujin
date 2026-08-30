@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { getBalance, addCoins, removeCoins } = require('../../../utils/economy');
+const { getBalance, addCoins, removeCoins } = require('../../../services/economy').economyService;
 const { readProfiles, writeProfiles, ensureUser } = require('../../../utils/profileStore');
 
 module.exports = {

@@ -6,7 +6,7 @@ const { readProfiles, writeProfiles, ensureUser } = require('../utils/profileSto
 const { readConfig } = require('../utils/configCache');
 const { readLevels, writeLevels, ensureUserData, getXpMultiplier } = require('../utils/levelStore');
 const { checkAndGrantBadges } = require('../utils/badgeManager');
-const { addCoins } = require('../utils/economy');
+const { addCoins } = require('../src/services/economy').economyService;
 const { updateMissionProgress } = require('../utils/dailyMissions');
 const { shouldSendAutoMessage } = require('../utils/autoMessageGuard');
 

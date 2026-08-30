@@ -32,9 +32,13 @@ function loadCommandRegistry({
   const slashFiles = getAllJsFiles(commandsDir);
   for (const filePath of slashFiles) {
     try {
-      const cmd = require(filePath);
-      if (cmd && cmd.data && cmd.execute) {
-        commands.set(cmd.data.name, cmd);
+      let cmd = require(filePath);
+      if (typeof cmd === 'function' && cmd.prototype && cmd.prototype.execute) {
+        cmd = new cmd();
+      }
+      if (cmd && cmd.data && (cmd.execute || typeof cmd.executeWithErrorHandling === 'function')) {
+        const executeFn = typeof cmd.executeWithErrorHandling === 'function' ? cmd.executeWithErrorHandling.bind(cmd) : cmd.execute.bind(cmd);
+        commands.set(cmd.data.name, { ...cmd, execute: executeFn });
         commandData.push(cmd.data.toJSON());
         if (typeof cmd.executePrefix === 'function') {
           prefixCommands.set(cmd.data.name, cmd);

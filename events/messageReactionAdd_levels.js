@@ -5,7 +5,7 @@ const { updateTopRoles } = require('../commands/toproles');
 const { readConfig } = require('../utils/configCache');
 const { readLevels, writeLevels, ensureUserData } = require('../utils/levelStore');
 const { updateMissionProgress } = require('../utils/dailyMissions');
-const { addCoins } = require('../utils/economy');
+const { addCoins } = require('../src/services/economy').economyService;
 
 function xpToNext(level) { return Math.round(200 * Math.pow(level + 1, 1.4)); }
 

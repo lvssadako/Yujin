@@ -1,7 +1,7 @@
 const logger = require('../src/utils/logger');
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { addChests, removeChest, getChestCount } = require('../../../utils/chestStore');
-const { getBalance, removeCoins } = require('../../../utils/economy');
+const { getBalance, removeCoins } = require('../../../services/economy').economyService;
 const { readProfiles, writeProfiles, ensureUser } = require('../../../utils/profileStore');
 const { updateMissionProgress } = require('../../../utils/dailyMissions');
 const { rollBadge, RARITIES } = require('../../../utils/badgeRoller');

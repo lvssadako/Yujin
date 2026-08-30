@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, ComponentType } = require('discord.js');
 const { readProfiles, writeProfiles, ensureUser } = require('../../../utils/profileStore');
 const { readConfig } = require('../../../utils/configCache');
-const { getBalance, addCoins } = require('../../../utils/economy');
+const { getBalance, addCoins } = require('../../../services/economy').economyService;
 const { getDaily, claimDaily } = require('../../../utils/dailyMissions');
 const { readLevels, writeLevels, ensureUserData, xpToNext } = require('../../../utils/levelStore');
 

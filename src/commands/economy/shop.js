@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { readConfig } = require('../../../utils/configCache');
 const { readProfiles, writeProfiles, ensureUser } = require('../../../utils/profileStore');
-const { getBalance, subtractCoins } = require('../../../utils/economy');
+const { getBalance, subtractCoins } = require('../../../services/economy').economyService;
 
 function asHours(ms) {
   return `${(ms / 3600000).toFixed(1)}h`;
