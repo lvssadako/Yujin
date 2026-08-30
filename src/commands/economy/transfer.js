@@ -1,6 +1,44 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { getBalance, addCoins, removeCoins } = require('../../services/economy/index').economyService;
-const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
+const { readProfiles, writeProfiles } = require('../../utils/profileStore');
+
+async function handleTransfer(guildId, userId, targetUser, cantidad) {
+  if (!targetUser || targetUser.id === userId) {
+    return { error: '❌ Debes elegir a otro usuario como destinatario.' };
+  }
+  if (targetUser.bot) {
+    return { error: '❌ No puedes transferir monedas a un bot.' };
+  }
+  if (cantidad == null || cantidad < 1 || isNaN(cantidad)) {
+    return { error: '❌ La cantidad debe ser mayor a 0.' };
+  }
+  const { coins } = getBalance(guildId, userId);
+  if (coins < cantidad) {
+    return { error: `❌ Fondos insuficientes. Tienes ${coins} 🪙.` };
+  }
+  if (!removeCoins(guildId, userId, cantidad)) {
+    return { error: '❌ No se pudo procesar la transferencia.' };
+  }
+  
+  addCoins(guildId, targetUser.id, cantidad);
+  
+  const profiles = readProfiles();
+  writeProfiles(profiles);
+  
+  const bal = getBalance(guildId, userId).coins;
+  
+  const embed = new EmbedBuilder()
+    .setColor(0x43b581)
+    .setAuthor({ name: '💸 Transferencia Realizada' })
+    .addFields(
+      { name: '📤 Monto Enviado', value: `> **${cantidad.toLocaleString()} 🪙** a <@${targetUser.id}>`, inline: false },
+      { name: '👛 Tu Nuevo Balance', value: `> **${bal.toLocaleString()} 🪙**`, inline: false }
+    )
+    .setFooter({ text: 'Transferencia exitosa' })
+    .setTimestamp();
+    
+  return { embed };
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -17,44 +55,16 @@ module.exports = {
       .setMinValue(1)),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
-    const guildId = interaction.guildId;
-    const userId = interaction.user.id;
+    await interaction.deferReply({ ephemeral: false });
     const destinatario = interaction.options.getUser('destinatario');
     const cantidad = interaction.options.getInteger('cantidad');
-
-    if (!destinatario || destinatario.id === userId) {
-      return interaction.editReply('❌ Debes elegir a otro usuario como destinatario.');
-    }
-    if (destinatario.bot) {
-      return interaction.editReply('❌ No puedes transferir monedas a un bot.');
-    }
-    if (cantidad == null || cantidad < 1) {
-      return interaction.editReply('❌ La cantidad debe ser mayor a 0.');
-    }
-    const { coins } = getBalance(guildId, userId);
-    if (coins < cantidad) {
-      return interaction.editReply(`❌ Fondos insuficientes. Tienes ${coins} 🪙.`);
-    }
-    if (!removeCoins(guildId, userId, cantidad)) {
-      return interaction.editReply('❌ No se pudo procesar la transferencia.');
-    }
-    addCoins(guildId, destinatario.id, cantidad);
-    const profiles = readProfiles();
-    writeProfiles(profiles);
-    const bal = getBalance(guildId, userId).coins;
-    const embed = new EmbedBuilder()
-      .setColor(0x43b581)
-      .setTitle('💸 Transferencia realizada')
-      .setDescription(`Has transferido **${cantidad} 🪙** a <@${destinatario.id}>.`)
-      .addFields(
-        { name: 'Tu nuevo balance', value: `${bal} 🪙`, inline: true }
-      )
-      .setFooter({ text: 'Transferencia entre usuarios' });
-    return interaction.editReply({ embeds: [embed] });
+    
+    const result = await handleTransfer(interaction.guildId, interaction.user.id, destinatario, cantidad);
+    if (result.error) return interaction.editReply({ content: result.error });
+    return interaction.editReply({ embeds: [result.embed] });
   },
 
-  async executePrefix(message, args, client) {
+  async executePrefix(message, args) {
     if (!message.guild || !message.member) {
       return message.reply('❌ Este comando solo puede usarse en servidores.');
     }
@@ -64,7 +74,6 @@ module.exports = {
       targetUser = message.mentions.users.first();
       cantidad = parseInt(args[1], 10);
     } else if (args.length > 1) {
-      // Buscar por ID o nombre
       const arg = args[0].replace(/[<@!>]/g, '');
       let user = message.guild.members.cache.get(arg)?.user;
       if (!user) {
@@ -76,26 +85,9 @@ module.exports = {
       if (user) targetUser = user;
       cantidad = parseInt(args[1], 10);
     }
-    if (!targetUser || targetUser.id === message.author.id) {
-      return message.reply('❌ Debes elegir a otro usuario como destinatario.');
-    }
-    if (targetUser.bot) {
-      return message.reply('❌ No puedes transferir monedas a un bot.');
-    }
-    if (isNaN(cantidad) || cantidad < 1) {
-      return message.reply('❌ La cantidad debe ser mayor a 0.');
-    }
-    const { coins } = getBalance(message.guild.id, message.author.id);
-    if (coins < cantidad) {
-      return message.reply(`❌ Fondos insuficientes. Tienes ${coins} 🪙.`);
-    }
-    if (!removeCoins(message.guild.id, message.author.id, cantidad)) {
-      return message.reply('❌ No se pudo procesar la transferencia.');
-    }
-    addCoins(message.guild.id, targetUser.id, cantidad);
-    const profiles = readProfiles();
-    writeProfiles(profiles);
-    const bal = getBalance(message.guild.id, message.author.id).coins;
-    return message.reply(`💸 Has transferido **${cantidad} 🪙** a ${targetUser.username}. Tu nuevo balance: **${bal} 🪙**`);
+    
+    const result = await handleTransfer(message.guild.id, message.author.id, targetUser, cantidad);
+    if (result.error) return message.reply(result.error);
+    return message.reply({ embeds: [result.embed] });
   }
 };

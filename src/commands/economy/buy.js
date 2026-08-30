@@ -6,6 +6,34 @@ const ITEMS = {
   'cana': { name: '🎣 Caña de Pescar', price: 2000, id: 'cana', desc: 'Desbloquea el comando /fish para pescar tesoros.' }
 };
 
+async function handleBuy(guildId, userId, itemId) {
+  const item = ITEMS[itemId];
+  if (!item) return { error: '❌ Objeto no válido. Opciones: `escudo`, `cana`.' };
+  
+  const bal = getBalance(guildId, userId);
+  if (bal.coins < item.price) {
+    return { error: `❌ No tienes suficientes monedas en la billetera. Cuesta **${item.price} 🪙**.` };
+  }
+  
+  removeCoins(guildId, userId, item.price);
+  addItem(guildId, userId, item.id, 1);
+  
+  const newBal = getBalance(guildId, userId);
+  
+  const embed = new EmbedBuilder()
+    .setColor(0x57F287)
+    .setAuthor({ name: '🛍️ Compra Exitosa' })
+    .addFields(
+      { name: '📦 Objeto Adquirido', value: `> **${item.name}**\n> *${item.desc}*`, inline: false },
+      { name: '💸 Costo', value: `> **${item.price} 🪙**`, inline: false },
+      { name: '👛 Balance Restante', value: `> **${newBal.coins} 🪙**`, inline: false }
+    )
+    .setFooter({ text: '¡Gracias por tu compra!' })
+    .setTimestamp();
+    
+  return { embed };
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('buy')
@@ -17,38 +45,15 @@ module.exports = {
       )),
   async execute(interaction) {
     const itemId = interaction.options.getString('objeto');
-    const item = ITEMS[itemId];
-    
-    const bal = getBalance(interaction.guildId, interaction.user.id);
-    if (bal.coins < item.price) {
-      return interaction.reply({ content: `❌ No tienes suficientes monedas en la billetera. Cuesta **${item.price} 🪙**.`, ephemeral: true });
-    }
-    
-    removeCoins(interaction.guildId, interaction.user.id, item.price);
-    addItem(interaction.guildId, interaction.user.id, item.id, 1);
-    
-    const emb = new EmbedBuilder().setColor(0x57F287)
-      .setTitle('🛍️ Compra Exitosa')
-      .setDescription(`Has comprado **${item.name}** por **${item.price} 🪙**.\\n> *${item.desc}*`);
-    await interaction.reply({ embeds: [emb] });
+    const result = await handleBuy(interaction.guildId, interaction.user.id, itemId);
+    if (result.error) return interaction.reply({ content: result.error, ephemeral: true });
+    await interaction.reply({ embeds: [result.embed] });
   },
   async executePrefix(message, args) {
     if (!args[0]) return message.reply('❌ Debes especificar un objeto (ej. `&buy escudo` o `&buy cana`).');
     const itemId = args[0].toLowerCase();
-    const item = ITEMS[itemId];
-    if (!item) return message.reply('❌ Objeto no válido. Opciones: `escudo`, `cana`.');
-    
-    const bal = getBalance(message.guild.id, message.author.id);
-    if (bal.coins < item.price) {
-      return message.reply(`❌ No tienes suficientes monedas en la billetera. Cuesta **${item.price} 🪙**.`);
-    }
-    
-    removeCoins(message.guild.id, message.author.id, item.price);
-    addItem(message.guild.id, message.author.id, item.id, 1);
-    
-    const emb = new EmbedBuilder().setColor(0x57F287)
-      .setTitle('🛍️ Compra Exitosa')
-      .setDescription(`Has comprado **${item.name}** por **${item.price} 🪙**.\\n> *${item.desc}*`);
-    await message.reply({ embeds: [emb] });
+    const result = await handleBuy(message.guild.id, message.author.id, itemId);
+    if (result.error) return message.reply(result.error);
+    await message.reply({ embeds: [result.embed] });
   }
 };
