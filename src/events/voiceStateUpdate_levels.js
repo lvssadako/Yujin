@@ -2,7 +2,7 @@ const { Events } = require('discord.js');
 const { updateTopRoles } = require('../commands/toproles');
 const { handleLevelRoles } = require('../utils/levelRoles');
 const { readConfig } = require('../utils/configCache');
-const { readLevels, writeLevels, ensureUserData } = require('../utils/levelStore');
+const { readLevels, writeLevels, ensureUserData } = require('../services/level').levelService;
 
 function xpToNext(level) { return 100 * Math.pow(level + 1, 2); }
 

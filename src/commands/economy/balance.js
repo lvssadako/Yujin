@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { getBalance } = require('../../../services/economy').economyService;
-const { getXpMultiplier } = require('../../../utils/levelStore');
+const { getXpMultiplier } = require('../../../services/level').levelService;
 
 module.exports = {
   data: new SlashCommandBuilder()

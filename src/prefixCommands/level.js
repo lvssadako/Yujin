@@ -5,7 +5,7 @@ const { createCanvas, loadImage } = require('@napi-rs/canvas');
 
 const dataDir = path.join(__dirname, '..', 'data');
 const levelsPath = path.join(dataDir, 'levels.json');
-const { readLevels, ensureUserData, xpToNext, getUserRank } = require('../utils/levelStore');
+const { readLevels, ensureUserData, xpToNext, getUserRank } = require('../services/level').levelService;
 
 async function fetchAvatarBuffer(url) {
   try {

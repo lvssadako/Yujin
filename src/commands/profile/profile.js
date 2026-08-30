@@ -8,7 +8,7 @@ const { readConfig } = require('../../../utils/configCache');
 const { normalizeExternalImageUrl } = require('../../../utils/urlSafety');
 
 // IMPORTA UTILIDADES DE NIVELES (reemplaza funciones locales)
-const { readLevels, ensureUserData, xpToNext, getUserRank } = require('../../../utils/levelStore');
+const { readLevels, ensureUserData, xpToNext, getUserRank } = require('../../../services/level').levelService;
 
 // Descargar a Buffer (URL http/https)
 async function fetchBuffer(url) {

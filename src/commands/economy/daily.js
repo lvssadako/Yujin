@@ -3,7 +3,7 @@ const { readProfiles, writeProfiles, ensureUser } = require('../../../utils/prof
 const { readConfig } = require('../../../utils/configCache');
 const { getBalance, addCoins } = require('../../../services/economy').economyService;
 const { getDaily, claimDaily } = require('../../../utils/dailyMissions');
-const { readLevels, writeLevels, ensureUserData, xpToNext } = require('../../../utils/levelStore');
+const { readLevels, writeLevels, ensureUserData, xpToNext } = require('../../../services/level').levelService;
 
 function bar10(progress, target) {
   const pct = target > 0 ? Math.floor((progress / target) * 100) : 0;

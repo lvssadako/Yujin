@@ -1,4 +1,4 @@
-# LCO Bot
+# Yujin Bot (LCO)
 
 Bot de Discord para gestión de comunidad con sistema de niveles, perfiles personalizados, tienda de boosts, misiones diarias, roles automáticos y recompensas por actividad.
 
@@ -20,19 +20,20 @@ Este proyecto centraliza una gran parte de la lógica del servidor en un bot ún
 - Node.js
 - Discord.js v14
 - Canvas para renderizado de perfiles
-- dotenv para configuración por entorno
+- Zod para validación de configuraciones
+- Winston para sistema de logs
 - Sistema de archivos local para persistencia (JSON)
-- Módulos internos de utilidades para organización funcional
 
 ## Estructura principal
 
-- `index.js`: arranque principal
-- `commands/`: comandos slash
-- `prefixCommands/`: comandos por prefijo
-- `events/`: handlers de eventos
-- `utils/`: persistencia, validación y utilidades compartidas
-- `data/`: almacenamiento local de estado del bot
-- `tests/`: pruebas automatizadas
+- `src/index.js`: Arranque principal
+- `src/commands/`: Comandos slash (divididos por dominio)
+- `src/prefixCommands/`: Comandos por prefijo
+- `src/events/`: Handlers de eventos
+- `src/services/`: Lógica de negocio centralizada (economía, niveles, etc.)
+- `src/utils/`: Validaciones, seguridad y generadores de utilidades (embeds, urls)
+- `data/`: Almacenamiento local de estado del bot (JSON)
+- `src/**/__tests__/`: Pruebas automatizadas colocalizadas
 
 ## Estado actual
 

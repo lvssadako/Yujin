@@ -1,5 +1,5 @@
 const { addCoins } = require('../src/services/economy').economyService;
-const { addXp } = require('../utils/levelStore');
+const { addXp } = require('../services/level').levelService;
 const { shouldSendAutoMessage } = require('../utils/autoMessageGuard');
 const { grantOnceAsync } = require('../utils/eventGuard');
 
