@@ -43,12 +43,12 @@ module.exports = {
     }
 
     const createdTs = Math.floor(user.createdTimestamp / 1000);
-    const createdAt = `<t:${createdTs}:F>\n(<t:${createdTs}:R>)`;
+    const createdAt = `<t:${createdTs}:F> (<t:${createdTs}:R>)`;
     
     let joinedAt = 'N/A';
     if (member?.joinedTimestamp) {
       const joinedTs = Math.floor(member.joinedTimestamp / 1000);
-      joinedAt = `<t:${joinedTs}:F>\n(<t:${joinedTs}:R>)`;
+      joinedAt = `<t:${joinedTs}:F> (<t:${joinedTs}:R>)`;
     }
 
     let color = 0x5865F2;
@@ -74,14 +74,26 @@ module.exports = {
       .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 1024 }))
       .setColor(color)
       .addFields(
-        { name: '👤 Información de Usuario', value: `**ID:** \`${user.id}\`\n**Mención:** <@${user.id}>`, inline: true },
-        { name: '🔰 Información de Miembro', value: `**Apodo:** ${member?.nickname || 'Ninguno'}\n**Rol más alto:** ${member ? member.roles.highest.toString() : 'N/A'}`, inline: true },
-        { name: '\u200b', value: '\u200b', inline: true }, // Spacer
-        { name: '📅 Creación de la cuenta', value: createdAt, inline: true },
-        { name: '📥 Ingreso al servidor', value: joinedAt, inline: true },
-        { name: '\u200b', value: '\u200b', inline: true }, // Spacer
-        { name: '📊 Servidor (LCO)', value: `**Nivel:** ${lvlData.level} (#${rank})\n**XP:** ${lvlData.xp}/${nextXp}\n**Monedas:** ${(bal.coins + bal.bank).toLocaleString()} 🪙`, inline: false },
-        { name: `🏷️ Roles (${member ? Math.max(0, member.roles.cache.size - 1) : 0})`, value: rolesDisplay, inline: false }
+        { 
+          name: '👤 Información General', 
+          value: `**Mención:** <@${user.id}>\n**ID:** \`${user.id}\`\n**Creación:** ${createdAt}`, 
+          inline: false 
+        },
+        { 
+          name: '🔰 Información de Miembro', 
+          value: `**Apodo:** ${member?.nickname || 'Ninguno'}\n**Ingreso:** ${joinedAt}\n**Rol más alto:** ${member ? member.roles.highest.toString() : 'N/A'}`, 
+          inline: false 
+        },
+        { 
+          name: '📊 Actividad y Economía', 
+          value: `**Nivel:** ${lvlData.level} (Rank #${rank}) | **XP:** ${lvlData.xp}/${nextXp}\n**Monedas Totales:** ${(bal.coins + bal.bank).toLocaleString()} 🪙`, 
+          inline: false 
+        },
+        { 
+          name: `🏷️ Roles (${member ? Math.max(0, member.roles.cache.size - 1) : 0})`, 
+          value: rolesDisplay, 
+          inline: false 
+        }
       )
       .setFooter({ text: `Solicitado por ${author.tag}` })
       .setTimestamp();
