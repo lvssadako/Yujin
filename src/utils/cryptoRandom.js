@@ -1,16 +1,16 @@
 const crypto = require('crypto');
 
 /**
- * Generates a cryptographically secure random float in the range [0, 1).
- * Replaces Math.random() in security-sensitive contexts.
+ * Generates an unbiased cryptographically secure random float in the range [0, 1).
+ * Uses Node.js native crypto.randomInt to guarantee zero modulo or division bias.
  * @returns {number}
  */
 function secureRandom() {
-  return crypto.randomBytes(4).readUInt32LE(0) / 0x100000000;
+  return crypto.randomInt(0, 1_000_000_000) / 1_000_000_000;
 }
 
 /**
- * Generates a cryptographically secure integer in the range [min, max] (inclusive).
+ * Generates an unbiased cryptographically secure integer in the range [min, max] (inclusive).
  * @param {number} min
  * @param {number} max
  * @returns {number}
