@@ -42,7 +42,7 @@ module.exports = {
       if (userWarns.length === 0) return interaction.reply({ content: '✅ Este usuario no tiene advertencias.', ephemeral: true });
       
       const emb = new EmbedBuilder().setColor(0x5865F2).setTitle(`📋 Advertencias de ${target.tag}`)
-        .setDescription(userWarns.map((w, i) => `**${i+1}.** [`${w.id}`] - ${w.reason} (Por: <@${w.modId}>)`).join('\n'));
+        .setDescription(userWarns.map((w, i) => `**\${i+1}.** [\`${w.id}\`] - \${w.reason} (Por: <@\${w.modId}>)`).join('\\n'));
       await interaction.reply({ embeds: [emb] });
     }
     else if (sub === 'remove') {
@@ -51,7 +51,7 @@ module.exports = {
       warns[guildId][target.id] = warns[guildId][target.id].filter(w => w.id !== id);
       if (warns[guildId][target.id].length === initLen) return interaction.reply({ content: '❌ ID no encontrado.', ephemeral: true });
       writeWarns(warns);
-      await interaction.reply({ content: `✅ Advertencia `${id}` eliminada para ${target.tag}.` });
+      await interaction.reply({ content: `✅ Advertencia \`${id}\` eliminada para ${target.tag}.` });
     }
   }
 };
