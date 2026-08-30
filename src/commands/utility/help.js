@@ -50,10 +50,10 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false) {
   // Embed principal
   const mainEmbed = new EmbedBuilder()
     .setTitle('📚 Centro de Ayuda de Yujin')
-    .setDescription('¡Bienvenido al sistema de ayuda! Selecciona una categoría en el menú desplegable de abajo para ver los comandos disponibles.\\n\\n*Tip: Todos los comandos están disponibles usando `/` (Slash Commands).*')
+    .setDescription('¡Bienvenido al sistema de ayuda! Selecciona una categoría en el menú desplegable de abajo para ver los comandos disponibles.\n\n*Tip: Todos los comandos están disponibles usando `/` (Slash Commands).*')
     .setColor(0x5865F2)
     .setThumbnail(client.user.displayAvatarURL())
-    .setFooter({ text: \`Solicitado por \${user.tag}\`, iconURL: user.displayAvatarURL() })
+    .setFooter({ text: `Solicitado por ${user.tag}`, iconURL: user.displayAvatarURL() })
     .setTimestamp();
 
   // Menú desplegable
@@ -93,10 +93,10 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false) {
       const catCommands = categorized[selected];
 
       const catEmbed = new EmbedBuilder()
-        .setTitle(\`\${catData.name}\`)
-        .setDescription(\`\${catData.desc}\\n\\n\` + catCommands.map(c => \`**/\${c.name}** - \${c.desc}\`).join('\\n'))
+        .setTitle(`${catData.name}`)
+        .setDescription(`${catData.desc}\n\n` + catCommands.map(c => `**/${c.name}** - ${c.desc}`).join('\n'))
         .setColor(0x5865F2)
-        .setFooter({ text: \`Mostrando \${catCommands.length} comandos\` });
+        .setFooter({ text: `Mostrando ${catCommands.length} comandos` });
 
       await i.update({ embeds: [catEmbed], components: [row] });
     }
