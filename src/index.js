@@ -1,9 +1,17 @@
 // index.js
+const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const fs = require('fs');
-const path = require('path');
-const { Client, Collection, GatewayIntentBits, REST, Routes, Events } = require('discord.js');
 const logger = require('./utils/logger');
+
+// Global error handlers
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught Exception', { error: err.message, stack: err.stack });
+});
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection', { reason: reason instanceof Error ? reason.message : reason, stack: reason instanceof Error ? reason.stack : undefined });
+});
+const { Client, Collection, GatewayIntentBits, REST, Routes, Events } = require('discord.js');
 const { loadAndValidateConfig } = require('./utils/config/loader');
 const { scheduleShopRotation } = require('./utils/badgeShop');
 const { readProfiles, writeProfiles } = require('./utils/profileStore');
