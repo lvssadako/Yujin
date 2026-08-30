@@ -26,6 +26,12 @@ module.exports = (client) => {
         return;
       }
 
+      if (interaction.customId?.startsWith('streak_')) {
+        const { handleStreakCustomizerInteraction } = require('../services/streak/streakCustomizer');
+        await handleStreakCustomizerInteraction(interaction);
+        return;
+      }
+
       // BOTONES
       if (interaction.isButton()) {
                 // Botón de compra de boost XP en /shop

@@ -7,16 +7,17 @@ const dataDir = path.join(__dirname, '..', 'data');
 const profilePath = path.join(dataDir, 'profile.json');
 
 function readProfiles() {
-  const parsed = readJsonSafe(profilePath, { users: {}, badges: {} });
-  if (!parsed || typeof parsed !== 'object') return { users: {}, badges: {} };
+  const parsed = readJsonSafe(profilePath, { users: {}, badges: {}, globalUsers: {} });
+  if (!parsed || typeof parsed !== 'object') return { users: {}, badges: {}, globalUsers: {} };
   parsed.users = parsed.users || {};
   parsed.badges = parsed.badges || {};
+  parsed.globalUsers = parsed.globalUsers || {};
   return parsed;
 }
 
 function writeProfiles(obj) {
   fs.mkdirSync(dataDir, { recursive: true });
-  writeJsonAtomic(profilePath, obj || { users: {}, badges: {} });
+  writeJsonAtomic(profilePath, obj || { users: {}, badges: {}, globalUsers: {} });
 
   try {
     const day = new Date().toISOString().slice(0, 10);
@@ -70,4 +71,20 @@ function ensureUser(profiles, guildId, userId) {
   return u;
 }
 
-module.exports = { readProfiles, writeProfiles, ensureUser };
+function ensureGlobalUser(profiles, userId) {
+  if (!profiles.globalUsers) profiles.globalUsers = {};
+  if (!profiles.globalUsers[userId]) {
+    profiles.globalUsers[userId] = {
+      streakBgUrl: '',
+      streakBgOpacity: 0.65,
+      streakAccent: '',
+      streakTemplate: 'inferno'
+    };
+  }
+  const g = profiles.globalUsers[userId];
+  if (typeof g.streakBgOpacity !== 'number') g.streakBgOpacity = 0.65;
+  if (typeof g.streakTemplate !== 'string') g.streakTemplate = 'inferno';
+  return g;
+}
+
+module.exports = { readProfiles, writeProfiles, ensureUser, ensureGlobalUser };

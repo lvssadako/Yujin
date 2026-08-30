@@ -4,8 +4,8 @@ const logger = require('../../utils/logger');
 
 async function fetchAvatarBuffer(url) {
   try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('Avatar fetch error');
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error('Fetch buffer error');
     const ab = await res.arrayBuffer();
     return Buffer.from(ab);
   } catch {
@@ -13,7 +13,6 @@ async function fetchAvatarBuffer(url) {
   }
 }
 
-// Función roundRect matemática sin glitches
 function roundRect(ctx, x, y, w, h, r) {
   if (w < 2 * r) r = w / 2;
   if (h < 2 * r) r = h / 2;
@@ -26,14 +25,20 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-// Icono vectorial de llama de fuego renderizado nativamente (sin depender de fuentes de emojis)
+function drawImageCover(ctx, img, x, y, w, h) {
+  const iw = img.width, ih = img.height;
+  const scale = Math.max(w / iw, h / ih);
+  const nw = iw * scale, nh = ih * scale;
+  const cx = x + (w - nw) / 2, cy = y + (h - nh) / 2;
+  ctx.drawImage(img, cx, cy, nw, nh);
+}
+
 function drawFlameIcon(ctx, x, y, size, mainColor = '#FF4500') {
   ctx.save();
   ctx.translate(x, y);
   const s = size / 32;
   ctx.scale(s, s);
 
-  // Llama exterior
   ctx.fillStyle = mainColor;
   ctx.beginPath();
   ctx.moveTo(16, 1);
@@ -46,7 +51,6 @@ function drawFlameIcon(ctx, x, y, size, mainColor = '#FF4500') {
   ctx.closePath();
   ctx.fill();
 
-  // Núcleo brillante interior
   ctx.fillStyle = '#FFEAA7';
   ctx.beginPath();
   ctx.moveTo(16, 13);
@@ -66,32 +70,67 @@ async function generateStreakCard(user, status, botName = 'Bot') {
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
 
-  const { streakDays, isActiveToday, currentTier, nextTier, progressPercent, daysToNext, freezersCount } = status;
-  const tierColorHex = '#' + (currentTier.color ? currentTier.color.toString(16).padStart(6, '0') : 'ff6b6b');
+  const {
+    streakDays,
+    isActiveToday,
+    currentTier,
+    nextTier,
+    progressPercent,
+    daysToNext,
+    freezersCount,
+    streakBgUrl,
+    streakBgOpacity,
+    streakAccent
+  } = status;
 
-  // 1. Fondo oscuro con gradiente suave
+  const tierColorHex = streakAccent || ('#' + (currentTier.color ? currentTier.color.toString(16).padStart(6, '0') : 'ff6b6b'));
+
+  // 1. Fondo base degradado
   const bgGrad = ctx.createLinearGradient(0, 0, width, height);
-  bgGrad.addColorStop(0, '#10111A');
+  bgGrad.addColorStop(0, '#0F101A');
   bgGrad.addColorStop(0.5, '#151726');
-  bgGrad.addColorStop(1, '#0C0D14');
+  bgGrad.addColorStop(1, '#0B0C12');
   ctx.fillStyle = bgGrad;
   roundRect(ctx, 0, 0, width, height, 24);
   ctx.fill();
 
-  // 2. Borde exterior elegante
+  // 2. Imagen de fondo / Wallpaper personalizado (si está configurado)
+  if (streakBgUrl) {
+    try {
+      const bgBuf = await fetchAvatarBuffer(streakBgUrl);
+      if (bgBuf) {
+        const bgImg = await loadImage(bgBuf);
+        ctx.save();
+        roundRect(ctx, 0, 0, width, height, 24);
+        ctx.clip();
+        drawImageCover(ctx, bgImg, 0, 0, width, height);
+
+        // Capa oscura translúcida para garantizar legibilidad perfecta
+        const opacity = typeof streakBgOpacity === 'number' ? streakBgOpacity : 0.65;
+        const tintAlpha = Math.min(0.9, Math.max(0.2, 1 - opacity));
+        ctx.fillStyle = `rgba(12, 13, 20, ${tintAlpha.toFixed(2)})`;
+        ctx.fillRect(0, 0, width, height);
+        ctx.restore();
+      }
+    } catch (e) {
+      logger.warn('[streakCard] Falló render de wallpaper de fondo:', e?.message);
+    }
+  }
+
+  // 3. Borde exterior elegante
   ctx.strokeStyle = tierColorHex;
   ctx.lineWidth = 2.5;
   roundRect(ctx, 2, 2, width - 4, height - 4, 24);
   ctx.stroke();
 
-  // 3. Brillo ambiental en la esquina superior derecha
+  // 4. Brillo ambiental en la esquina superior derecha
   const glowGrad = ctx.createRadialGradient(width - 120, 70, 10, width - 120, 70, 260);
-  glowGrad.addColorStop(0, tierColorHex + '28');
+  glowGrad.addColorStop(0, tierColorHex + '25');
   glowGrad.addColorStop(1, '#00000000');
   ctx.fillStyle = glowGrad;
   ctx.fillRect(0, 0, width, height);
 
-  // 4. Avatar del usuario
+  // 5. Avatar del usuario
   const avSize = 130;
   const avX = 45;
   const avY = 45;
@@ -132,7 +171,7 @@ async function generateStreakCard(user, status, botName = 'Bot') {
     ctx.fillText('AVATAR', avX + 15, avY + 75);
   }
 
-  // 5. Nombre de usuario
+  // 6. Nombre de usuario
   const textX = avX + avSize + 28;
   ctx.fillStyle = '#FFFFFF';
   ctx.font = 'bold 34px "Segoe UI", sans-serif';
@@ -148,7 +187,7 @@ async function generateStreakCard(user, status, botName = 'Bot') {
   const pillX = width - pillW - 45;
   const pillY = avY + 12;
 
-  ctx.fillStyle = tierColorHex + '22';
+  ctx.fillStyle = tierColorHex + '28';
   roundRect(ctx, pillX, pillY, pillW, pillH, 10);
   ctx.fill();
   ctx.strokeStyle = tierColorHex;
@@ -156,12 +195,11 @@ async function generateStreakCard(user, status, botName = 'Bot') {
   roundRect(ctx, pillX, pillY, pillW, pillH, 10);
   ctx.stroke();
 
-  // Pequeña llama vectorial dentro de la pastilla
   drawFlameIcon(ctx, pillX + 10, pillY + 7, 18, tierColorHex);
   ctx.fillStyle = tierColorHex;
   ctx.fillText(tierLabel, pillX + 30, pillY + 22);
 
-  // 6. Contador Gigante de Racha con Llama Vectorial
+  // 7. Contador Gigante de Racha con Llama Vectorial
   const flameSize = 44;
   drawFlameIcon(ctx, textX, avY + 68, flameSize, tierColorHex);
 
@@ -180,7 +218,7 @@ async function generateStreakCard(user, status, botName = 'Bot') {
   const statusH = 28;
   
   if (statusX + statusW < width - 40) {
-    ctx.fillStyle = statusColor + '1E';
+    ctx.fillStyle = statusColor + '20';
     roundRect(ctx, statusX, statusY, statusW, statusH, 8);
     ctx.fill();
     ctx.strokeStyle = statusColor + '88';
@@ -188,7 +226,6 @@ async function generateStreakCard(user, status, botName = 'Bot') {
     roundRect(ctx, statusX, statusY, statusW, statusH, 8);
     ctx.stroke();
 
-    // Punto circular indicador
     ctx.beginPath();
     ctx.arc(statusX + 13, statusY + statusH / 2, 4, 0, Math.PI * 2);
     ctx.fillStyle = statusColor;
@@ -197,7 +234,7 @@ async function generateStreakCard(user, status, botName = 'Bot') {
     ctx.fillText(statusLabel, statusX + 22, statusY + 19);
   }
 
-  // 7. Fila de Beneficios (Píldoras informativas estilizadas)
+  // 8. Fila de Beneficios (Píldoras informativas estilizadas)
   const pillsY = 210;
   const bonusXp = Math.round((currentTier.xpMultiplier - 1) * 100);
   const perks = [
@@ -212,7 +249,7 @@ async function generateStreakCard(user, status, botName = 'Bot') {
     const pw = ctx.measureText(perk.label).width + 32;
     const ph = 34;
     
-    ctx.fillStyle = '#171926';
+    ctx.fillStyle = '#141624E6';
     roundRect(ctx, curPillX, pillsY, pw, ph, 8);
     ctx.fill();
     ctx.strokeStyle = perk.color + '55';
@@ -220,7 +257,6 @@ async function generateStreakCard(user, status, botName = 'Bot') {
     roundRect(ctx, curPillX, pillsY, pw, ph, 8);
     ctx.stroke();
 
-    // Punto de color
     ctx.beginPath();
     ctx.arc(curPillX + 13, pillsY + ph / 2, 3.5, 0, Math.PI * 2);
     ctx.fillStyle = perk.dot;
@@ -231,14 +267,14 @@ async function generateStreakCard(user, status, botName = 'Bot') {
     curPillX += pw + 14;
   }
 
-  // 8. Barra de Progreso hacia el siguiente nivel
+  // 9. Barra de Progreso hacia el siguiente nivel
   const barX = 45;
   const barY = 280;
   const barW = width - 90;
   const barH = 20;
 
   // Fondo de la barra
-  ctx.fillStyle = '#171926';
+  ctx.fillStyle = '#141624E6';
   roundRect(ctx, barX, barY, barW, barH, 10);
   ctx.fill();
 
@@ -254,12 +290,12 @@ async function generateStreakCard(user, status, botName = 'Bot') {
     ctx.fill();
   }
 
-  // 9. Texto explicativo inferior
+  // 10. Texto explicativo inferior
   const nextText = nextTier
     ? `Siguiente nivel: ${nextTier.name.toUpperCase()} (${pct}%) · Faltan ${daysToNext} día${daysToNext === 1 ? '' : 's'} consecutivos`
     : '¡Has alcanzado el rango máximo de racha de la comunidad!';
 
-  ctx.fillStyle = '#8E92A8';
+  ctx.fillStyle = '#9FA3BC';
   ctx.font = '14px "Segoe UI", sans-serif';
   ctx.fillText(nextText, barX, barY + 42);
 
@@ -267,7 +303,7 @@ async function generateStreakCard(user, status, botName = 'Bot') {
   const footerRight = `${nameDisplay} · Chatea a diario para mantener tu fuego`;
   ctx.font = '13px "Segoe UI", sans-serif';
   const frW = ctx.measureText(footerRight).width;
-  ctx.fillStyle = '#55586D';
+  ctx.fillStyle = '#6E728B';
   ctx.fillText(footerRight, width - frW - 45, barY + 42);
 
   const buffer = canvas.toBuffer('image/png');

@@ -1,5 +1,6 @@
-const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
+const { readProfiles, writeProfiles, ensureUser, ensureGlobalUser } = require('../../utils/profileStore');
 const { getInventory, removeItem, addCoins } = require('../economy').economyService;
+const { STREAK_TEMPLATES } = require('../../constants/streakThemes');
 const { readConfig } = require('../../utils/configCache');
 const logger = require('../../utils/logger');
 
@@ -58,7 +59,6 @@ function recordMessageActivity(guildId, userId) {
   if (isConsecutive) {
     newStreak = previousStreak + 1;
   } else if (previousStreak > 0) {
-    // Si perdió días, verificar si tiene congelador en el inventario
     const inv = getInventory(guildId, userId);
     if (inv && (inv['congelador'] || 0) > 0) {
       removeItem(guildId, userId, 'congelador', 1);
@@ -73,7 +73,6 @@ function recordMessageActivity(guildId, userId) {
   u.streakDays = newStreak;
   u.lastActiveDay = today;
 
-  // Evaluar recompensas por subir de nivel de fuego
   const prevTier = getFlameTier(previousStreak);
   const newTier = getFlameTier(newStreak);
   const tierUpgraded = (isConsecutive || savedByFreeze) && (newTier.minDays > prevTier.minDays);
@@ -102,6 +101,7 @@ function recordMessageActivity(guildId, userId) {
 function getUserStreakStatus(guildId, userId) {
   const profiles = readProfiles();
   const u = ensureUser(profiles, guildId, userId);
+  const g = ensureGlobalUser(profiles, userId);
   const { today, midnightTs, msRemaining } = getLocalDayInfo();
 
   const streakDays = Number(u.streakDays) || 0;
@@ -122,6 +122,12 @@ function getUserStreakStatus(guildId, userId) {
     daysToNext = nextTier.minDays - streakDays;
   }
 
+  // Resolver fondo global
+  let effectiveBgUrl = g.streakBgUrl || '';
+  if (!effectiveBgUrl && g.streakTemplate && STREAK_TEMPLATES[g.streakTemplate]) {
+    effectiveBgUrl = STREAK_TEMPLATES[g.streakTemplate].url;
+  }
+
   return {
     streakDays,
     lastActiveDay: lastActive,
@@ -133,8 +139,42 @@ function getUserStreakStatus(guildId, userId) {
     midnightTs,
     msRemaining,
     freezersCount,
-    alertsDisabled: Boolean(u.streakAlertsDisabled)
+    alertsDisabled: Boolean(u.streakAlertsDisabled),
+    // Personalización global
+    streakBgUrl: effectiveBgUrl,
+    streakBgOpacity: typeof g.streakBgOpacity === 'number' ? g.streakBgOpacity : 0.65,
+    streakAccent: g.streakAccent || '',
+    streakTemplate: g.streakTemplate || 'inferno'
   };
+}
+
+function setGlobalStreakCustomization(userId, updates = {}) {
+  const profiles = readProfiles();
+  const g = ensureGlobalUser(profiles, userId);
+
+  if (typeof updates.streakTemplate === 'string') {
+    g.streakTemplate = updates.streakTemplate;
+    if (updates.streakTemplate === 'none') {
+      g.streakBgUrl = '';
+    } else if (STREAK_TEMPLATES[updates.streakTemplate]) {
+      g.streakBgUrl = STREAK_TEMPLATES[updates.streakTemplate].url;
+    }
+  }
+
+  if (typeof updates.streakBgUrl === 'string') {
+    g.streakBgUrl = updates.streakBgUrl;
+  }
+
+  if (typeof updates.streakAccent === 'string') {
+    g.streakAccent = updates.streakAccent;
+  }
+
+  if (typeof updates.streakBgOpacity === 'number') {
+    g.streakBgOpacity = updates.streakBgOpacity;
+  }
+
+  writeProfiles(profiles);
+  return g;
 }
 
 function setStreakAlertPreference(guildId, userId, disabled) {
@@ -175,6 +215,7 @@ module.exports = {
   getLocalDayInfo,
   recordMessageActivity,
   getUserStreakStatus,
+  setGlobalStreakCustomization,
   setStreakAlertPreference,
   getStreakLeaderboard
 };
