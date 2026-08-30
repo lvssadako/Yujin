@@ -1,59 +1,40 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { getBalance } = require('../../services/economy/index').economyService;
-const { getXpMultiplier } = require('../../services/level').levelService;
+const { getBalance, getInventory } = require('../../services/economy').economyService;
+
+async function renderBalance(guildId, target) {
+    const bal = getBalance(guildId, target.id);
+    const inv = getInventory(guildId, target.id);
+    const invText = Object.keys(inv).length > 0 
+      ? Object.entries(inv).map(([item, count]) => `> **${item}**: x${count}`).join('\n')
+      : '> *Mochila vacía.*';
+
+    return new EmbedBuilder()
+      .setColor(0xF1C40F)
+      .setAuthor({ name: `Estado de Cuenta de ${target.tag}`, iconURL: target.displayAvatarURL() })
+      .addFields(
+        { name: '💰 Billetera', value: `**\`${bal.coins.toLocaleString()}\`** 🪙`, inline: true },
+        { name: '🏦 Banco', value: `**\`${bal.bank.toLocaleString()}\`** 🪙`, inline: true },
+        { name: '💎 Total', value: `**\`${(bal.coins + bal.bank).toLocaleString()}\`** 🪙`, inline: true },
+        { name: '🎒 Mochila', value: invText, inline: false }
+      )
+      .setFooter({ text: 'Usa /bank para guardar dinero y /buy para objetos.' })
+      .setTimestamp();
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('balance')
-    .setDescription('Ver tu balance')
-    .addUserOption(o => o.setName('user').setDescription('Usuario').setRequired(false)),
-
+    .setDescription('Revisa tu balance (Billetera y Banco) e inventario rápido.')
+    .addUserOption(opt => opt.setName('usuario').setDescription('Ver el balance de otro usuario').setRequired(false)),
   async execute(interaction) {
-    const target = interaction.options.getUser('user') || interaction.user;
-    const { coins, gems } = getBalance(interaction.guildId, target.id);
-
-    const embed = new EmbedBuilder()
-      .setColor(0xF6C343)
-      .setTitle(`💰 Balance de ${target.username}`)
-      .addFields(
-        { name: '🪙 Monedas', value: String(coins), inline: true },
-        { name: '💎 Gemas', value: String(gems), inline: true }
-      );
-
-    return interaction.reply({ embeds: [embed] });
+    const target = interaction.options.getUser('usuario') || interaction.user;
+    const emb = await renderBalance(interaction.guildId, target);
+    await interaction.reply({ embeds: [emb] });
   },
-
   async executePrefix(message, args, client) {
-    if (!message.guild || !message.member) {
-      return message.reply('❌ Este comando solo puede usarse en servidores.');
-    }
-
-    // Buscar usuario objetivo: mención, id o nombre
-    let targetUser = message.author;
-    if (message.mentions.users.size > 0) {
-      targetUser = message.mentions.users.first();
-    } else if (args.length > 0) {
-      const arg = args[0].replace(/[<@!>]/g, '');
-      let user = message.guild.members.cache.get(arg)?.user;
-      if (!user) {
-        user = message.guild.members.cache.find(m =>
-          m.user.username.toLowerCase() === arg.toLowerCase() ||
-          m.user.tag.toLowerCase() === arg.toLowerCase()
-        )?.user;
-      }
-      if (user) targetUser = user;
-    }
-
-    const { coins, gems } = getBalance(message.guild.id, targetUser.id);
-
-    const embed = new EmbedBuilder()
-      .setColor(0xF6C343)
-      .setTitle(`💰 Balance de ${targetUser.username}`)
-      .addFields(
-        { name: '🪙 Monedas', value: String(coins), inline: true },
-        { name: '💎 Gemas', value: String(gems), inline: true }
-      );
-
-    return message.reply({ embeds: [embed] });
+    let target = message.author;
+    if (message.mentions.users.size > 0) target = message.mentions.users.first();
+    const emb = await renderBalance(message.guild.id, target);
+    await message.reply({ embeds: [emb] });
   }
 };
