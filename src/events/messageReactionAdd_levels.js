@@ -1,11 +1,11 @@
-const logger = require('./utils/logger');
+const logger = require('../utils/logger');
 const { Events } = require('discord.js');
 const { handleLevelRoles } = require('../utils/levelRoles');
 const { updateTopRoles } = require('../commands/toproles');
 const { readConfig } = require('../utils/configCache');
 const { readLevels, writeLevels, ensureUserData } = require('../services/level').levelService;
 const { updateMissionProgress } = require('../utils/dailyMissions');
-const { addCoins } = require('../src/services/economy').economyService;
+const { addCoins } = require('../services/economy').economyService;
 
 function xpToNext(level) { return Math.round(200 * Math.pow(level + 1, 1.4)); }
 

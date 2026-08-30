@@ -1,4 +1,4 @@
-const logger = require('./utils/logger');
+const logger = require('../utils/logger');
 const { Events } = require('discord.js');
 const { updateTopRoles } = require('../commands/toproles');
 const { handleLevelRoles } = require('../utils/levelRoles');
@@ -6,7 +6,7 @@ const { readProfiles, writeProfiles, ensureUser } = require('../utils/profileSto
 const { readConfig } = require('../utils/configCache');
 const { readLevels, writeLevels, ensureUserData, getXpMultiplier } = require('../services/level').levelService;
 const { checkAndGrantBadges } = require('../utils/badgeManager');
-const { addCoins } = require('../src/services/economy').economyService;
+const { addCoins } = require('../services/economy').economyService;
 const { updateMissionProgress } = require('../utils/dailyMissions');
 const { shouldSendAutoMessage } = require('../utils/autoMessageGuard');
 

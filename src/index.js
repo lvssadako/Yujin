@@ -94,6 +94,7 @@ require('./events/interactionCreate')(client);
 require('./events/messageCreate')(client);
 // Cargar y reprogramar timers de bump pendientes
 require('./events/bumpTimersLoader')(client);
+require('./services/giveaways/giveawayManager').init(client);
 
 // Prefijo de comandos
 const PREFIX = '&';
