@@ -33,11 +33,12 @@ async function endGiveaway(messageId, guildId, channelId) {
     }
     
     const emb = EmbedBuilder.from(msg.embeds[0])
-      .setColor(0x95A5A6)
-      .setDescription(`Terminado\n\n**Ganadores:** ${winners.length > 0 ? winners.map(id => `<@${id}>`).join(', ') : 'Nadie participó'}`);
+      .setColor(0x2F3136) // Dark theme color for ended
+      .setTitle('🎊 Sorteo Finalizado 🎊')
+      .setDescription(`🎁 **Premio:** ${gw.prize}\n🏆 **Ganadores:** ${gw.winnerCount}\n👑 **Host:** <@${gw.hostId || 'N/A'}>\n\n🎉 **Ganadores Oficiales:**\n${winners.length > 0 ? winners.map(id => `> <@${id}>`).join('\n') : '> *Nadie participó.*'}`);
     
     const disabledBtn = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('gw_join').setLabel('Sorteo Finalizado').setEmoji('🎉').setStyle(ButtonStyle.Secondary).setDisabled(true)
+      new ButtonBuilder().setCustomId('gw_join').setLabel('Sorteo Finalizado').setEmoji('🔒').setStyle(ButtonStyle.Secondary).setDisabled(true)
     );
     
     await msg.edit({ embeds: [emb], components: [disabledBtn] });
@@ -96,11 +97,13 @@ function init(client) {
 
 async function createGiveaway(channel, prize, durationMs, winnerCount, hostId) {
   const endAt = Date.now() + durationMs;
+  const endTs = Math.floor(endAt / 1000);
+  
   const emb = new EmbedBuilder()
-    .setTitle('🎉 ¡NUEVO SORTEO! 🎉')
-    .setDescription(`**Premio:** ${prize}\n**Ganadores:** ${winnerCount}\n**Organizado por:** <@${hostId}>\n\n¡Toca el botón 🎉 para participar!`)
-    .setColor(0xF47FFF)
-    .setFooter({ text: `Participantes: 0 • Termina` })
+    .setTitle('🎁 ¡Sorteo Activo! 🎁')
+    .setDescription(`**Premio:** ${prize}\n**Ganadores:** ${winnerCount}\n**Organizado por:** <@${hostId}>\n\n⏳ **Termina:** <t:${endTs}:R> (<t:${endTs}:f>)\n\n*¡Toca el botón 🎉 abajo para participar!*`)
+    .setColor(0x5865F2)
+    .setFooter({ text: `Participantes: 0` })
     .setTimestamp(endAt);
     
   const row = new ActionRowBuilder().addComponents(
