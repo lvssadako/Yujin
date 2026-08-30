@@ -1,4 +1,4 @@
-const logger = require('../src/utils/logger');
+const logger = require('./utils/logger');
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const { readProfiles, writeProfiles, ensureUser } = require('../../../utils/profileStore');
 const { readLevels } = require('../../../services/level').levelService;

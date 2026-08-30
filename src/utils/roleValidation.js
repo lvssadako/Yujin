@@ -1,4 +1,4 @@
-const logger = require('../src/utils/logger');
+const logger = require('./utils/logger');
 function canBotManageRole(guild, role) {
   if (!role || typeof role !== 'object') return false;
   if (!guild || typeof guild !== 'object') return false;

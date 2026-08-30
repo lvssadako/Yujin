@@ -1,4 +1,4 @@
-const logger = require('../src/utils/logger');
+const logger = require('./utils/logger');
 const { SlashCommandBuilder } = require('discord.js');
 const { readProfiles, writeProfiles, ensureUser } = require('../../../utils/profileStore');
 const { normalizeExternalImageUrl } = require('../../../utils/urlSafety');

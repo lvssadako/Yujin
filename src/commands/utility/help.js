@@ -1,4 +1,4 @@
-const logger = require('../src/utils/logger');
+const logger = require('./utils/logger');
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require('discord.js');
 
 module.exports = {

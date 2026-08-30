@@ -1,4 +1,4 @@
-const logger = require('../src/utils/logger');
+const logger = require('./utils/logger');
 const { Events } = require('discord.js');
 const { readConfig } = require('../utils/configCache');
 const { setStart, popElapsedMinutes, clearTimer } = require('../utils/roleTimeStore');
