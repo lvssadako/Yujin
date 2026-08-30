@@ -59,7 +59,7 @@ This document summarizes the comprehensive stabilization, security hardening, mo
 
 ## Test Suite Status
 
-**Total Tests:** 45 (all passing)
+**Total Tests:** 47 (all passing)
 
 | Test File | Tests | Domain Tested |
 |---|:---:|---|
@@ -76,6 +76,7 @@ This document summarizes the comprehensive stabilization, security hardening, mo
 | `src/utils/logger/__tests__/logger.test.js` | 2 | Winston logger instance & structured logging |
 | `src/utils/config/__tests__/config-schema.test.js` | 3 | Zod schema validation & loader integration |
 | `src/services/economy/__tests__/economy-service.test.js` | 2 | Balance queries, atomic coin additions/deductions |
+| `src/services/level/__tests__/level-service.test.js` | 2 | Balanced voice/text XP & daily/weekly leaderboards |
 | `src/middleware/__tests__/rate-limit.test.js` | 4 | In-memory sliding window, checks, reset & TTL cleanup |
 | `src/database/__tests__/database-adapter.test.js` | 2 | Atomic CRUD operations & repository transactions |
 

@@ -93,8 +93,10 @@ module.exports = (client) => {
 
       const cfg = readConfig();
 
-      // 1) Contar SIEMPRE el mensaje (perfil + misiones)
+      // 1) Contar SIEMPRE el mensaje (perfil + misiones + diarios/semanales)
       data.messages = (data.messages || 0) + 1;
+      data.daily.messages = (data.daily.messages || 0) + 1;
+      data.weekly.messages = (data.weekly.messages || 0) + 1;
       updateMissionProgress(message.guild, userId, 'messages', 1);
 
       // 2) Filtros anti-spam/cooldown para XP
@@ -147,6 +149,12 @@ module.exports = (client) => {
         if (gained > 0) {
           const oldLevel = data.level || 0;
           data.xp = (data.xp || 0) + gained;
+          data.textXp = (data.textXp || 0) + gained;
+          data.daily.xp = (data.daily.xp || 0) + gained;
+          data.daily.textXp = (data.daily.textXp || 0) + gained;
+          data.weekly.xp = (data.weekly.xp || 0) + gained;
+          data.weekly.textXp = (data.weekly.textXp || 0) + gained;
+
           updateMissionProgress(message.guild, userId, 'xp_gain', gained);
 
           while (data.xp >= xpToNext(data.level)) {

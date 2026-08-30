@@ -20,30 +20,44 @@
 | **Capa de Base de Datos y Repositorios** | ✅ Completado | Adaptadores `src/database/` preparados para JSON y SQLite con `EconomyRepository` |
 | **Middleware de Rate Limiting** | ✅ Completado | `RateLimiter` sliding window en memoria con limpieza automática TTL y cooldowns |
 | **Ciclo de Vida y Graceful Shutdown** | ✅ Completado | Handlers `SIGINT`/`SIGTERM` con limpieza de timers, watchers y cierre ordenado |
-| **Suite de Pruebas Automatizadas** | ✅ Completado | 45 tests automatizados (`node --test`) pasando al 100% de manera consistente |
+| **Leaderboard Multi-Período y Categorías** | ✅ Completado | Tops Global, Semanal y Diario con filtros interactivos de General, Texto y Voz |
+| **Sistema Balanceado de XP (Voz & Texto)** | ✅ Completado | Ratios equilibrados (20 XP/min), métricas temporales y anti-AFK en canales de voz |
+| **Centro de Ayuda Rediseñado (`/help`)** | ✅ Completado | Banner HD verificado, categorías dinámicas y navegación intuitiva |
+| **Suite de Pruebas Automatizadas** | ✅ Completado | 47 tests automatizados (`node --test`) pasando al 100% de manera consistente |
 
 ---
 
 ## 🌟 SISTEMAS NUEVOS DESTACADOS
 
-### 1. Motor de Rachas de Actividad (`src/services/streak/`)
+### 1. Motor de Niveles y Leaderboard Dinámico (`src/commands/level/leaderboard.js`, `src/services/level/`)
+- **Tops por Período**: Clasificación **Global**, **Semanal** (reseteo inteligente por semana ISO) y **Diario** (por día actual).
+- **Filtros por Actividad**: Vistas de clasificación **General** (Nivel y XP), **Chat de Texto** (Mensajes) y **Canales de Voz** (Horas y Minutos).
+- **Balance Texto/Voz**: 20 XP base por minuto en llamadas de voz activas con modificadores de presencia y anti-AFK.
+- **Navegación Interactiva**: Botones de cambio de período y categoría en vivo con renderizado Canvas HD.
+
+### 2. Centro de Ayuda y Guía de Comandos (`src/commands/utility/help.js`)
+- Banner oficial de alta resolución verificado en CDN seguro de Unsplash.
+- Menú de selección interactivo por categorías (`Moderación`, `Economía`, `Juegos`, `Niveles`, `Boosts`, `Configuración`, `Utilidad`).
+- Vista detallada de comandos con sintaxis, permisos requeridos y ejemplos de uso (`/help comando: <nombre>`).
+
+### 3. Motor de Rachas de Actividad (`src/services/streak/`)
 - Registro diario con detección precisa de medianoche por huso horario.
 - 6 Niveles de Fuego con beneficios progresivos (+% XP pasivo, % descuento en tienda, drops de monedas).
 - Generación de tarjetas Canvas con llamas vectoriales nítidas, avatar circular y firmas dinámicas.
 - Estudio de personalización interactivo (`/streak customizar`) con 7 plantillas temáticas sincronizadas.
 
-### 2. Motor de Hot Reload y Watcher Inteligente (`src/loaders/commandLoader.js`)
+### 4. Motor de Hot Reload y Watcher Inteligente (`src/loaders/commandLoader.js`)
 - Watcher en memoria con purga de caché `require.cache`.
 - Sincronización REST con Discord API protegida por hash SHA-256 (`syncSlashCommands`) para evitar rate limits.
 - Comandos administrativos `/reload` y `/restart`.
 
-### 3. Middleware y Seguridad Operativa (`src/middleware/rateLimit.js`, `src/utils/roleValidation.js`)
+### 5. Middleware y Seguridad Operativa (`src/middleware/rateLimit.js`, `src/utils/roleValidation.js`)
 - Rate limiting sliding-window con TTL para proteger minijuegos y transacciones de economía contra abusos.
 - Validación de jerarquía estricta contra escalada de privilegios (`canBotManageRole`).
 - Moderación completa: `/ban`, `/unban`, `/kick`, `/timeout`, `/warn`, `/clear`.
 - Auditoría de mensajes borrados y editados.
 
-### 4. Capa de Base de Datos y Repositorios (`src/database/`)
+### 6. Capa de Base de Datos y Repositorios (`src/database/`)
 - Adaptador abstracto `BaseDatabaseAdapter`, implementación atómica `JsonDatabaseAdapter` y repositorio `EconomyRepository`.
 
 ---
@@ -93,8 +107,9 @@
 ✔ RateLimiter allows requests within capacity
 ✔ RateLimiter check() inspects capacity without consuming points
 ✔ RateLimiter reset() and clear() work correctly
-✔ RateLimiter cleanupExpired() purges expired keys
+✔ levelService getDayKey and getWeekKey return valid ISO format keys
+✔ levelService adds text and voice XP with distinct daily and weekly tracking
 ✔ JsonDatabaseAdapter performs atomic get, set, delete operations
 ✔ EconomyRepository manages balances and transactions
-ℹ pass 45, fail 0, suites 0, total 45 tests (100% Passing)
+ℹ pass 47, fail 0, suites 0, total 47 tests (100% Passing)
 ```

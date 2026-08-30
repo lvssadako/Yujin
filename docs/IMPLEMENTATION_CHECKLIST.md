@@ -165,7 +165,7 @@ Risk: 🟢 Bajo
 │ TESTING & QA AUTOMATIZADO                               │
 └─────────────────────────────────────────────────────────┘
 
-☑ Test runner nativo de Node.js (node --test) con 45 pruebas:
+☑ Test runner nativo de Node.js (node --test) con 47 pruebas:
   ├─ src/utils/__tests__/json-store.test.js (3 tests)
   ├─ src/utils/__tests__/event-guard.test.js (2 tests)
   ├─ src/utils/__tests__/bump-reminder.test.js (1 test)
@@ -179,12 +179,13 @@ Risk: 🟢 Bajo
   ├─ src/utils/logger/__tests__/logger.test.js (2 tests)
   ├─ src/utils/config/__tests__/config-schema.test.js (3 tests)
   ├─ src/services/economy/__tests__/economy-service.test.js (2 tests)
+  ├─ src/services/level/__tests__/level-service.test.js (2 tests)
   ├─ src/middleware/__tests__/rate-limit.test.js (4 tests)
   └─ src/database/__tests__/database-adapter.test.js (2 tests)
 
 ☑ Configuración de package.json ("npm test" ejecuta todas las suites).
 
-Status: ✅ Completado al 100% (45/45 pruebas pasando)
+Status: ✅ Completado al 100% (47/47 pruebas pasando)
 Risk: 🟢 Bajo
 ```
 

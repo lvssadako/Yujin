@@ -67,13 +67,42 @@ async function awardVoice(guild, userId, member, channelId, sinceMs) {
   const chanMult = (cfg.channels && Number(cfg.channels[channelId])) || 1;
   const roleBonusPercent = getRoleBonusPercent(cfg, member);
   const roleMult = 1 + (roleBonusPercent / 100);
-  const basePerMin = Number(cfg.voiceXpPerMinute) || 6;
+  
+  // Balanceado: 20 XP base por minuto en canal de voz activo (equivalente a chat activo)
+  const basePerMin = Number(cfg.voiceXpPerMinute) || 20;
 
-  const gained = Math.max(0, Math.round(basePerMin * (elapsedSec / 60) * chanMult * roleMult));
+  // Modificadores de actividad y anti-AFK
+  let activityMult = 1.0;
+  if (member?.voice) {
+    if (member.voice.selfDeaf || member.voice.serverDeaf) {
+      activityMult = 0.2; // Sordeado recibe sólo 20%
+    } else if (member.voice.selfMute || member.voice.serverMute) {
+      activityMult = 0.8; // Muteado pero escuchando recibe 80%
+    }
+
+    const channel = member.voice.channel;
+    if (channel && channel.members.filter(m => !m.user.bot).size <= 1) {
+      activityMult *= 0.5; // Solo en sala recibe 50%
+    }
+  }
+
+  const gained = Math.max(0, Math.round(basePerMin * (elapsedSec / 60) * chanMult * roleMult * activityMult));
+  const elapsedMs = elapsedSec * 1000;
 
   const oldLevel = data.level;
   data.voiceTime = (data.voiceTime || 0) + elapsedSec;
-  data.xp = (data.xp || 0) + gained;
+  data.voiceMs = (data.voiceMs || 0) + elapsedMs;
+  data.daily.voiceMs = (data.daily.voiceMs || 0) + elapsedMs;
+  data.weekly.voiceMs = (data.weekly.voiceMs || 0) + elapsedMs;
+
+  if (gained > 0) {
+    data.xp = (data.xp || 0) + gained;
+    data.voiceXp = (data.voiceXp || 0) + gained;
+    data.daily.xp = (data.daily.xp || 0) + gained;
+    data.daily.voiceXp = (data.daily.voiceXp || 0) + gained;
+    data.weekly.xp = (data.weekly.xp || 0) + gained;
+    data.weekly.voiceXp = (data.weekly.voiceXp || 0) + gained;
+  }
 
   let leveledUp = false;
   while (data.xp >= xpToNext(data.level)) { data.level += 1; leveledUp = true; }

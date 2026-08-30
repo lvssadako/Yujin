@@ -182,9 +182,9 @@ El proyecto utiliza el test runner nativo de Node.js (`node --test`), garantizan
 - Jerarquía de roles y asignación segura (`roleValidation`).
 - Persistencia atómica de JSON y protección contra duplicidad de recompensas (`grantOnce`).
 - Validación de esquemas con Zod (`schema.js`) y logging centralizado con Winston (`logger`).
-- Servicio desacoplado de economía con operaciones de balance y transacciones (`economyService`).
 - Middleware de Rate Limiting y Cooldowns con limpieza TTL (`rateLimit.js`).
 - Capa de abstracción de base de datos y repositorios (`src/database/`).
+- Sistema balanceado de niveles de texto y voz con tops global, semanal y diario (`src/services/level/`).
 
 Ejecución de la suite completa:
 ```bash
@@ -192,7 +192,7 @@ npm test
 # o directamente:
 node --test "src/**/__tests__/*.test.js"
 ```
-*Resultado: 45 pruebas pasando al 100%.*
+*Resultado: 47 pruebas pasando al 100%.*
 
 ---
 
