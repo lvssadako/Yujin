@@ -31,8 +31,16 @@ module.exports = {
       warns[guildId][target.id].push({ id: warnId, reason, date: Date.now(), modId: interaction.user.id });
       writeWarns(warns);
       
-      const emb = new EmbedBuilder().setColor(0xFFA500).setTitle('⚠️ Usuario Advertido')
-        .setDescription(`**${target.tag}** ha recibido una advertencia.\\n**Razón:** ${reason}\\n**ID:** \`${warnId}\``);
+      const emb = new EmbedBuilder().setColor(0xFFA500)
+        .setAuthor({ name: '⚠️ Nueva Advertencia (Warn)' })
+        .setThumbnail(target.displayAvatarURL({ dynamic: true }))
+        .addFields(
+          { name: '👤 Usuario', value: `<@${target.id}> (${target.tag})`, inline: true },
+          { name: '🛡️ Moderador', value: `<@${interaction.user.id}>`, inline: true },
+          { name: '📝 Razón', value: `> ${reason}`, inline: false }
+        )
+        .setFooter({ text: `Warn ID: ${warnId}` })
+        .setTimestamp();
       await interaction.reply({ embeds: [emb] });
       
       try { await target.send(`Has recibido una advertencia en **${interaction.guild.name}**. Razón: ${reason}`); } catch (e) {}
