@@ -13,9 +13,7 @@ function createEconomyService(options = {}) {
 
   function readEconomy() {
     const parsed = readJsonSafe(economyPath, { guilds: {} });
-    if (!parsed || typeof parsed !== 'object') {
-      return { guilds: {} };
-    }
+    if (!parsed || typeof parsed !== 'object') return { guilds: {} };
     parsed.guilds = parsed.guilds || {};
     return parsed;
   }
@@ -28,29 +26,31 @@ function createEconomyService(options = {}) {
   function ensureUserEconomy(data, guildId, userId) {
     data.guilds = data.guilds || {};
     data.guilds[guildId] = data.guilds[guildId] || {};
-    data.guilds[guildId][userId] = data.guilds[guildId][userId] || { coins: 0, gems: 0 };
+    data.guilds[guildId][userId] = data.guilds[guildId][userId] || { coins: 0, gems: 0, bank: 0, inventory: {} };
 
     const user = data.guilds[guildId][userId];
     user.coins = asSafeNumber(user.coins, 0);
     user.gems = asSafeNumber(user.gems, 0);
+    user.bank = asSafeNumber(user.bank, 0);
+    user.inventory = user.inventory || {};
     return user;
   }
 
   function getBalance(guildId, userId) {
     const data = readEconomy();
     const guildData = data.guilds[guildId] || {};
-    const user = guildData[userId] || { coins: 0, gems: 0 };
+    const user = guildData[userId] || { coins: 0, gems: 0, bank: 0, inventory: {} };
     return {
       coins: asSafeNumber(user.coins, 0),
-      gems: asSafeNumber(user.gems, 0)
+      gems: asSafeNumber(user.gems, 0),
+      bank: asSafeNumber(user.bank, 0)
     };
   }
 
   function addCoins(guildId, userId, amount) {
     const data = readEconomy();
     const user = ensureUserEconomy(data, guildId, userId);
-    const value = Math.max(0, asSafeNumber(amount, 0));
-    user.coins += value;
+    user.coins += Math.max(0, asSafeNumber(amount, 0));
     writeEconomy(data);
     return user.coins;
   }
@@ -65,25 +65,56 @@ function createEconomyService(options = {}) {
     return true;
   }
 
-  function addGems(guildId, userId, amount) {
+  function addBank(guildId, userId, amount) {
     const data = readEconomy();
     const user = ensureUserEconomy(data, guildId, userId);
-    user.gems += Math.max(0, asSafeNumber(amount, 0));
+    user.bank += Math.max(0, asSafeNumber(amount, 0));
     writeEconomy(data);
-    return user.gems;
+    return user.bank;
+  }
+
+  function removeBank(guildId, userId, amount) {
+    const data = readEconomy();
+    const user = ensureUserEconomy(data, guildId, userId);
+    const value = Math.max(0, asSafeNumber(amount, 0));
+    if (user.bank < value) return false;
+    user.bank -= value;
+    writeEconomy(data);
+    return true;
+  }
+
+  function getInventory(guildId, userId) {
+    const data = readEconomy();
+    const guildData = data.guilds[guildId] || {};
+    const user = guildData[userId] || { inventory: {} };
+    return user.inventory || {};
+  }
+
+  function addItem(guildId, userId, itemId, amount = 1) {
+    const data = readEconomy();
+    const user = ensureUserEconomy(data, guildId, userId);
+    user.inventory[itemId] = (user.inventory[itemId] || 0) + amount;
+    writeEconomy(data);
+    return user.inventory[itemId];
+  }
+
+  function removeItem(guildId, userId, itemId, amount = 1) {
+    const data = readEconomy();
+    const user = ensureUserEconomy(data, guildId, userId);
+    if (!user.inventory[itemId] || user.inventory[itemId] < amount) return false;
+    user.inventory[itemId] -= amount;
+    if (user.inventory[itemId] <= 0) delete user.inventory[itemId];
+    writeEconomy(data);
+    return true;
   }
 
   return {
-    readEconomy,
-    writeEconomy,
-    ensureUserEconomy,
-    getBalance,
-    addCoins,
-    removeCoins,
-    addGems
+    readEconomy, writeEconomy, ensureUserEconomy,
+    getBalance, addCoins, removeCoins,
+    addBank, removeBank,
+    getInventory, addItem, removeItem
   };
 }
 
 const economyService = createEconomyService();
-
 module.exports = { economyService, createEconomyService };

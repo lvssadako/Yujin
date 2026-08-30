@@ -1,6 +1,5 @@
-
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { getBalance, addCoins, removeCoins } = require('../../services/economy/index').economyService;
+const { getBalance, addCoins, removeCoins, getInventory, removeItem } = require('../../services/economy/index').economyService;
 const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
 
 module.exports = {
@@ -29,11 +28,23 @@ module.exports = {
     
     const targetBal = getBalance(guildId, target.id).coins;
     if (targetBal < 500) {
-      return interaction.reply({ content: `❌ **${target.tag}** es demasiado pobre (menos de 500 🪙). ¡Busca a alguien más rico!`, ephemeral: true });
+      return interaction.reply({ content: `❌ **${target.tag}** es demasiado pobre en su billetera (menos de 500 🪙). ¡Busca a alguien más rico!`, ephemeral: true });
     }
     
     user.lastRob = now;
     writeProfiles(profiles);
+    
+    // Check if victim has a shield
+    const targetInv = getInventory(guildId, target.id);
+    if (targetInv['escudo'] && targetInv['escudo'] > 0) {
+      removeItem(guildId, target.id, 'escudo', 1); // Consume the shield
+      const fine = 500;
+      removeCoins(guildId, userId, fine);
+      
+      const emb = new EmbedBuilder().setColor(0xED4245)
+        .setDescription(`🛡️ ¡Intentaste robar a **${target.tag}** pero tenía un **Escudo Anti-Robo**!\\nTu ataque fue bloqueado, su escudo se rompió, y tú pagas una multa de **${fine} 🪙**.`);
+      return interaction.reply({ embeds: [emb] });
+    }
     
     const success = Math.random() > 0.55; // 45% chance to win
     if (success) {
