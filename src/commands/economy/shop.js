@@ -183,7 +183,7 @@ function buildShopEmbed(cfg, userData) {
       const rarity = item.rarity ? ` • ${String(item.rarity).toUpperCase()}` : '';
       const priceLabel = discount > 0 ? `**${finalPrice} 🪙** *(antes: ${item.price} 🪙)*` : `**${item.price} 🪙**`;
 
-      return `**${item.name}${suffix}**\n${item.description}\nPrecio: ${priceLabel}${extra}${rarity}${discount > 0 ? ` • -${discount}%` : ''}\nID: \`${item.id}\``;
+      return `> 🏷️ **${item.name}${suffix}**\n> ╰ *${item.description}*\n> 💰 **Precio:** ${priceLabel}${extra}${rarity}${discount > 0 ? ` • -${discount}%` : ''} | 🆔 \`${item.id}\``;
     });
 
     embed.addFields({
