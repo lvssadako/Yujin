@@ -101,6 +101,13 @@ try {
 } catch (e) {
   logger.error('Error cargando sistemas de seguridad', { error: e.message });
 }
+
+try {
+  require('./events/reminderLoader').init(client);
+  logger.info('Sistema de recordatorios cargado.');
+} catch (e) {
+  logger.error('Error cargando recordatorios', { error: e.message });
+}
 // Cargar y reprogramar timers de bump pendientes
 require('./events/bumpTimersLoader')(client);
 require('./services/giveaways/giveawayManager').init(client);
