@@ -51,28 +51,12 @@ async function resolveBadgeIcon(icon, size = 128) {
   }
 }
 
-function normalizeCdnUrl(u) {
-  try {
-    const url = new URL(String(u));
-    if ((url.hostname === 'cdn.discordapp.com' || url.hostname === 'media.discordapp.net') &&
-        url.pathname.startsWith('/attachments/')) {
-      url.search = '';
-    }
-    return url.toString();
-  } catch { return u; }
-}
-
 function getProfileBackgroundUrl(up) {
   if (!up) return null;
   const raw = up.bgUrl || up.backgroundUrl || up.background || up.bg || up.wallpaper || up.cardBg || null;
   if (!raw) return null;
 
-  const safe = normalizeExternalImageUrl(raw);
-  if (!safe) return null;
-
-  let cleaned = normalizeCdnUrl(safe);
-  if (cleaned.includes('?')) cleaned = cleaned.split('?')[0];
-  return cleaned;
+  return normalizeExternalImageUrl(raw);
 }
 
 function drawImageCover(ctx, img, x, y, w, h) {

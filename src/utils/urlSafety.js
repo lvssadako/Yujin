@@ -56,7 +56,12 @@ function normalizeExternalImageUrl(raw) {
     return null;
   }
 
-  url.search = '';
+  // Preserve query parameters for hosts that require them (CDN auth tokens,
+  // image sizing params, etc.).  Only strip the fragment.
+  const hostsRequiringQuery = /(?:cdn\.discordapp\.com|media\.discordapp\.net|images\.unsplash\.com|cdn\.pixabay\.com|images\.pexels\.com)/i;
+  if (!hostsRequiringQuery.test(hostname)) {
+    url.search = '';
+  }
   url.hash = '';
   return url.toString();
 }

@@ -2,9 +2,28 @@ const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const { AttachmentBuilder } = require('discord.js');
 const logger = require('../../utils/logger');
 
+// Strip emoji / symbol unicode codepoints that @napi-rs/canvas cannot render
+// (there are no color-emoji fonts available server-side).
+function stripEmoji(text) {
+  return String(text)
+    .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')   // Supplemental Symbols & Pictographs, Emoticons, etc.
+    .replace(/[\u{2600}-\u{27BF}]/gu, '')      // Misc symbols, Dingbats
+    .replace(/[\u{FE00}-\u{FE0F}]/gu, '')      // Variation selectors
+    .replace(/[\u{200D}]/gu, '')                // Zero-width joiner
+    .replace(/[\u{20E3}]/gu, '')                // Combining enclosing keycap
+    .replace(/[\u{E0020}-\u{E007F}]/gu, '')     // Tags
+    .trim();
+}
+
 async function fetchAvatarBuffer(url) {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(8000),
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
+      }
+    });
     if (!res.ok) throw new Error('Fetch buffer error');
     const ab = await res.arrayBuffer();
     return Buffer.from(ab);
@@ -17,11 +36,7 @@ function roundRect(ctx, x, y, w, h, r) {
   if (w < 2 * r) r = w / 2;
   if (h < 2 * r) r = h / 2;
   ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
+  ctx.roundRect(x, y, w, h, r);
   ctx.closePath();
 }
 
@@ -179,7 +194,7 @@ async function generateStreakCard(user, status, botName = 'Bot') {
   ctx.fillText(usernameDisplay, textX, avY + 40);
 
   // Badge del Nivel de Fuego (Pastilla superior derecha)
-  const tierLabel = currentTier.name.toUpperCase();
+  const tierLabel = stripEmoji(currentTier.name).toUpperCase();
   ctx.font = 'bold 15px "Segoe UI", sans-serif';
   const tierTextWidth = ctx.measureText(tierLabel).width;
   const pillW = tierTextWidth + 36;
@@ -239,7 +254,7 @@ async function generateStreakCard(user, status, botName = 'Bot') {
   const bonusXp = Math.round((currentTier.xpMultiplier - 1) * 100);
   const perks = [
     { label: `+${bonusXp}% XP EXTRA`, color: '#F1C40F', dot: '#F1C40F' },
-    { label: `${currentTier.shopDiscount > 0 ? `-${currentTier.shopDiscount}% TIENDA` : 'SIN DESCUENTO'}`, color: '#E67E22', dot: '#E67E22' },
+    { label: `${currentTier.shopDiscount > 0 ? `-${currentTier.shopDiscount}% TIENDA` : '0% TIENDA'}`, color: '#E67E22', dot: '#E67E22' },
     { label: `${freezersCount} CONGELADOR${freezersCount === 1 ? '' : 'ES'}`, color: '#3498DB', dot: '#3498DB' }
   ];
 
@@ -292,8 +307,8 @@ async function generateStreakCard(user, status, botName = 'Bot') {
 
   // 10. Texto explicativo inferior
   const nextText = nextTier
-    ? `Siguiente nivel: ${nextTier.name.toUpperCase()} (${pct}%) · Faltan ${daysToNext} día${daysToNext === 1 ? '' : 's'} consecutivos`
-    : '¡Has alcanzado el rango máximo de racha de la comunidad!';
+    ? `Siguiente nivel: ${stripEmoji(nextTier.name).toUpperCase()} (${pct}%) · Faltan ${daysToNext} dia${daysToNext === 1 ? '' : 's'} consecutivos`
+    : 'Has alcanzado el rango maximo de racha de la comunidad!';
 
   ctx.fillStyle = '#9FA3BC';
   ctx.font = '14px "Segoe UI", sans-serif';

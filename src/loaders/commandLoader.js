@@ -20,10 +20,18 @@ function getAllJsFiles(dir) {
   return files;
 }
 
+function purgeFileCache(filePath) {
+  try {
+    const resolved = require.resolve(filePath);
+    delete require.cache[resolved];
+  } catch {}
+}
+
 function loadCommandRegistry({
   commandsDir,
   sharedDir,
-  prefixDir
+  prefixDir,
+  purgeCache = false
 }) {
   const commands = new Map();
   const prefixCommands = new Map();
@@ -32,6 +40,7 @@ function loadCommandRegistry({
   const slashFiles = getAllJsFiles(commandsDir);
   for (const filePath of slashFiles) {
     try {
+      if (purgeCache) purgeFileCache(filePath);
       let cmd = require(filePath);
       if (typeof cmd === 'function' && cmd.prototype && cmd.prototype.execute) {
         cmd = new cmd();
@@ -57,6 +66,7 @@ function loadCommandRegistry({
     for (const file of sharedFiles) {
       const filePath = path.join(sharedDir, file);
       try {
+        if (purgeCache) purgeFileCache(filePath);
         const cmd = require(filePath);
         if (cmd && cmd.data && cmd.executeSlash && cmd.name && cmd.executePrefix) {
           commands.set(cmd.data.name, {
@@ -80,6 +90,7 @@ function loadCommandRegistry({
     for (const file of prefixFiles) {
       const filePath = path.join(prefixDir, file);
       try {
+        if (purgeCache) purgeFileCache(filePath);
         const cmd = require(filePath);
         if (cmd && cmd.name && cmd.execute) {
           prefixCommands.set(cmd.name, cmd);
@@ -96,4 +107,73 @@ function loadCommandRegistry({
   return { commands, prefixCommands, commandData };
 }
 
-module.exports = { getAllJsFiles, loadCommandRegistry };
+function reloadCommandRegistry(client, paths = {}) {
+  const commandsDir = paths.commandsDir || path.join(__dirname, '..', 'commands');
+  const sharedDir = paths.sharedDir || path.join(__dirname, '..', 'commands_shared');
+  const prefixDir = paths.prefixDir || path.join(__dirname, '..', 'prefixCommands');
+
+  const registry = loadCommandRegistry({
+    commandsDir,
+    sharedDir,
+    prefixDir,
+    purgeCache: true
+  });
+
+  if (client) {
+    client.commands.clear();
+    client.prefixCommands.clear();
+
+    for (const [name, cmd] of registry.commands.entries()) {
+      client.commands.set(name, cmd);
+    }
+    for (const [name, cmd] of registry.prefixCommands.entries()) {
+      client.prefixCommands.set(name, cmd);
+    }
+    client.commandData = registry.commandData;
+  }
+
+  return registry;
+}
+
+function enableCommandWatcher(client, paths = {}) {
+  const commandsDir = paths.commandsDir || path.join(__dirname, '..', 'commands');
+  const prefixDir = paths.prefixDir || path.join(__dirname, '..', 'prefixCommands');
+  const sharedDir = paths.sharedDir || path.join(__dirname, '..', 'commands_shared');
+
+  const watchDirs = [commandsDir, prefixDir, sharedDir].filter(d => fs.existsSync(d));
+  let reloadTimeout = null;
+
+  for (const dir of watchDirs) {
+    try {
+      fs.watch(dir, { recursive: true }, (eventType, filename) => {
+        if (!filename || (!filename.endsWith('.js') && !filename.endsWith('.json'))) return;
+
+        if (reloadTimeout) clearTimeout(reloadTimeout);
+        reloadTimeout = setTimeout(() => {
+          try {
+            const registry = reloadCommandRegistry(client, paths);
+            logger.info('[HotReload] Comandos recargados automáticamente tras detectar cambios', {
+              changedFile: filename,
+              commandsCount: registry.commands.size,
+              prefixCount: registry.prefixCommands.size
+            });
+          } catch (err) {
+            logger.error('[HotReload] Error al autorecargar comandos', { error: err.message });
+          }
+        }, 300);
+      });
+    } catch (err) {
+      logger.warn('[HotReload] No se pudo inicializar watcher en directorio', { dir, error: err.message });
+    }
+  }
+
+  logger.info('[HotReload] Watcher de comandos activo en tiempo real.');
+}
+
+module.exports = {
+  getAllJsFiles,
+  loadCommandRegistry,
+  reloadCommandRegistry,
+  enableCommandWatcher
+};
+

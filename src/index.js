@@ -40,12 +40,13 @@ client.commands = new Collection();
 client.slashCommands = new Collection();
 client.prefixCommands = new Collection();
 
-const { loadCommandRegistry } = require('./loaders/commandLoader');
-const registry = loadCommandRegistry({
+const { loadCommandRegistry, enableCommandWatcher } = require('./loaders/commandLoader');
+const loaderPaths = {
   commandsDir: path.join(__dirname, 'commands'),
   sharedDir: path.join(__dirname, 'commands_shared'),
   prefixDir: path.join(__dirname, 'prefixCommands')
-});
+};
+const registry = loadCommandRegistry(loaderPaths);
 
 for (const [name, cmd] of registry.commands.entries()) {
   client.commands.set(name, cmd);
@@ -54,6 +55,11 @@ for (const [name, cmd] of registry.prefixCommands.entries()) {
   client.prefixCommands.set(name, cmd);
 }
 const commandData = registry.commandData;
+
+// Iniciar detector de cambios en caliente (Hot Reload en tiempo real)
+if (process.env.DISABLE_HOT_RELOAD !== 'true') {
+  enableCommandWatcher(client, loaderPaths);
+}
 
 // Registrar comandos cuando el bot esté listo
 client.once(Events.ClientReady, async () => {
