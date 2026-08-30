@@ -1,78 +1,66 @@
 const { EmbedBuilder } = require('discord.js');
-const { readProfiles, writeProfiles, ensureUser } = require('../utils/profileStore');
-const { readConfig } = require('../utils/configCache');
+const { readProfiles, writeProfiles } = require('../utils/profileStore');
+const { getFlameTier, getLocalDayInfo } = require('./streak/streakService');
 const logger = require('../utils/logger');
 
 let clientRef = null;
 let intervalRef = null;
 
-function streakEmoji(streak) {
-  if (streak >= 30) return '🌟';
-  if (streak >= 14) return '💎';
-  if (streak >= 7) return '🔥';
-  if (streak >= 3) return '⚡';
-  return '✨';
-}
-
 async function checkStreaks() {
   if (!clientRef) return;
 
-  const cfg = readConfig();
-  const tz = cfg.timezone || 0;
+  const { today, midnightTs, msRemaining } = getLocalDayInfo();
+  const hoursUntilMidnight = msRemaining / 3600000;
 
-  const now = Date.now();
-  const today = Math.floor((now + tz * 3600000) / 86400000);
-  const midnightLocal = (today + 1) * 86400000 - tz * 3600000;
-  const hoursUntilMidnight = (midnightLocal - now) / 3600000;
-
-  if (hoursUntilMidnight > 3 || hoursUntilMidnight < 0) return;
+  // Solo ejecuta si faltan 3 horas o menos para medianoche (y más de 0)
+  if (hoursUntilMidnight > 3 || hoursUntilMidnight <= 0) return;
 
   const profiles = readProfiles();
   let modified = false;
 
   for (const guild of clientRef.guilds.cache.values()) {
-    const guildProfiles = Object.entries(profiles).filter(([uid, p]) => {
-      if (!p || typeof p !== 'object') return false;
-      const streak = p.dailyStreak || 0;
-      if (streak < 1) return false;
-      const lastDay = p.lastDailyDay || 0;
-      if (lastDay === today) return false;
-      if (p.lastStreakReminderDay === today) return false;
-      return true;
-    });
+    const guildUsers = profiles.users?.[guild.id];
+    if (!guildUsers || typeof guildUsers !== 'object') continue;
 
-    for (const [userId, profile] of guildProfiles) {
+    for (const [userId, profile] of Object.entries(guildUsers)) {
+      const streak = Number(profile.streakDays) || 0;
+      if (streak < 1) continue;
+
+      const lastActive = Number(profile.lastActiveDay) || 0;
+      if (lastActive === today) continue; // Ya envió mensaje hoy, racha a salvo
+
+      const lastReminded = Number(profile.lastStreakReminderDay) || 0;
+      if (lastReminded === today) continue; // Ya fue notificado hoy
+
       try {
         const member = await guild.members.fetch(userId).catch(() => null);
-        if (!member) continue;
+        if (!member || member.user.bot) continue;
 
-        const streak = profile.dailyStreak || 0;
-        const sEmoji = streakEmoji(streak);
-        const minutesLeft = Math.floor((midnightLocal - now) / 60000);
+        const tier = getFlameTier(streak);
+        const minutesLeft = Math.floor(msRemaining / 60000);
         const hoursLeft = Math.floor(minutesLeft / 60);
         const minsLeft = minutesLeft % 60;
         const timeText = hoursLeft > 0 ? `${hoursLeft}h ${minsLeft}m` : `${minsLeft} minutos`;
 
         const embed = new EmbedBuilder()
-          .setAuthor({ name: '⚠️ ¡Tu racha está en peligro!' })
+          .setAuthor({ name: '🔥 ¡Tu Racha de Actividad está en Peligro!' })
           .setColor(0xFEE75C)
-          .setDescription(`${sEmoji} Llevas **${streak} día${streak !== 1 ? 's' : ''}** de racha en **${guild.name}** y aún no has reclamado tu daily de hoy.`)
+          .setDescription(`Llevas **${streak} día${streak !== 1 ? 's' : ''}** de racha activa en **${guild.name}** (${tier.emoji} **Nivel: ${tier.name}**).\n\nTodavía no has enviado ningún mensaje hoy en el servidor. Si no escribes antes de medianoche, perderás tu racha y tus bonificaciones de XP.`)
           .addFields(
-            { name: '⏳ Tiempo Restante', value: `Te quedan **${timeText}** antes de perder tu racha.`, inline: false },
-            { name: '💡 ¿Qué hacer?', value: '> Usa `/daily` en el servidor para reclamar tu recompensa y mantener tu racha.', inline: false }
+            { name: '⏳ Tiempo Restante', value: `Te quedan **${timeText}** (Límite: <t:${midnightTs}:t> · <t:${midnightTs}:R>)`, inline: false },
+            { name: '💬 ¿Cómo salvarla?', value: `> ¡Solo entra a **${guild.name}** y envía al menos un mensaje en cualquier canal de texto!`, inline: false }
           )
-          .setFooter({ text: `Servidor: ${guild.name} · No pierdas tu progreso` })
+          .setFooter({ text: `${guild.name} · Sistema de Rachas de Actividad` })
           .setTimestamp();
 
         await member.user.send({ embeds: [embed] }).catch(() => {
-          logger.warn('No se pudo enviar DM de racha', { userId, guild: guild.id });
+          logger.warn('[streakReminder] No se pudo enviar DM de racha', { userId, guildId: guild.id });
         });
 
         profile.lastStreakReminderDay = today;
         modified = true;
-
       } catch (err) {
-        logger.error('Error en streak reminder', { userId, error: err.message });
+        logger.error('[streakReminder] Error procesando usuario:', { userId, error: err.message });
       }
     }
   }
@@ -84,9 +72,9 @@ async function checkStreaks() {
 
 function init(client) {
   clientRef = client;
-  intervalRef = setInterval(checkStreaks, 30 * 60 * 1000);
-  setTimeout(checkStreaks, 10000);
-  logger.info('Sistema de recordatorio de rachas iniciado.');
+  intervalRef = setInterval(checkStreaks, 20 * 60 * 1000); // Chequea cada 20 minutos
+  setTimeout(checkStreaks, 5000);
+  logger.info('Sistema de alerta de rachas por DM iniciado.');
 }
 
 function stop() {

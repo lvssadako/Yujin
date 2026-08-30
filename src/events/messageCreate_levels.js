@@ -9,6 +9,7 @@ const { checkAndGrantBadges } = require('../utils/badgeManager');
 const { addCoins } = require('../services/economy').economyService;
 const { updateMissionProgress } = require('../utils/dailyMissions');
 const { shouldSendAutoMessage } = require('../utils/autoMessageGuard');
+const { recordMessageActivity } = require('../services/streak/streakService');
 
 function xpToNext(level) {
   return Math.round(200 * Math.pow(level + 1, 1.4));
@@ -433,28 +434,14 @@ module.exports = (client) => {
         }
       }
 
-      // Streak diaria (independiente del XP)
-      const profiles = readProfiles();
-      const up = ensureUser(profiles, guildId, userId);
-      const tzOffset = (cfg.timezone || 0) * 3600000;
-      const today = Math.floor((Date.now() + tzOffset) / 86400000);
-
-      if (up.lastActiveDay !== today) {
-        const wasStreak = up.streakDays || 0;
-        const isConsecutive = up.lastActiveDay === today - 1;
-
-        up.streakDays = isConsecutive ? (up.streakDays + 1) : 1;
-        up.lastActiveDay = today;
-
-        if (!isConsecutive && wasStreak >= 7 && cfg.notifyStreakLost) {
-          try {
-            await message.author.send(
-              `💔 Tu racha de **${wasStreak} días** se ha perdido. ¡Comienza una nueva hoy!`
-            );
-          } catch {}
-        }
-
-        writeProfiles(profiles);
+      // Streak diaria por actividad de mensajes
+      const streakResult = recordMessageActivity(guildId, userId);
+      if (streakResult.updated && streakResult.wasReset && streakResult.previousStreak >= 7 && cfg.notifyStreakLost) {
+        try {
+          await message.author.send(
+            `💔 Tu racha de actividad de **${streakResult.previousStreak} días** en **${message.guild.name}** se ha perdido. ¡Comienza una nueva hoy enviando mensajes!`
+          );
+        } catch {}
       }
 
       // Guardar niveles (mensajes + posible XP)

@@ -18,7 +18,7 @@ const COMMAND_MAP = {
   level: 'level', streak: 'level', streaks: 'level', leaderboard: 'level', badge: 'level', profile: 'level', profileset: 'level',
   boosters: 'boost', boostxp: 'boost',
   leveladdchannel: 'config', leveladmin: 'config', levellistchannels: 'config', levelremovechannel: 'config', levelrewards: 'config', menuconfig: 'config', setboostchannel: 'config', setbumpreminder: 'config', setchannel: 'config',
-  bumpreminderinfo: 'utility', help: 'utility', manage: 'utility', toproles: 'utility', info: 'utility', ping: 'utility'
+  bumpreminderinfo: 'utility', help: 'utility', manage: 'utility', toproles: 'utility', info: 'utility', ping: 'utility', racha: 'utility', reminder: 'utility'
 };
 
 // Generador automático de ejemplos estéticos para comandos populares
