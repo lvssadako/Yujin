@@ -2,6 +2,8 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { getInventory, addCoins, getBalance } = require('../../services/economy').economyService;
 const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
 
+const { secureRandom, secureRandomInt } = require('../../utils/cryptoRandom');
+
 async function handleFish(guildId, userId) {
   const inv = getInventory(guildId, userId);
   if (!inv['cana'] || inv['cana'] < 1) {
@@ -23,7 +25,7 @@ async function handleFish(guildId, userId) {
   user.lastFish = now;
   writeProfiles(profiles);
   
-  const rand = Math.random();
+  const rand = secureRandom();
   let reward = 0;
   let msg = '';
   let color = 0x3498DB;
@@ -32,15 +34,15 @@ async function handleFish(guildId, userId) {
     msg = '> Solo pescaste una bota vieja... No ganas nada. 🥾';
     color = 0x95A5A6;
   } else if (rand < 0.6) {
-    reward = Math.floor(Math.random() * 100) + 50;
+    reward = secureRandomInt(50, 150);
     msg = `> ¡Pescaste un pez común! Lo vendiste por **${reward} 🪙**. 🐟`;
     color = 0x2ECC71;
   } else if (rand < 0.9) {
-    reward = Math.floor(Math.random() * 200) + 150;
+    reward = secureRandomInt(150, 350);
     msg = `> ¡Atrapaste un pez raro! Lo vendiste por **${reward} 🪙**. 🐠`;
     color = 0x9B59B6;
   } else {
-    reward = Math.floor(Math.random() * 500) + 500;
+    reward = secureRandomInt(500, 1000);
     msg = `> ¡INCREÍBLE! Pescaste un **Tiburón Dorado**. Lo vendiste por **${reward} 🪙**. 🦈✨`;
     color = 0xF1C40F;
   }

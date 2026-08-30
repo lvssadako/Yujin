@@ -10,6 +10,7 @@ const { addCoins } = require('../services/economy').economyService;
 const { updateMissionProgress } = require('../utils/dailyMissions');
 const { shouldSendAutoMessage } = require('../utils/autoMessageGuard');
 const { recordMessageActivity } = require('../services/streak/streakService');
+const { secureRandom, secureRandomInt, secureChoice } = require('../utils/cryptoRandom');
 
 function xpToNext(level) {
   return Math.round(200 * Math.pow(level + 1, 1.4));
@@ -105,7 +106,7 @@ module.exports = (client) => {
       let leveledUpCount = 0;
 
       if (passesCooldown && passesContent) {
-        const base = Math.floor(Math.random() * 16) + 15; // 15-30 XP base
+        const base = secureRandomInt(15, 30); // 15-30 XP base
 
         // Bonus de roles
         const bonuses = cfg.roleXpBonuses || {};
@@ -155,7 +156,7 @@ module.exports = (client) => {
           }
 
           // Monedas cuando hay XP
-          const baseCoins = Math.floor(Math.random() * 3) + 1;
+          const baseCoins = secureRandomInt(1, 3);
           const boosterRole = message.guild?.roles?.premiumSubscriberRole;
           const isBooster = member?.premiumSince || (boosterRole && member?.roles?.cache?.has(boosterRole.id));
           const coinsEarned = isBooster ? Math.floor(baseCoins * 1.5) : baseCoins;
@@ -359,7 +360,7 @@ module.exports = (client) => {
           dropText = '¡MEGA DROP!';
           dropPrizeMin = 1000;
           dropPrizeMax = 2500;
-        } else if (Math.random() < 0.1) { // 10% cofres
+        } else if (secureRandom() < 0.1) { // 10% cofres
           dropType = 'chest';
           dropIcon = '🗝️';
           dropText = '¡Drop de cofres!';
@@ -392,9 +393,9 @@ module.exports = (client) => {
               if (eligible.size === 0) return;
               winnerId = eligible.random().id;
             } else {
-              winnerId = participants[Math.floor(Math.random() * participants.length)];
+              winnerId = secureChoice(participants);
             }
-            prize = Math.floor(Math.random() * (dropPrizeMax - dropPrizeMin + 1)) + dropPrizeMin;
+            prize = secureRandomInt(dropPrizeMin, dropPrizeMax);
 
             // Entregar premio
             if (dropType === 'coins' || dropType === 'mega') {

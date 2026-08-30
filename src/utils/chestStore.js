@@ -5,13 +5,14 @@ const dataDir = path.join(__dirname, '..', 'data');
 const filePath = path.join(dataDir, 'chests.json');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
+const { writeJsonAtomic, readJsonSafe } = require('./jsonStore');
+
 function readChests() {
-  try { return JSON.parse(fs.readFileSync(filePath, 'utf8')); }
-  catch { return { guilds: {} }; }
+  return readJsonSafe(filePath, { guilds: {} });
 }
 
 function writeChests(obj) {
-  fs.writeFileSync(filePath, JSON.stringify(obj, null, 2), 'utf8');
+  writeJsonAtomic(filePath, obj || { guilds: {} });
 }
 
 function ensureUser(chests, guildId, userId) {
@@ -21,9 +22,11 @@ function ensureUser(chests, guildId, userId) {
 }
 
 function addChests(guildId, userId, amount) {
+  const safeAmount = Math.max(0, Math.floor(Number(amount) || 0));
+  if (safeAmount <= 0) return getChestCount(guildId, userId);
   const chests = readChests();
   const user = ensureUser(chests, guildId, userId);
-  user.chests = (user.chests || 0) + amount;
+  user.chests = (user.chests || 0) + safeAmount;
   writeChests(chests);
   return user.chests;
 }

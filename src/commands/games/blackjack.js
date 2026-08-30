@@ -18,15 +18,17 @@ function canBet(u, amount) {
   return true;
 }
 
+const { secureChoice } = require('../../utils/cryptoRandom');
+
 const blackjack = {
   nuevaMano: function () {
     return [blackjack.carta(), blackjack.carta()];
   },
   carta: function () {
-    const palos = ['ΓÖá∩╕Å', 'ΓÖÑ∩╕Å', 'ΓÖª∩╕Å', 'ΓÖú∩╕Å'];
+    const palos = ['♠️', '♥️', '♦️', '♣️'];
     const valores = [2, 3, 4, 5, 6, 7, 8, 9, 10, 'J', 'Q', 'K', 'A'];
-    const palo = palos[Math.floor(Math.random() * palos.length)];
-    const valor = valores[Math.floor(Math.random() * valores.length)];
+    const palo = secureChoice(palos) || '♠️';
+    const valor = secureChoice(valores) || 'A';
     return { palo, valor };
   },
   valor: function (mano) {

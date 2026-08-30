@@ -1,21 +1,23 @@
-const logger = require('./logger');
 const fs = require('fs');
 const path = require('path');
+const logger = require('./logger');
+const { secureRandomInt } = require('./cryptoRandom');
 
-const SHOP_FILE = path.join(__dirname, '..', 'data', 'badgeShop.json');
+const SHOP_FILE = path.join(__dirname, '../data/badgeShop.json');
+
+const DEFAULT_SHOP = {
+  rotation: [],
+  lastRotation: 0,
+  rotationInterval: 24 * 60 * 60 * 1000, // 24h
+  poolSize: 6
+};
 
 function readShop() {
-  if (!fs.existsSync(SHOP_FILE)) {
-    const initial = {
-      rotation: [],
-      lastRotation: 0,
-      rotationInterval: 24 * 60 * 60 * 1000,
-      poolSize: 4
-    };
-    fs.writeFileSync(SHOP_FILE, JSON.stringify(initial, null, 2));
-    return initial;
+  try {
+    return JSON.parse(fs.readFileSync(SHOP_FILE, 'utf8'));
+  } catch {
+    return { ...DEFAULT_SHOP };
   }
-  return JSON.parse(fs.readFileSync(SHOP_FILE, 'utf8'));
 }
 
 function writeShop(data) {
@@ -38,7 +40,13 @@ function rotateShop(allBadges) {
     return shop.rotation;
   }
 
-  const shuffled = shopBadges.sort(() => Math.random() - 0.5);
+  // Shuffle seguro con Fisher-Yates
+  const shuffled = [...shopBadges];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = secureRandomInt(0, i);
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
   const stockByRarity = { legendary: 1, epic: 2, rare: 3, common: 5 };
 
   shop.rotation = shuffled.slice(0, shop.poolSize).map(b => ({
@@ -66,7 +74,6 @@ function ensureRotation(allBadges) {
 
 // Programar rotación automática cada 10 min (verifica vencimiento)
 function scheduleShopRotation(getAllBadgesFn) {
-  // Primera verificación inmediata
   try {
     ensureRotation(getAllBadgesFn());
   } catch (e) {
@@ -77,9 +84,15 @@ function scheduleShopRotation(getAllBadgesFn) {
     try {
       ensureRotation(getAllBadgesFn());
     } catch (e) {
-      logger.warn('[SHOP] Error en rotación programada:', e.message);
+      logger.warn('[SHOP] Error en rotación periódica:', e.message);
     }
-  }, 10 * 60 * 1000); // cada 10 minutos
+  }, 10 * 60 * 1000);
 }
 
-module.exports = { readShop, writeShop, rotateShop, ensureRotation, scheduleShopRotation };
+module.exports = {
+  readShop,
+  writeShop,
+  rotateShop,
+  ensureRotation,
+  scheduleShopRotation
+};

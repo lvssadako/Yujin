@@ -14,6 +14,8 @@ function readGiveaways() {
 }
 function writeGiveaways(data) { writeJsonAtomic(filePath, data); }
 
+const { secureRandomInt } = require('../../utils/cryptoRandom');
+
 async function endGiveaway(messageId, guildId, channelId) {
   const gws = readGiveaways();
   const gw = gws[messageId];
@@ -28,8 +30,12 @@ async function endGiveaway(messageId, guildId, channelId) {
     
     let winners = [];
     if (gw.entries.length > 0) {
-      const shuffled = gw.entries.sort(() => 0.5 - Math.random());
-      winners = shuffled.slice(0, gw.winnerCount);
+      const pool = [...gw.entries];
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = secureRandomInt(0, i);
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      winners = pool.slice(0, gw.winnerCount);
     }
     
     const emb = EmbedBuilder.from(msg.embeds[0])

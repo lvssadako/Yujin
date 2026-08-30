@@ -38,7 +38,9 @@ module.exports = {
     const animMsg = await message.reply({ embeds: [animEmbed] });
     await new Promise(r => setTimeout(r, 1600));
 
-    const resultado = Math.floor(Math.random() * 37);
+const { secureRandomInt } = require('../utils/cryptoRandom');
+
+    const resultado = secureRandomInt(0, 36);
     let color = 'verde';
     if (resultado === 0) color = 'verde';
     else if ([2,4,6,8,10,11,13,15,17,20,22,24,26,28,29,31,33,35].includes(resultado)) color = 'negro';

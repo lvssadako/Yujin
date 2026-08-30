@@ -5,12 +5,14 @@ const RARITIES = {
   legendary:  { weight: 1,  emoji: '🟡', color: 0xf39c12 }
 };
 
+const { secureRandom, secureChoice } = require('./cryptoRandom');
+
 function rollBadge(profiles) {
   const allBadges = Object.values(profiles.badges || {}).filter(b => b.type === 'shop');
   if (!allBadges.length) return null;
 
   const totalWeight = Object.values(RARITIES).reduce((sum, r) => sum + r.weight, 0);
-  let random = Math.random() * totalWeight;
+  let random = secureRandom() * totalWeight;
   let selectedRarity = 'common';
 
   for (const [rarity, data] of Object.entries(RARITIES)) {
@@ -25,7 +27,7 @@ function rollBadge(profiles) {
 
   let attempts = 0;
   while (!pool.length && attempts < 6) {
-    random = Math.random() * totalWeight;
+    random = secureRandom() * totalWeight;
     for (const [rarity, data] of Object.entries(RARITIES)) {
       random -= data.weight;
       if (random <= 0) {
@@ -43,7 +45,7 @@ function rollBadge(profiles) {
   if (!pool.length) pool = allBadges;
   if (!pool.length) return null;
 
-  return pool[Math.floor(Math.random() * pool.length)];
+  return secureChoice(pool);
 }
 
 module.exports = { rollBadge, RARITIES };

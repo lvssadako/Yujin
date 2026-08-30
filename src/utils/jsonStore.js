@@ -12,11 +12,13 @@ function readJsonSafe(filePath, fallback = {}) {
   }
 }
 
+const crypto = require('crypto');
+
 function writeJsonAtomic(filePath, data) {
   const dir = path.dirname(filePath);
   fs.mkdirSync(dir, { recursive: true });
 
-  const tmpFile = `${filePath}.tmp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const tmpFile = `${filePath}.tmp-${Date.now()}-${crypto.randomBytes(6).toString('hex')}`;
   const payload = JSON.stringify(data, null, 2);
 
   fs.writeFileSync(tmpFile, payload, 'utf8');

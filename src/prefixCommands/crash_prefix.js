@@ -46,9 +46,11 @@ module.exports = {
     if (coins < bet) return message.reply(`❌ Fondos insuficientes. Tienes ${coins} 🪙.`);
     if (!canBet(u, bet)) return message.reply(`🚫 Alcanzaste el límite diario de pérdidas.`);
     if (!removeCoins(guildId, userId, bet)) return message.reply('❌ No se pudo procesar la apuesta.');
-    // Crash point aleatorio
-    const rand = Math.random();
-    const crashPoint = Math.max(1.0, 1 / (1 - rand));
+const { secureRandom } = require('../utils/cryptoRandom');
+
+    // Crash point aleatorio seguro
+    const rand = secureRandom();
+    const crashPoint = Math.max(1.0, 1 / (1 - Math.min(0.99, rand)));
     const actualCrash = Math.min(100, Math.round(crashPoint * 100) / 100);
     const won = target <= actualCrash;
     const frames = [1.0, 1.2, 1.5, 1.8, 2.0, 2.5, 3.0, 4.0, 5.0, 10.0];

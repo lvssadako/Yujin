@@ -2,6 +2,7 @@ const logger = require('./logger');
 const fs = require('fs');
 const path = require('path');
 const { readConfig } = require('./configCache');
+const { secureRandom } = require('./cryptoRandom');
 
 const dataDir = path.join(__dirname, '..', 'data');
 const filePath = path.join(dataDir, 'daily_missions.json');
@@ -25,7 +26,7 @@ function nextMidnightTs(tz) {
   return reset.getTime() - tz * 3600000;
 }
 
-// Pool de misiones (ajusta aquí)
+// Pool de misiones
 function baseTemplates(guild) {
   const cfg = readConfig();  
   const list = [
@@ -62,7 +63,7 @@ function baseTemplates(guild) {
       type: 'role_time',
       roleId: statusRoleId,
       target: 180,
-      reward: { coins: 250, xp: 150, gems :1 },
+      reward: { coins: 250, xp: 150, gems: 1 },
       desc: 'Coloca el link del server en tu estado por 3 horas',
       icon: '🛡️',
       weight: 3
@@ -80,11 +81,10 @@ function genDaily(guild, userId, tz) {
   const pool = [...baseTemplates(guild)];
   const chosen = [];
   
-  // ✅ Selección ponderada (3 misiones)
+  // ✅ Selección ponderada segura (3 misiones)
   for (let i = 0; i < 3 && pool.length; i++) {
-    // selección ponderada
     const totalW = pool.reduce((s, m) => s + (m.weight || 1), 0);
-    let r = Math.random() * totalW;
+    let r = secureRandom() * totalW;
     for (let j = 0; j < pool.length; j++) {
       r -= (pool[j].weight || 1);
       if (r <= 0) {
@@ -126,7 +126,6 @@ function timeToResetMs(guild, userId, tz) {
 function updateMissionProgress(guild, userId, type, amount = 1) {
   const cfg = readConfig();
   const tz = cfg.timezone || 0;
-  // Asegura listado del día
   const list = getDaily(guild, userId, tz);
 
   const store = readStore();
@@ -142,14 +141,13 @@ function updateMissionProgress(guild, userId, type, amount = 1) {
       m.completed = true;
       changed = true;
     } else {
-      changed = true; // ✅ Marcar como cambiado incluso sin completar
+      changed = true;
     }
   }
   
-  // ✅ FIX CRÍTICO: Guardar siempre que haya cambios
   if (changed) {
     writeStore(store);
-    logger.info(`[Missions] ${userId} → ${type} +${amount} (actualizado);`);
+    logger.info(`[Missions] ${userId} → ${type} +${amount} (actualizado)`);
   }
 }
 

@@ -10,6 +10,8 @@ const MESSAGES = [
   "Hiciste un turno extra en la cafetería y conseguiste {coins} 🪙."
 ];
 
+const { secureRandomInt, secureChoice } = require('../../utils/cryptoRandom');
+
 async function handleWork(guildId, userId) {
   const profiles = readProfiles();
   const user = ensureUser(profiles, guildId, userId);
@@ -23,12 +25,12 @@ async function handleWork(guildId, userId) {
     return { error: `⏳ Estás muy cansado. Vuelve a trabajar en **${left} minutos**.` };
   }
   
-  const coins = Math.floor(Math.random() * 300) + 100;
+  const coins = secureRandomInt(100, 400);
   user.lastWork = now;
   writeProfiles(profiles);
   addCoins(guildId, userId, coins);
   
-  const msg = MESSAGES[Math.floor(Math.random() * MESSAGES.length)].replace('{coins}', coins);
+  const msg = (secureChoice(MESSAGES) || MESSAGES[0]).replace('{coins}', coins);
   const bal = getBalance(guildId, userId);
   
   const embed = new EmbedBuilder()

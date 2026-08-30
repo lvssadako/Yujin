@@ -46,9 +46,11 @@ async function handleRob(guildId, userId, targetUser) {
     return { embed };
   }
   
-  const success = Math.random() > 0.55;
+const { secureRandom } = require('../../utils/cryptoRandom');
+
+  const success = secureRandom() > 0.55;
   if (success) {
-    const stolen = Math.floor(targetBal * (Math.random() * 0.15 + 0.05));
+    const stolen = Math.max(1, Math.floor(targetBal * (secureRandom() * 0.15 + 0.05)));
     removeCoins(guildId, targetUser.id, stolen);
     addCoins(guildId, userId, stolen);
     
