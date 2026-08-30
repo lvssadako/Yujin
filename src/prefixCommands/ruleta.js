@@ -1,5 +1,5 @@
 // Comando ruleta prefix
-const { getBalance, removeCoins, addCoins } = require('../utils/economy');
+const { getBalance, removeCoins, addCoins } = require('../services/economy').economyService;
 const { EmbedBuilder } = require('discord.js');
 
 module.exports = {

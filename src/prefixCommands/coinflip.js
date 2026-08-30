@@ -1,7 +1,7 @@
 // Prefix command for coinflip (adaptado para no usar interaction.deferReply)
 const { EmbedBuilder } = require('discord.js');
 const crypto = require('crypto');
-const { getBalance, addCoins, removeCoins } = require('../utils/economy');
+const { getBalance, addCoins, removeCoins } = require('../services/economy').economyService;
 const { readProfiles, writeProfiles, ensureUser } = require('../utils/profileStore');
 
 const COOLDOWN_MS = 10_000;

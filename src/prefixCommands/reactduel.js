@@ -1,5 +1,5 @@
   // Prefix command for reactduel adaptado para no usar interaction
-  const { getBalance, addCoins, removeCoins } = require('../utils/economy');
+  const { getBalance, addCoins, removeCoins } = require('../services/economy').economyService;
   const { readProfiles, writeProfiles, ensureUser } = require('../utils/profileStore');
   const { EmbedBuilder } = require('discord.js');
   const MIN_BET = 100;
