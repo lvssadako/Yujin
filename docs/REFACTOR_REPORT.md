@@ -1,53 +1,75 @@
 # Reporte de Refactorización y Auditoría de Seguridad (Yujin Bot)
 
-Este documento detalla todas las modificaciones críticas realizadas durante la fase de reestructuración del bot, así como los riesgos técnicos, lógicos y de seguridad que cada cambio previno o mitigó.
+**Contexto del Reporte:** Este documento detalla la evolución arquitectónica y de seguridad desde la **Primera Versión Legacy** (ubicada originalmente en \`C:\\Users\\yooh2\\Documents\\LCOBOT_OLD\`) hasta la actual versión moderna y estructurada en el repositorio activo.
 
 ---
 
 ## 1. Reestructuración Arquitectónica a \`src/\`
-**Cambios realizados:** 
-Se migró todo el código espagueti de la raíz hacia una estructura profesional: \`src/commands/\`, \`src/events/\`, \`src/services/\`, \`src/utils/\` y se movieron los datos persistentes a \`data/\`.
+**Estado en la Versión Antigua (\`LCOBOT_OLD\`):** 
+Las carpetas críticas como \`commands\`, \`events\`, \`utils\`, \`tests\` y el archivo \`index.js\` estaban tirados directamente en la raíz del proyecto. Los archivos de datos (JSONs) se creaban indiscriminadamente junto al código fuente.
 
-*   **Riesgo Mitigado:** **Deuda Técnica y Escalabilidad.** Tener todos los archivos mezclados en la raíz generaba dependencias circulares que rompían el código silenciosamente y hacía imposible mantener el bot a largo plazo sin romper otras cosas.
+**Estado Actual:** 
+Se migró todo a un entorno aislado y profesional \`src/\` subdividido lógicamente en \`commands/\`, \`events/\`, \`services/\`, \`utils/\`. Los datos de estado se aislaron en su propia carpeta \`data/\`.
+
+*   **Riesgo Mitigado:** **Deuda Técnica y Exposición de Datos.** Mezclar código fuente con bases de datos causaba dependencias circulares, hacía imposible dockerizar el bot o subirlo a un hosting limpiamente, y corría el riesgo de subir bases de datos completas a repositorios públicos por error.
 
 ## 2. Persistencia Atómica de JSON (\`jsonStore.js\`)
-**Cambios realizados:** 
-Se eliminó la escritura directa con \`fs.writeFileSync\` inestable y se implementó un sistema de escritura "atómica" (escribe en un archivo temporal y luego lo renombra instantáneamente).
+**Estado en la Versión Antigua (\`LCOBOT_OLD\`):** 
+Se utilizaba \`fs.writeFileSync\` para guardar niveles, perfiles y dinero.
 
-*   **Riesgo Mitigado (CRÍTICO):** **Corrupción total de bases de datos.** En el modelo anterior, si el servidor Node.js se apagaba, había un corte de energía, o 2 usuarios ejecutaban comandos al mismo milisegundo, los archivos JSON (como el de perfiles o niveles) podían quedar vacíos o corruptos, perdiéndose la economía de todo el servidor.
+**Estado Actual:** 
+Se desarrolló \`jsonStore.js\` que aplica escrituras "atómicas" (escribe primero en un archivo \`.tmp\` y luego lo renombra).
+
+*   **Riesgo Mitigado (CRÍTICO):** **Corrupción total de bases de datos.** En \`LCOBOT_OLD\`, un corte de energía, una falla de Node.js o 2 usuarios ejecutando un comando al mismo milisegundo podían interceptar el guardado, dejando el JSON vacío (\`0 bytes\`) y borrando la economía y los perfiles de todos los miembros del servidor sin forma de recuperarlos.
 
 ## 3. Centralización de Economía (\`economyService.js\`)
-**Cambios realizados:** 
-Se eliminó la posibilidad de que los minijuegos o comandos de apuestas modificaran los JSON de perfiles de manera aislada. Todo entra por funciones únicas (\`addCoins\`, \`removeCoins\`) y se incluyó un sistema de idempotencia (\`grantOnce\`).
+**Estado en la Versión Antigua (\`LCOBOT_OLD\`):** 
+Comandos sueltos (como los minijuegos en \`prefixCommands/\`) sumaban y restaban monedas leyendo y sobrescribiendo \`profiles.json\` directamente cada uno por su cuenta.
 
-*   **Riesgo Mitigado:** **Exploits de Duplicación (Dinero Infinito).** Previene ataques donde los usuarios podían abusar del lag de la red, usar macros de clics rápidos en botones (ej. cobrar recompensas dobles) o bugs donde el dinero se restaba erróneamente en números negativos.
+**Estado Actual:** 
+Todo flujo de monedas debe pasar obligatoriamente por un "banco central" (\`src/services/economy/index.js\`), el cual valida los fondos e implementa protecciones de idempotencia (\`grantOnce\`).
+
+*   **Riesgo Mitigado:** **Exploits de Duplicación (Dinero Infinito).** Anteriormente, los usuarios podían abusar del lag o usar macros para reclamar recompensas múltiples veces antes de que el archivo JSON se cerrara. Esto devaluaba totalmente la economía.
 
 ## 4. Jerarquía de Moderación Estricta (\`ban\`, \`kick\`, \`timeout\`)
-**Cambios realizados:** 
-Se añadieron comprobaciones de jerarquía de roles de Discord nativas a los comandos de moderación. El bot ahora compara la posición del rol del ejecutor contra la posición del objetivo.
+**Estado en la Versión Antigua (\`LCOBOT_OLD\`):** 
+Los comandos administrativos simplemente revisaban si el usuario tenía el permiso general de "Banear" o "Expulsar", pero no comprobaban su jerarquía en el servidor.
 
-*   **Riesgo Mitigado (CRÍTICO):** **Escalada de Privilegios.** Anteriormente, un moderador raso (con el permiso básico) podría haber ejecutado \`/ban\` sobre un Administrador, un Co-Dueño o incluso sobre el propio Bot, destruyendo la seguridad interna del servidor.
+**Estado Actual:** 
+El código calcula la posición del rol más alto del usuario que ejecuta el comando vs la posición del rol más alto de la víctima, bloqueando el ataque si la víctima es igual o superior.
+
+*   **Riesgo Mitigado (CRÍTICO):** **Escalada de Privilegios.** En el bot original, un moderador nuevo o hackeado podría haber baneado a los Administradores o al Dueño del servidor, destruyendo la comunidad desde adentro.
 
 ## 5. Prevención Global de Caídas (\`uncaughtException\`)
-**Cambios realizados:** 
-Se inyectó un capturador maestro de errores asíncronos al principio del archivo \`index.js\`.
+**Estado en la Versión Antigua (\`LCOBOT_OLD\`):** 
+Cualquier error de conexión a internet o de la API de Discord hacía que el proceso \`node index.js\` crasheara.
 
-*   **Riesgo Mitigado:** **Downtime e Inactividad del Bot.** En Node.js, si ocurre un solo error no manejado (como una respuesta fallida de la API de Discord), el proceso completo se "apaga". Ahora, el bot sobrevive al error, lo envía a los registros (logger) y continúa funcionando 24/7 de forma transparente para los usuarios.
+**Estado Actual:** 
+Se inyectaron manejadores globales de errores asíncronos en el núcleo del bot.
+
+*   **Riesgo Mitigado:** **Downtime e Inactividad del Bot.** Si ocurría un fallo a las 3:00 AM, el bot se desconectaba hasta que el dueño despertara para volver a encenderlo. Ahora, el bot sobrevive al error, lo envía a los registros (logger) y continúa funcionando 24/7.
 
 ## 6. Evolución a Slash Commands (Wrappers)
-**Cambios realizados:** 
-Se crearon envoltorios en \`src/commands/games/\` que convierten los juegos de apuestas clásicos (\`&ruleta\`, \`&slots\`) a interactivos nativos (\`/ruleta\`) sin destruir su código original. Además, se aplicó un rediseño "Premium" al comando \`help\`.
+**Estado en la Versión Antigua (\`LCOBOT_OLD\`):** 
+Los sistemas principales (ruleta, slots, coinflip) estaban obsoletos y programados únicamente como comandos de texto (\`&\`).
 
-*   **Riesgo Mitigado:** **Abandono de UX y Obsolescencia.** Discord está deprecando agresivamente el uso de comandos por prefijo (privilege intents). No tener los comandos como "Slash" corría el riesgo de que el bot eventualmente dejara de funcionar o de que los usuarios nuevos no supieran cómo usarlo.
+**Estado Actual:** 
+Se desarrollaron wrappers en \`src/commands/games/\` para transformar el código legado en *Slash Commands* nativos, incluyendo una UI premium interactiva para \`/help\`.
 
-## 7. Pruebas Automatizadas Unitarias (100% Cobertura Crítica)
-**Cambios realizados:** 
-Se restauraron y actualizaron las rutas de los 32 tests nativos de \`node --test\`.
+*   **Riesgo Mitigado:** **Deprecación por parte de Discord.** Discord está limitando severamente la lectura de mensajes (Privileged Intents) para bots de texto. Seguir usando el modelo antiguo garantizaba que el bot dejara de funcionar a medida que creciera.
 
-*   **Riesgo Mitigado:** **Regresiones silenciosas.** Evita el miedo a subir actualizaciones. Si en el futuro agregas código que rompe el sistema de XP, los tests fallarán en tu consola y te avisarán ANTES de que el bot suba a producción e impacte al servidor.
+## 7. Automatización de Tests (100% Cobertura)
+**Estado en la Versión Antigua (\`LCOBOT_OLD\`):** 
+Los tests en la carpeta \`tests/\` no cubrían los flujos complejos y las rutas estaban rotas al cambiar de carpetas.
 
-## 8. Sorteos Persistentes y Almacenamiento Dinámico
-**Cambios realizados:** 
-El sistema de \`/sorteo\` (Giveaways) guarda su estado y tiempo en disco (JSON).
+**Estado Actual:** 
+Se reconstruyó la suite de Node.js test runner con 32 validaciones estrictas.
 
-*   **Riesgo Mitigado:** **Pérdida de eventos por reinicios.** Si organizas un sorteo de 24 horas y reinicias el bot en la hora 23 (para actualizar código), no se cancelará; el bot volverá a leer la fecha objetivo y reanudará la cuenta regresiva.
+*   **Riesgo Mitigado:** **Regresiones silenciosas.** Se previno el riesgo de subir código nuevo que, por error, rompiera módulos críticos que ya funcionaban bien.
+
+## 8. Nuevas Funciones Seguras (Sorteos, Trabajo, Warns)
+**Estado en la Versión Antigua (\`LCOBOT_OLD\`):** 
+Carecía de moderación preventiva y los usuarios no tenían formas activas de ganar dinero más allá de un daily y juegos de azar.
+
+**Estado Actual:** 
+Se construyó un sistema de advertencias locales persistentes (\`warns.json\`), métodos seguros de ganar dinero (\`/work\`, \`/rob\`), y un gestor dinámico de sorteos (\`giveawayManager\`) que sobrevive a los reinicios.
