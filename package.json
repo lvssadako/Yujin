@@ -12,7 +12,7 @@
   "dependencies": {
     "@napi-rs/canvas": "^0.1.81",
     "canvas": "^3.2.0",
-    "discord.js": "^14.11.0",
+    "discord.js": "^14.27.0",
     "dotenv": "^16.4.5",
     "winston": "^3.19.0",
     "zod": "^4.4.3"
