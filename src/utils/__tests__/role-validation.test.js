@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { canBotManageRole, validateRoleForAssignment } = require('../utils/roleValidation');
+const { canBotManageRole, validateRoleForAssignment } = require('../roleValidation');
 
 test('canBotManageRole rejects managed roles', () => {
   const role = { id: 'role-1', name: 'Bot Role', managed: true, comparePositionTo: () => -1 };

@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const { readJsonSafe, writeJsonAtomic, deepMerge } = require('../utils/jsonStore');
+const { readJsonSafe, writeJsonAtomic, deepMerge } = require('../jsonStore');
 
 test('readJsonSafe returns empty object for invalid JSON', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lcobot-json-'));

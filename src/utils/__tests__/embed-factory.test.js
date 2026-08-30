@@ -9,7 +9,7 @@ const {
   createWarningEmbed,
   createBoostEmbed,
   createLevelEmbed 
-} = require('../utils/embedFactory');
+} = require('../embedFactory');
 
 test('COLORS object contains standard colors', () => {
   assert.equal(typeof COLORS.success, 'number');

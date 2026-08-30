@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { getBalance, addCoins, removeCoins } = require('../../../services/economy').economyService;
-const { readProfiles, writeProfiles, ensureUser } = require('../../../utils/profileStore');
+const { getBalance, addCoins, removeCoins } = require('../../services/economy/index').economyService;
+const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
 
 module.exports = {
   data: new SlashCommandBuilder()

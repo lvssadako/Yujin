@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { grantOnce, makeRewardKey, clearEventGuard } = require('../utils/eventGuard');
+const { grantOnce, makeRewardKey, clearEventGuard } = require('../eventGuard');
 
 test('grantOnce prevents duplicate execution within TTL', () => {
   let count = 0;

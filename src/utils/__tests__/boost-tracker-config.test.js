@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { resolveBoostAnnouncementChannel } = require('../events/guildMemberUpdate_boostTracker');
+const { resolveBoostAnnouncementChannel } = require('../../events/guildMemberUpdate_boostTracker');
 
 test('resolveBoostAnnouncementChannel prefers added channel over generic boost channel', async () => {
   const botMember = { id: 'bot-id' };

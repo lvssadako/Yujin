@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { readProfiles, ensureUser } = require('../../../utils/profileStore');
+const { readProfiles, ensureUser } = require('../../utils/profileStore');
 
 module.exports = {
   name: 'boostsxp',

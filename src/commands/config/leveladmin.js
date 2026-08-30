@@ -1,9 +1,9 @@
-const logger = require('./utils/logger');
+const logger = require('../../utils/logger');
 const fs = require('fs');
 const path = require('path');
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { validateRoleForAssignment } = require('../../../utils/roleValidation');
-const { validateChannelForSending } = require('../../../utils/channelValidation');
+const { validateRoleForAssignment } = require('../../utils/roleValidation');
+const { validateChannelForSending } = require('../../utils/channelValidation');
 
 const dataDir = path.join(__dirname, '..', 'data');
 const levelsPath = path.join(dataDir, 'levels.json');

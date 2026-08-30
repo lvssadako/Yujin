@@ -1,9 +1,9 @@
-const logger = require('./utils/logger');
+const logger = require('../utils/logger');
 const fs = require('fs');
 const path = require('path');
 const { Events, EmbedBuilder } = require('discord.js');
 const { checkAndGrantBadges } = require('../utils/badgeManager');
-const { addCoins } = require('../src/services/economy').economyService;
+const { addCoins } = require('../services/economy/index').economyService;
 const { validateChannelForSending } = require('../utils/channelValidation');
 const { createBoostEmbed, createInfoEmbed } = require('../utils/embedFactory');
 

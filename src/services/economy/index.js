@@ -1,4 +1,4 @@
-const { readJsonSafe, writeJsonAtomic } = require('../../../utils/jsonStore');
+const { readJsonSafe, writeJsonAtomic } = require('../../utils/jsonStore');
 const path = require('node:path');
 const fs = require('node:fs');
 

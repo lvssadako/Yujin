@@ -1,5 +1,5 @@
 // Blackjack prefix command wrapper adaptado para editar el mismo mensaje
-const blackjack = require('../commands/games/blackjack.js');
+const blackjack = require('../commands/games/blackjack');
 
 module.exports = {
   name: 'blackjack',

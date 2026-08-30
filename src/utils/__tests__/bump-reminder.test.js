@@ -17,7 +17,7 @@ function restore() {
 test('addTimer should replace duplicate bump reminders for the same guild/user', () => {
   fs.writeFileSync(timersPath, '[]', 'utf8');
 
-  const { addTimer, readTimers } = require('../utils/bumpTimers');
+  const { addTimer, readTimers } = require('../bumpTimers');
 
   addTimer({ id: 'old', guildId: 'guild-1', channelId: 'channel-1', roleId: 'role-1', userId: 'user-1', sendAt: 1000 });
   addTimer({ id: 'new', guildId: 'guild-1', channelId: 'channel-1', roleId: 'role-1', userId: 'user-1', sendAt: 2000 });

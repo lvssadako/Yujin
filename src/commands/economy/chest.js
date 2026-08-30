@@ -1,10 +1,10 @@
-const logger = require('./utils/logger');
+const logger = require('../../utils/logger');
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { addChests, removeChest, getChestCount } = require('../../../utils/chestStore');
-const { getBalance, removeCoins } = require('../../../services/economy').economyService;
-const { readProfiles, writeProfiles, ensureUser } = require('../../../utils/profileStore');
-const { updateMissionProgress } = require('../../../utils/dailyMissions');
-const { rollBadge, RARITIES } = require('../../../utils/badgeRoller');
+const { addChests, removeChest, getChestCount } = require('../../utils/chestStore');
+const { getBalance, removeCoins } = require('../../services/economy/index').economyService;
+const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
+const { updateMissionProgress } = require('../../utils/dailyMissions');
+const { rollBadge, RARITIES } = require('../../utils/badgeRoller');
 
 module.exports = {
   data: new SlashCommandBuilder()

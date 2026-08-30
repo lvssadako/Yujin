@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
-const loggerPath = path.join(__dirname, '..', 'src', 'utils', 'logger', 'index.js');
+const loggerPath = path.join(__dirname, '..', 'index.js');
 
 test('logger module is available and exposes standard log methods', async () => {
   const logger = require(loggerPath);

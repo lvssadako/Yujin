@@ -2,8 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
-const { loadCommandRegistry } = require('../src/loaders/commandLoader');
-const projectRoot = path.join(__dirname, '..');
+const { loadCommandRegistry } = require('../../loaders/commandLoader');
+const projectRoot = path.join(__dirname, '..', '..');
 
 test('loadCommandRegistry loads slash and prefix commands from the current project layout', () => {
   const registry = loadCommandRegistry({

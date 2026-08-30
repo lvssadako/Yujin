@@ -1,14 +1,14 @@
-const logger = require('./utils/logger');
+const logger = require('../../utils/logger');
 const fs = require('fs');
 const path = require('path');
 const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
 const { createCanvas, loadImage } = require('canvas');
-const { readProfiles, ensureUser } = require('../../../utils/profileStore');
-const { readConfig } = require('../../../utils/configCache');
-const { normalizeExternalImageUrl } = require('../../../utils/urlSafety');
+const { readProfiles, ensureUser } = require('../../utils/profileStore');
+const { readConfig } = require('../../utils/configCache');
+const { normalizeExternalImageUrl } = require('../../utils/urlSafety');
 
 // IMPORTA UTILIDADES DE NIVELES (reemplaza funciones locales)
-const { readLevels, ensureUserData, xpToNext, getUserRank } = require('../../../services/level').levelService;
+const { readLevels, ensureUserData, xpToNext, getUserRank } = require('../../services/level').levelService;
 
 // Descargar a Buffer (URL http/https)
 async function fetchBuffer(url) {

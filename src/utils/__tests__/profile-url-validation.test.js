@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { normalizeExternalImageUrl } = require('../utils/urlSafety');
+const { normalizeExternalImageUrl } = require('../urlSafety');
 
 test('normalizeExternalImageUrl accepts safe public image hosts', () => {
   const url = 'https://catbox.moe/user/file.png?raw=1';

@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { validateChannelForSending, getValidNotificationChannel } = require('../utils/channelValidation');
+const { validateChannelForSending, getValidNotificationChannel } = require('../channelValidation');
 
 test('validateChannelForSending rejects non-existent channels', async () => {
   const guild = {

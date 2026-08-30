@@ -1,9 +1,9 @@
-const logger = require('./utils/logger');
+const logger = require('../../utils/logger');
 const fs = require('fs');
 const path = require('path');
 const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
-const { readLevels, xpToNext, getUserRank } = require('../../../services/level').levelService;
+const { readLevels, xpToNext, getUserRank } = require('../../services/level').levelService;
 
 const dataDir = path.join(__dirname, '..', 'data');
 const levelsPath = path.join(dataDir, 'levels.json');

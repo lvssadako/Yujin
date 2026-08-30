@@ -1,10 +1,10 @@
-const logger = require('./utils/logger');
+const logger = require('../../utils/logger');
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle, ComponentType } = require('discord.js');
-const { readProfiles, writeProfiles, ensureUser } = require('../../../utils/profileStore');
-const { readLevels } = require('../../../services/level').levelService;
-const { readShop, writeShop, rotateShop, ensureRotation } = require('../../../utils/badgeShop');
-const { getBalance, removeCoins } = require('../../../services/economy').economyService;
-const { readConfig } = require('../../../utils/configCache');
+const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
+const { readLevels } = require('../../services/level').levelService;
+const { readShop, writeShop, rotateShop, ensureRotation } = require('../../utils/badgeShop');
+const { getBalance, removeCoins } = require('../../services/economy/index').economyService;
+const { readConfig } = require('../../utils/configCache');
 
 const RARITIES = {
   common: { emoji: '⚪', color: 0x9E9E9E },
@@ -894,7 +894,7 @@ module.exports = {
 
     if (sub === 'progress') {
       const targetUser = interaction.options.getUser('user') || interaction.user;
-      const { getUserBadges } = require('../../../utils/badgeManager');
+      const { getUserBadges } = require('../../utils/badgeManager');
       const levels = readLevels();
       
       const userProfile = ensureUser(profiles, interaction.guildId, targetUser.id);
@@ -941,7 +941,7 @@ module.exports = {
     }
 
     if (sub === 'mine') {
-      const { getUserBadges } = require('../../../utils/badgeManager');
+      const { getUserBadges } = require('../../utils/badgeManager');
       const { earned, equipped } = getUserBadges(interaction.guildId, interaction.user.id);
 
       if (!earned.length) {
@@ -1109,7 +1109,7 @@ module.exports = {
         return interaction.editReply('❌ Solo admins pueden verificar otros usuarios');
       }
       
-      const { checkAndGrantBadges } = require('../../../utils/badgeManager');
+      const { checkAndGrantBadges } = require('../../utils/badgeManager');
       const newBadges = await checkAndGrantBadges(interaction.guild, targetUser.id);
 
       if (!newBadges.length) {

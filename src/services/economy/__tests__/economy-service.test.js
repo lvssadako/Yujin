@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { createEconomyService } = require('../src/services/economy');
+const { createEconomyService } = require('../index');
 
 function makeService() {
   const tempPath = path.join(__dirname, '.tmp-economy.json');

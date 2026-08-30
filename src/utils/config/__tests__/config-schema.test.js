@@ -3,8 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const schemaPath = path.join(__dirname, '..', 'src', 'utils', 'config', 'schema.js');
-const loaderPath = path.join(__dirname, '..', 'src', 'utils', 'config', 'loader.js');
+const schemaPath = path.join(__dirname, '..', 'schema.js');
+const loaderPath = path.join(__dirname, '..', 'loader.js');
 
 const tempDir = path.join(__dirname, '.tmp-config');
 

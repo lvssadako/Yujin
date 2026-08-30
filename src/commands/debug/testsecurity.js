@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { onCriticalAction } = require('../events/onCriticalAction');
+const { onCriticalAction } = require('../../events/onCriticalAction');
 const config = require('../../../config.json'); // <--- AGREGA ESTO
 
 module.exports = {

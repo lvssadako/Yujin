@@ -1,4 +1,4 @@
-const logger = require('./utils/logger');
+const logger = require('./logger');
 const { readProfiles, writeProfiles, ensureUser } = require('./profileStore');
 const { readLevels } = require('./levelStore');
 

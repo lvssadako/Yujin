@@ -1,9 +1,9 @@
 const { SlashCommandBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, ComponentType } = require('discord.js');
-const { readProfiles, writeProfiles, ensureUser } = require('../../../utils/profileStore');
-const { readConfig } = require('../../../utils/configCache');
-const { getBalance, addCoins } = require('../../../services/economy').economyService;
-const { getDaily, claimDaily } = require('../../../utils/dailyMissions');
-const { readLevels, writeLevels, ensureUserData, xpToNext } = require('../../../services/level').levelService;
+const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
+const { readConfig } = require('../../utils/configCache');
+const { getBalance, addCoins } = require('../../services/economy/index').economyService;
+const { getDaily, claimDaily } = require('../../utils/dailyMissions');
+const { readLevels, writeLevels, ensureUserData, xpToNext } = require('../../services/level').levelService;
 
 function bar10(progress, target) {
   const pct = target > 0 ? Math.floor((progress / target) * 100) : 0;

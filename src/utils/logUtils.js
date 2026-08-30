@@ -1,4 +1,4 @@
-const config = require('../config.json');
+const config = require('../../config.json');
 
 async function sendToLogChannel(client, content) {
   if (!config.logChannelId) return;

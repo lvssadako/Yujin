@@ -1,4 +1,4 @@
-const logger = require('./utils/logger');
+const logger = require('./logger');
 async function validateChannelForSending(guild, channelId, context = '') {
   if (typeof channelId !== 'string' || !channelId.trim()) {
     return { valid: false, reason: 'Channel ID is empty or invalid.' };

@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { getBalance, addCoins, removeCoins, addGems, removeGems } = require('../../../services/economy').economyService;
-const { addChests, removeChest, getChestCount } = require('../../../utils/chestStore');
+const { getBalance, addCoins, removeCoins, addGems, removeGems } = require('../../services/economy/index').economyService;
+const { addChests, removeChest, getChestCount } = require('../../utils/chestStore');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -136,7 +136,7 @@ module.exports = {
       }
 
       if (sub === 'set') {
-        const { readEconomy, writeEconomy, ensureUserEcon } = require('../../../services/economy').economyService;
+        const { readEconomy, writeEconomy, ensureUserEcon } = require('../../services/economy/index').economyService;
         const econ = readEconomy();
         const u = ensureUserEcon(econ, guildId, targetUser.id);
         
