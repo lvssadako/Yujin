@@ -15,9 +15,14 @@ function stripEmoji(text) {
     .trim();
 }
 
+const { normalizeExternalImageUrl } = require('../../utils/urlSafety');
+
 async function fetchAvatarBuffer(url) {
+  const safeUrl = normalizeExternalImageUrl(url);
+  if (!safeUrl) return null;
+
   try {
-    const res = await fetch(url, {
+    const res = await fetch(safeUrl, {
       signal: AbortSignal.timeout(8000),
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',

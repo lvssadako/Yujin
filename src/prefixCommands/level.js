@@ -7,9 +7,19 @@ const dataDir = path.join(__dirname, '..', 'data');
 const levelsPath = path.join(dataDir, 'levels.json');
 const { readLevels, ensureUserData, xpToNext, getUserRank } = require('../services/level').levelService;
 
+const { normalizeExternalImageUrl } = require('../utils/urlSafety');
+
 async function fetchAvatarBuffer(url) {
+  const safeUrl = normalizeExternalImageUrl(url);
+  if (!safeUrl) return null;
+
   try {
-    const res = await fetch(url);
+    const res = await fetch(safeUrl, {
+      signal: AbortSignal.timeout(8000),
+      headers: {
+        'User-Agent': 'Mozilla/5.0'
+      }
+    });
     if (!res.ok) throw new Error('avatar fetch failed');
     const ab = await res.arrayBuffer();
     return Buffer.from(ab);

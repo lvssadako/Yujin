@@ -15,15 +15,18 @@ const { normalizeExternalImageUrl } = require('../../utils/urlSafety');
 // IMPORTA UTILIDADES DE NIVELES (reemplaza funciones locales)
 const { readLevels, ensureUserData, xpToNext, getUserRank } = require('../../services/level').levelService;
 
-// Descargar a Buffer (URL http/https)
+// Descargar a Buffer (URL http/https segura)
 async function fetchBuffer(url) {
+  const safeUrl = normalizeExternalImageUrl(url);
+  if (!safeUrl) return null;
+
   try {
     const headers = {
       'User-Agent': 'Mozilla/5.0',
       'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
       'Referer': 'https://discord.com/'
     };
-    const res = await fetch(url, { headers, redirect: 'follow', signal: AbortSignal.timeout(10000) });
+    const res = await fetch(safeUrl, { headers, redirect: 'follow', signal: AbortSignal.timeout(10000) });
     if (!res.ok) return null;
     const ab = await res.arrayBuffer();
     return Buffer.from(ab);

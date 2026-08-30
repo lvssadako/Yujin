@@ -31,6 +31,9 @@ function deepMerge(a, b) {
   const out = { ...a };
 
   for (const key of Object.keys(b)) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      continue;
+    }
     const value = b[key];
     if (value && typeof value === 'object' && !Array.isArray(value) && value !== null) {
       out[key] = deepMerge(a[key] || {}, value);
