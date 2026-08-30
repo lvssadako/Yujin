@@ -32,7 +32,7 @@ module.exports = {
       writeWarns(warns);
       
       const emb = new EmbedBuilder().setColor(0xFFA500).setTitle('⚠️ Usuario Advertido')
-        .setDescription(`**${target.tag}** ha recibido una advertencia.\n**Razón:** ${reason}\n**ID:** `${warnId}``);
+        .setDescription(`**${target.tag}** ha recibido una advertencia.\\n**Razón:** ${reason}\\n**ID:** \`${warnId}\``);
       await interaction.reply({ embeds: [emb] });
       
       try { await target.send(`Has recibido una advertencia en **${interaction.guild.name}**. Razón: ${reason}`); } catch (e) {}

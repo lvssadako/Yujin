@@ -1,6 +1,6 @@
 const logger = require('../utils/logger');
 const { Events } = require('discord.js');
-const { updateTopRoles } = require('../commands/toproles');
+const { updateTopRoles } = require('../commands/utility/toproles');
 const { handleLevelRoles } = require('../utils/levelRoles');
 const { readProfiles, writeProfiles, ensureUser } = require('../utils/profileStore');
 const { readConfig } = require('../utils/configCache');

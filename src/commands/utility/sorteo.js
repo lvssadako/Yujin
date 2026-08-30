@@ -1,7 +1,7 @@
 
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { createGiveaway } = require('../../services/giveaways/giveawayManager');
-const ms = require('ms'); // We need to add 'ms' or write a basic parser. We'll use a basic parser if ms is not installed.
+
 
 module.exports = {
   data: new SlashCommandBuilder()

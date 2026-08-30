@@ -1,5 +1,5 @@
 const { Events } = require('discord.js');
-const { updateTopRoles } = require('../commands/toproles');
+const { updateTopRoles } = require('../commands/utility/toproles');
 const { handleLevelRoles } = require('../utils/levelRoles');
 const { readConfig } = require('../utils/configCache');
 const { readLevels, writeLevels, ensureUserData } = require('../services/level').levelService;
