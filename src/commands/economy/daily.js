@@ -61,10 +61,11 @@ module.exports = {
     const bal = getBalance(interaction.guildId, interaction.user.id);
 
     // Encabezado "Daily"
+    const endTs = Math.floor(nextDayStart / 1000);
     const dailyStatus = canClaimDaily
       ? '✅ **Daily: disponible ahora**'
-      : `⏳ **Daily: disponible en ${fmtTime(msLeft)}**`;
-    const missionsStatus = `🗓️ **Se renuevan en ${fmtTime(msLeft)}**`;
+      : `⏳ **Daily:** disponible <t:${endTs}:R>`;
+    const missionsStatus = `🗓️ **Se renuevan:** <t:${endTs}:R>`;
     const totalRewards = calcTotalRewards(missions);
     const rewardsText = [
       totalRewards.coins > 0 ? `${totalRewards.coins} 🪙` : '',
