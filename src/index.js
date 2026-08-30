@@ -91,7 +91,7 @@ client.once(Events.ClientReady, async () => {
 
 // Cargar handler de interacciones (¡PROFESIONAL!)
 require('./events/interactionCreate')(client);
-require('./events/messageCreate')(client);
+require('./events/messageCreate')(client);\n// Cargar sistemas de Seguridad y Auditoría\ntry {\n  require('./events/messageCreate_automod')(client);\n  require('./events/messageDelete_audit')(client);\n  require('./events/messageUpdate_audit')(client);\n  logger.info('Sistemas Automod y Audit cargados.');\n} catch (e) {\n  logger.error('Error cargando sistemas de seguridad', { error: e.message });\n}
 // Cargar y reprogramar timers de bump pendientes
 require('./events/bumpTimersLoader')(client);
 require('./services/giveaways/giveawayManager').init(client);
