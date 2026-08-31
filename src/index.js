@@ -201,8 +201,11 @@ for (const file of levelEvents) {
 }
 
 // Evento de status/roles
+let stopPresenceStatusRolesFn = null;
 try {
-  require('./events/presenceStatusRoles')(client);
+  const presenceModule = require('./events/presenceStatusRoles');
+  presenceModule(client);
+  stopPresenceStatusRolesFn = presenceModule.stopPresenceStatusRoles;
   logger.info('Evento de status/roles cargado');
 } catch (e) {
   logger.error('Error cargando presenceStatusRoles', { error: e.message, stack: e.stack });
@@ -238,6 +241,10 @@ async function gracefulShutdown(signal) {
 
   try {
     if (stopBoostTrackerFn) stopBoostTrackerFn();
+  } catch {}
+
+  try {
+    if (stopPresenceStatusRolesFn) stopPresenceStatusRolesFn();
   } catch {}
 
   try {
