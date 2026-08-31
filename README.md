@@ -78,7 +78,17 @@ Bot integral de Discord para gestión comunitaria avanzada, diseñado con arquit
 
 ---
 
-### 💰 5. Economía, Préstamos y Recompensas
+### 🔗 5. Roles por Estado Personalizado (Presence Status Roles)
+- **Detección en Tiempo Real (`presenceStatusRoles`)**: Asigna automáticamente un rol exclusivo cuando un usuario incluye un enlace o texto promocional del servidor (ej. `.gg/lco`) en su estado personalizado de Discord (`ActivityType.Custom`).
+- **Protección contra Pérdida por Desconexión (Offline/Invisible Guard)**: Cuando un usuario se desconecta o pasa a modo invisible, el bot preserva sus roles intactos.
+- **Tiempo de Gracia de 10 Segundos**: Si el usuario retira el enlace, se activa un temporizador de gracia de 10 segundos antes de revocar el rol, cancelándose de inmediato si el usuario reincorpora el enlace.
+- **Resolución Segura de Miembros**: Fallback con `fetch` dinámico para miembros no cacheados tras reinicios.
+- **Beneficios Vinculados**: Otorga **+25% de bono de XP pasivo** y computa el tiempo activo para completar misiones diarias (`role_time`).
+- **Gestión de Memoria y Apagado Limpio**: Control de cooldown por usuario con auto-limpieza TTL y cancelación de temporizadores en *Graceful Shutdown*.
+
+---
+
+### 💰 6. Economía, Préstamos y Recompensas
 - **Monedas y Transacciones**: Consulta de balance (`/balance`, `/bal`), transferencias entre usuarios (`/transfer`), ranking económico (`/ecotop`), compras en tienda (`/buy`, `/shop`) y sistema bancario con depósito y retiro (`/bank deposit`, `/bank withdraw`).
 - **🏦 Sistema de Préstamos Bancarios (`/loan` & `&loan`)**:
   - **Solicitud Inmediata (`/loan take <cantidad>`)**: Préstamos de 500 a 100,000 monedas depositados al instante en la billetera.
@@ -198,6 +208,7 @@ El proyecto utiliza el test runner nativo de Node.js (`node --test`), garantizan
 - Validación y normalización de URLs externas y seguridad contra SSRF (`urlSafety`).
 - Renderizado de tarjetas Canvas en alta definición y manejo de niveles máximos (`streakCard`).
 - Jerarquía de roles y asignación segura (`roleValidation`).
+- Roles automáticos por estado personalizado de Discord con protección offline y tiempo de gracia (`presenceStatusRoles`).
 - Persistencia atómica de JSON y protección contra duplicidad de recompensas (`grantOnce`).
 - Validación de esquemas con Zod (`schema.js`) y logging centralizado con Winston (`logger`).
 - Middleware de Rate Limiting y Cooldowns con limpieza TTL (`rateLimit.js`).
@@ -210,7 +221,7 @@ npm test
 # o directamente:
 node --test "src/**/__tests__/*.test.js"
 ```
-*Resultado: 47 pruebas pasando al 100%.*
+*Resultado: 55 pruebas pasando al 100%.*
 
 ---
 

@@ -59,17 +59,26 @@ Se desarrollaron wrappers en \`src/commands/games/\` para transformar el código
 *   **Riesgo Mitigado:** **Deprecación por parte de Discord.** Discord está limitando severamente la lectura de mensajes (Privileged Intents) para bots de texto. Seguir usando el modelo antiguo garantizaba que el bot dejara de funcionar a medida que creciera.
 
 ## 7. Automatización de Tests (100% Cobertura)
-**Estado en la Versión Antigua (\`LCOBOT_OLD\`):** 
-Los tests en la carpeta \`tests/\` no cubrían los flujos complejos y las rutas estaban rotas al cambiar de carpetas.
+**Estado en la Versión Antigua (`LCOBOT_OLD`):** 
+Los tests en la carpeta `tests/` no cubrían los flujos complejos y las rutas estaban rotas al cambiar de carpetas.
 
 **Estado Actual:** 
-Se reconstruyó la suite de Node.js test runner con 32 validaciones estrictas.
+Se reconstruyó la suite de Node.js test runner con 55 validaciones estrictas y tests unitarios colocalizados para cada subsistema.
 
 *   **Riesgo Mitigado:** **Regresiones silenciosas.** Se previno el riesgo de subir código nuevo que, por error, rompiera módulos críticos que ya funcionaban bien.
 
 ## 8. Nuevas Funciones Seguras (Sorteos, Trabajo, Warns)
-**Estado en la Versión Antigua (\`LCOBOT_OLD\`):** 
+**Estado en la Versión Antigua (`LCOBOT_OLD`):** 
 Carecía de moderación preventiva y los usuarios no tenían formas activas de ganar dinero más allá de un daily y juegos de azar.
 
 **Estado Actual:** 
-Se construyó un sistema de advertencias locales persistentes (\`warns.json\`), métodos seguros de ganar dinero (\`/work\`, \`/rob\`), y un gestor dinámico de sorteos (\`giveawayManager\`) que sobrevive a los reinicios.
+Se construyó un sistema de advertencias locales persistentes (`warns.json`), métodos seguros de ganar dinero (`/work`, `/fish`, `/loan`), y un gestor dinámico de sorteos (`giveawayManager`) que sobrevive a los reinicios.
+
+## 9. Blindaje del Sistema de Roles por Estado (`presenceStatusRoles.js`)
+**Estado en la Versión Antigua (`LCOBOT_OLD`):** 
+Si un usuario se ponía en modo invisible, se desconectaba o sufría una caída momentánea de conexión, el bot interpretaba que había borrado el enlace y le quitaba el rol de inmediato. Además, acumulaba identificadores en memoria sin límite y crasheaba si el miembro no estaba en la caché local.
+
+**Estado Actual:** 
+Se implementó protección estricta para estados `offline`/`invisible`, resolución segura con fetch dinámico para miembros no cacheados, temporizador con tiempo de gracia de 10 segundos antes de retirar el rol, auto-limpieza TTL del mapa de cooldown y cancelación ordenada de temporizadores durante el *Graceful Shutdown*.
+
+*   **Riesgo Mitigado:** **Parpadeo de roles (*role flickering*), pérdida injusta de beneficios y fugas de memoria.** Los miembros retienen sus roles legítimamente mientras están desconectados y el proceso del bot se mantiene libre de fugas de memoria.

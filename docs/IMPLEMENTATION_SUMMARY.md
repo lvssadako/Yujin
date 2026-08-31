@@ -71,11 +71,18 @@ This document summarizes the comprehensive stabilization, security hardening, mo
 - Anti-spam randomized countdown delays (2.5s to 6.5s) preventing pre-clicking.
 - Real-time reaction timing down to the millisecond with automatic pot collection and payout.
 
+### 13. Presence Status Roles & Custom Status Verification (`src/events/presenceStatusRoles.js`)
+- **Real-Time Discord Presence Listener**: Automatically assigns exclusive roles when members include specific invite/promotional links (e.g. `.gg/lco`) in their custom status (`ActivityType.Custom`).
+- **Offline / Invisible Protection**: Prevents role loss when users go offline or invisible by skipping presence checks on offline payloads.
+- **Grace Period (10s Removal Buffer)**: When a member removes the status text, a 10-second timer is scheduled. If the user restores the status or goes offline during the buffer, the role is safely retained.
+- **Uncached Member Fetch Fallback**: Reliably retrieves uncached guild members using `guild.members.fetch()` fallback.
+- **Memory Safety & Graceful Shutdown**: Automatic map pruning for cooldowns and full timer cleanup via `stopPresenceStatusRoles()` upon bot termination.
+
 ---
 
 ## Test Suite Status
 
-**Total Tests:** 49 (all passing)
+**Total Tests:** 55 (all passing)
 
 | Test File | Tests | Domain Tested |
 |---|:---:|---|
@@ -85,6 +92,7 @@ This document summarizes the comprehensive stabilization, security hardening, mo
 | `src/utils/__tests__/boost-tracker-config.test.js` | 1 | Boost announcement channel resolution priority |
 | `src/utils/__tests__/profile-url-validation.test.js` | 4 | Safe image host whitelist & SSRF prevention |
 | `src/utils/__tests__/role-validation.test.js` | 5 | Role hierarchy and assignability verification |
+| `src/utils/__tests__/presence-status-roles.test.js` | 6 | Presence triggers, offline protection, delayed removal & timer cancellation |
 | `src/utils/__tests__/channel-validation.test.js` | 4 | Channel permissions, text channel checks |
 | `src/utils/__tests__/embed-factory.test.js` | 5 | Embed builder, color themes, author formatting |
 | `src/utils/__tests__/streak.test.js` | 3 | Streak slash registration, HD card rendering |
