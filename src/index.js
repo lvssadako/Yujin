@@ -15,6 +15,10 @@ const { Client, Collection, GatewayIntentBits, REST, Routes, Events } = require(
 const { loadAndValidateConfig } = require('./utils/config/loader');
 const { scheduleShopRotation } = require('./utils/badgeShop');
 const { readProfiles, writeProfiles } = require('./utils/profileStore');
+const { initFonts } = require('./utils/canvasFontLoader');
+
+// Inicializar y registrar fuentes para Canvas
+initFonts();
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;

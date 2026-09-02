@@ -109,17 +109,17 @@ async function renderLeaderboardCanvas(guild, leaderboardEntries, timeframe, cat
 
   // Header Title
   ctx.fillStyle = THEME.text;
-  ctx.font = 'bold 36px "Segoe UI"';
+  ctx.font = 'bold 36px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
   ctx.fillText(guild.name || 'Servidor', 45, 70);
 
   ctx.fillStyle = THEME.textDim;
-  ctx.font = 'bold 20px "Segoe UI"';
+  ctx.font = 'bold 20px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
   ctx.fillText(`${getTimeframeTitle(timeframe)} • ${getCategorySubtitle(category)}`, 45, 110);
 
   // If empty
   if (leaderboardEntries.length === 0) {
     ctx.fillStyle = THEME.textDim;
-    ctx.font = '24px "Segoe UI"';
+    ctx.font = '24px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('No hay actividad registrada en este período todavía.', width / 2, headerH + 60);
     ctx.textAlign = 'left';
@@ -148,7 +148,7 @@ async function renderLeaderboardCanvas(guild, leaderboardEntries, timeframe, cat
     ctx.fill();
 
     ctx.fillStyle = (i < 3) ? '#000000' : THEME.text;
-    ctx.font = 'bold 20px "Segoe UI"';
+    ctx.font = 'bold 20px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`${i + 1}`, rankX, rankY);
@@ -177,7 +177,7 @@ async function renderLeaderboardCanvas(guild, leaderboardEntries, timeframe, cat
     const nameX = avX + avatarSize + 22;
     const nameY = y + 45;
     ctx.fillStyle = THEME.text;
-    ctx.font = 'bold 30px "Segoe UI"';
+    ctx.font = 'bold 30px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
 
     let maxNameWidth = 400;
     let displayName = username;
@@ -189,7 +189,7 @@ async function renderLeaderboardCanvas(guild, leaderboardEntries, timeframe, cat
 
     // Detail subtitle
     ctx.fillStyle = THEME.textDim;
-    ctx.font = '17px "Segoe UI"';
+    ctx.font = '17px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
     ctx.fillText(entry.detail, nameX, nameY + 30);
 
     // Right side metric (Score / Level Badge)
@@ -197,7 +197,7 @@ async function renderLeaderboardCanvas(guild, leaderboardEntries, timeframe, cat
     if (category === 'general') {
       const levelText = `Nivel ${entry.level}`;
       ctx.fillStyle = THEME.text;
-      ctx.font = 'bold 26px "Segoe UI"';
+      ctx.font = 'bold 26px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
       ctx.textAlign = 'right';
       ctx.fillText(levelText, width - 60, nameY);
 
@@ -228,14 +228,14 @@ async function renderLeaderboardCanvas(guild, leaderboardEntries, timeframe, cat
       const mins = Math.floor((timeframe === 'global' ? entry.voiceMs : (timeframe === 'weekly' ? entry.weekly.voiceMs : entry.daily.voiceMs)) / 60000);
       const hours = (mins / 60).toFixed(1);
       ctx.fillStyle = '#57F287';
-      ctx.font = 'bold 24px "Segoe UI"';
+      ctx.font = 'bold 24px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
       ctx.textAlign = 'right';
       ctx.fillText(`🎙️ ${hours} hrs (${mins}m)`, width - 60, nameY + 12);
       ctx.textAlign = 'left';
     } else if (category === 'text') {
       const msgs = timeframe === 'global' ? entry.messages : (timeframe === 'weekly' ? entry.weekly.messages : entry.daily.messages);
       ctx.fillStyle = '#5865F2';
-      ctx.font = 'bold 24px "Segoe UI"';
+      ctx.font = 'bold 24px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
       ctx.textAlign = 'right';
       ctx.fillText(`💬 ${msgs.toLocaleString()} msgs`, width - 60, nameY + 12);
       ctx.textAlign = 'left';

@@ -1,4 +1,4 @@
-﻿const logger = require('../../utils/logger');
+const logger = require('../../utils/logger');
 const fs = require('fs');
 const path = require('path');
 const { SlashCommandBuilder, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
@@ -119,7 +119,7 @@ function lightenHex(hex, amount = 0.25) {
   } catch { return '#ff6b6b'; }
 }
 
-function drawAutoScaledText(ctx, text, x, y, maxW, initialSize, weight = 'bold', fontFace = '"Segoe UI", "Helvetica Neue", Arial, sans-serif') {
+function drawAutoScaledText(ctx, text, x, y, maxW, initialSize, weight = 'bold', fontFace = '"Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", "Helvetica Neue", Arial, sans-serif') {
   let size = initialSize;
   ctx.font = `${weight} ${size}px ${fontFace}`;
   while (ctx.measureText(text).width > maxW && size > 16) {

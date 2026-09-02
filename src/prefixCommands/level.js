@@ -148,7 +148,7 @@ module.exports = {
       const nameX = avX + avSize + 28;
       const nameY = avY + 70;
       ctx.fillStyle = '#FBE5E3';
-      ctx.font = 'bold 50px "Segoe UI"';
+      ctx.font = 'bold 50px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
       ctx.fillText(`${targetUser.username}`, nameX, nameY);
 
       // Rank box
@@ -156,7 +156,7 @@ module.exports = {
       roundRect(ctx, panelX + panelW - 150, avY - 10, 110, 48, 12);
       ctx.fill();
       ctx.fillStyle = '#0b0c0c';
-      ctx.font = 'bold 20px "Segoe UI"';
+      ctx.font = 'bold 20px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
       ctx.fillText(`Rank #${rank}`, panelX + panelW - 132, avY + 20);
 
       // Level box
@@ -164,7 +164,7 @@ module.exports = {
       roundRect(ctx, panelX + panelW - 150, avY + 50, 110, 44, 10);
       ctx.fill();
       ctx.fillStyle = '#44011fff';
-      ctx.font = 'bold 20px "Segoe UI"';
+      ctx.font = 'bold 20px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
       ctx.fillText(`Level ${userData.level || 0}`, panelX + panelW - 132, avY + 80);
 
       // Progress bar
@@ -188,12 +188,12 @@ module.exports = {
       }
 
       // Progress text
-      ctx.font = '17px "Segoe UI"';
+      ctx.font = '17px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
       ctx.fillStyle = '#D7B8C2';
       ctx.fillText(`${userData.xp || 0} / ${need} XP • ${percent}%`, barX + barW + 12, barY + barH - 6);
 
       // Footer (server name)
-      ctx.font = '20px "Segoe UI"';
+      ctx.font = '20px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
       ctx.fillStyle = '#D7B8C2';
       ctx.fillText(`${message.guild.name}`, panelX + 36, panelY + panelH - 16);
 

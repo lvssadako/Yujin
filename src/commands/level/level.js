@@ -4,10 +4,10 @@ const path = require('path');
 const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const { readLevels, xpToNext, getUserRank } = require('../../services/level').levelService;
+const { FONT_FALLBACKS } = require('../../utils/canvasFontLoader');
 
 const dataDir = path.join(__dirname, '..', 'data');
 const levelsPath = path.join(dataDir, 'levels.json');
-
 
 async function fetchAvatarBuffer(url) {
   try {
@@ -58,14 +58,11 @@ module.exports = {
       const canvas = createCanvas(width, height);
       const ctx = canvas.getContext('2d');
 
-      // Transparent background en caso de volverlo a usar ctx.clearRect(0, 0, width, height);
-      
-
       // Panel
       const panelX = 0;
-const panelY = 0;
-const panelW = width;
-const panelH = height;
+      const panelY = 0;
+      const panelW = width;
+      const panelH = height;
       ctx.fillStyle = '#2B1C28';
       roundRect(ctx, panelX, panelY, panelW, panelH, 18);
       ctx.fill();
@@ -79,10 +76,9 @@ const panelH = height;
       const avSize = 140;
       const avX = panelX + 32;
       const avY = panelY + (panelH - avSize) / 2;
-      let avBuf = null;
       try {
         const url = targetUser.displayAvatarURL({ extension: 'png', size: 256 });
-        avBuf = await fetchAvatarBuffer(url);
+        const avBuf = await fetchAvatarBuffer(url);
         if (avBuf) {
           const img = await loadImage(avBuf);
           // border
@@ -113,22 +109,23 @@ const panelH = height;
       const nameX = avX + avSize + 28;
       const nameY = avY + 70;
       ctx.fillStyle = '#FBE5E3';
-      ctx.font = 'bold 50px "Segoe UI"';
+      ctx.font = `bold 50px ${FONT_FALLBACKS}`;
       ctx.fillText(`${targetUser.username}`, nameX, nameY);
 
       // Rank badge
       ctx.fillStyle = '#E6B655';
-      roundRect(ctx, panelX + panelW - 150, avY + -10, 110, 48, 12);
+      roundRect(ctx, panelX + panelW - 150, avY - 10, 110, 48, 12);
       ctx.fill();
       ctx.fillStyle = '#0b0c0c';
-      ctx.font = 'bold 20px "Segoe UI"';
+      ctx.font = `bold 20px ${FONT_FALLBACKS}`;
       ctx.fillText(`Rank #${rank}`, panelX + panelW - 132, avY + 20);
+
       // Level box
       ctx.fillStyle = '#C45A78';
       roundRect(ctx, panelX + panelW - 150, avY + 50, 110, 44, 10);
       ctx.fill();
       ctx.fillStyle = '#44011fff';
-      ctx.font = 'bold 20px "Segoe UI"';
+      ctx.font = `bold 20px ${FONT_FALLBACKS}`;
       ctx.fillText(`Nivel ${userData.level}`, panelX + panelW - 132, avY + 80);
 
       // Progress bar
@@ -138,12 +135,12 @@ const panelH = height;
       const barH = 22;
 
       // background
-      ctx.fillStyle = '#6d6c6cd2)';
+      ctx.fillStyle = '#6d6c6cd2';
       roundRect(ctx, barX, barY, barW, barH, barH/2);
       ctx.fill();
 
       // fill
-      const fillW = Math.max(0, Math.min(1, userData.xp / need)) * barW;
+      const fillW = Math.max(0, Math.min(1, (userData.xp || 0) / need)) * barW;
       if (fillW > 0) {
         const grad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
         grad.addColorStop(0, '#C45A78');
@@ -153,12 +150,12 @@ const panelH = height;
         ctx.fill();
       }
       // progress text
-      ctx.font = '15px "Segoe UI"';
+      ctx.font = `15px ${FONT_FALLBACKS}`;
       ctx.fillStyle = '#D7B8C2';
       ctx.fillText(`${userData.xp} / ${need} XP • ${percent}%`, barX + barW + 12, barY + barH - 6);
 
       // Small footer with server name
-      ctx.font = '20px "Segoe UI"';
+      ctx.font = `20px ${FONT_FALLBACKS}`;
       ctx.fillStyle = '#D7B8C2';
       ctx.fillText(`${interaction.guild.name}`, panelX + 36, panelY + panelH - 16);
 
