@@ -61,6 +61,10 @@ Bot integral de Discord para gestión comunitaria avanzada, diseñado con arquit
 - **Comandos de Mantenimiento para Administradores**:
   - `/reload` (o `&reload`): Recarga comandos, servicios y utilidades en caliente (con opción `sync_discord` para forzar sincronización con Discord).
   - `/restart` (o `&restart`): Reinicia el proceso del bot de manera segura y controlada con confirmación visual.
+- **👑 Panel Exclusivo para Dueño y Desarrollador (`OWNER_ID`, `DEVELOPER_ID` en `.env`)**:
+  - `/host` (o `&host`): Monitoreo integral en tiempo real de la máquina anfitriona / VM Ubuntu (CPU cores/load, RAM usada/libre con barras de progreso, almacenamiento en disco, proceso Node.js RSS/Heap, Uptime y ping).
+  - `/logs` (o `&logs`): Visor de incidentes que filtra y formatea los **15 errores y advertencias más recientes** (`error.log` / `combined.log`) con opciones de filtro (`all`, `error`, `warn`).
+  - `/dev` (o `&dev`): Suite unificada con subcomandos `status`, `host`, `logs`, `eval` (con protección de tokens/secretos), `reload`, `restart`, `eco` y `loan`.
 
 ---
 
@@ -215,6 +219,10 @@ El proyecto utiliza el test runner nativo de Node.js (`node --test`), garantizan
 - Middleware de Rate Limiting y Cooldowns con limpieza TTL (`rateLimit.js`).
 - Capa de abstracción de base de datos y repositorios (`src/database/`).
 - Sistema balanceado de niveles de texto y voz con tops global, semanal y diario (`src/services/level/`).
+- Autenticación centralizada de Dueño y Desarrollador desde variables `.env` (`staffAuth.js`).
+- Monitoreo en tiempo real de hardware de la VM Ubuntu/Linux (`hostMonitor.js`).
+- Extracción, orden y filtrado de incidentes y advertencias (`logReader.js`).
+- Compatibilidad dual completa en comandos Slash (`/`) y Prefijo (`&`).
 
 Ejecución de la suite completa:
 ```bash
@@ -222,7 +230,7 @@ npm test
 # o directamente:
 node --test "src/**/__tests__/*.test.js"
 ```
-*Resultado: 55 pruebas pasando al 100%.*
+*Resultado: 58 pruebas pasando al 100%.*
 
 ---
 
@@ -232,6 +240,8 @@ node --test "src/**/__tests__/*.test.js"
 2. **Idempotencia de Recompensas**: Toda recompensa o evento repetitivo debe validarse mediante `grantOnce` o claves compuestas `guild:user:event` para evitar duplicaciones.
 3. **Seguridad y Validación**: Validar tipos de datos, permisos de usuario y jerarquía del bot antes de guardar cambios o ejecutar acciones administrativas.
 4. **Diseño Visual Consistente**: Todos los mensajes del bot deben utilizar las utilidades de `src/utils/embedFactory.js` para mantener coherencia estética.
+5. **Doble Compatibilidad Obligatoria**: Todo comando debe implementar tanto `execute(interaction, client)` para Slash como `executePrefix(message, args, client)` para prefijo `&`.
+6. **Protección de Credenciales y `.env`**: Jamás acceder directamente al archivo `.env`; utilizar `process.env` en runtime y sanitizar secretos en salidas de diagnóstico.
 
 ---
 

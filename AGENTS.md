@@ -76,6 +76,29 @@ Los mensajes del bot deben:
 - reducir ambigüedad
 - no exponer detalles internos del sistema
 
+### 7. Dualidad Obligatoria: Slash Commands y Comandos con Prefijo
+
+Todo comando nuevo o refactorizado debe contar obligatoriamente con compatibilidad dual:
+
+- `execute(interaction, client)`: Manejo de Slash Command (`/comando`).
+- `executePrefix(message, args, client)`: Manejo de Prefijo (`&comando`).
+- Ambos métodos deben mantener paridad de subcomandos, validación de permisos y formato visual.
+
+### 8. Autenticación Centralizada de Staff y Protección de `.env`
+
+- **Jamás solicitar ni acceder directamente al archivo `.env`**. El acceso a variables de entorno se realiza exclusivamente en runtime vía `process.env`.
+- Toda verificación de privilegios exclusivos para Dueño (Owner) o Desarrollador (Developer) debe realizarse mediante [`src/utils/staffAuth.js`](file:///C:/Users/yooh2/Documents/LCOBOT/src/utils/staffAuth.js) (`isOwnerOrDev`, `isOwner`, `isDeveloper`).
+- Los comandos exclusivos de desarrollo no deben ser visibles en `/help` ni exponerse a usuarios que no posean los IDs correspondientes en `OWNER_ID` o `DEVELOPER_ID`.
+
+### 9. Censura de Secretos y Manejo Seguro de Diagnósticos
+
+- En utilidades de inspección o `eval`, jamás exponer en chat ni en embeds datos sensibles como `TOKEN` de Discord, secretos de Webhook o claves de API (`[REDACTED]`).
+
+### 10. Estabilidad Financiera y Techo de Deuda en Préstamos
+
+- Todo cálculo de intereses debe respetar el intervalo de 24 horas por préstamo (`TICK_INTERVAL_MS`) e imponer el techo de deuda máximo (`MAX_DEBT_MULTIPLIER = 2.5`).
+- El scheduler de préstamos se ejecuta cada 1 hora de forma idempotente, verificando el tiempo transcurrido por usuario sin duplicar cobros tras reinicios del bot.
+
 ## Problemas ya detectados y que NO deben repetirse
 
 - escritura directa a JSON en varios lugares sin validación
@@ -85,6 +108,8 @@ Los mensajes del bot deben:
 - URLs externas aceptadas sin validación fuerte
 - embeds con estilos inconsistentes
 - config mezclada entre raíz y `data/` sin resolución clara
+- acumulación acelerada de intereses en préstamos por reinicio de procesos
+- comandos que solo funcionan en slash olvidando soporte para prefijo `&`
 
 ## Estándar de calidad
 
@@ -93,7 +118,7 @@ Los mensajes del bot deben:
 - revisar si existe un servicio central
 - confirmar si ya hay un flujo de validación
 - añadir test antes o en el mismo cambio
-- comprobar impacto en economía / niveles / roles / notificaciones
+- comprobar impacto en economía / niveles / roles / notificaciones / comandos prefix y slash
 
 ### Después de cambiar
 
@@ -101,11 +126,13 @@ Los mensajes del bot deben:
 - verificar que no se producen mensajes duplicados
 - validar integridad de archivos JSON
 - revisar errores del terminal
+- comprobar paridad entre Slash y Prefix
 
 ## Comandos de validación recomendados
 
 - `node --check index.js`
-- `node --test tests/*.js`
+- `node --test src/utils/__tests__/*.test.js`
+- `node --test src/services/**/__tests__/*.test.js`
 - `pnpm audit`
 
 ## Aportación de diseño

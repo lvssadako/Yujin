@@ -12,6 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('../../utils/logger');
 const { COLORS } = require('../../utils/embedFactory');
+const { isOwnerOrDev } = require('../../utils/staffAuth');
 
 // Directorio de imágenes fuentes de Yujin
 const SOURCES_DIR = path.join(__dirname, '..', '..', '..', 'sources');
@@ -92,7 +93,26 @@ const CATEGORIES = {
   }
 };
 
+const DEV_CATEGORY = {
+  dev: {
+    name: '👑 Panel de Desarrollo y Owner',
+    desc: 'Monitoreo de recursos de la VM Ubuntu, visor de logs de error/warn, eval seguro y control de bot.',
+    emoji: '🛠️',
+    color: 0x5865F2
+  }
+};
+
 const COMMAND_MAP = {
+  // Panel de Desarrollo y Owner (Exclusivo)
+  dev: 'dev',
+  host: 'dev',
+  logs: 'dev',
+  reload: 'dev',
+  restart: 'dev',
+  testboost: 'dev',
+  testbutton: 'dev',
+  testsecurity: 'dev',
+
   // Moderación y Seguridad
   ban: 'admin',
   unban: 'admin',
@@ -103,11 +123,6 @@ const COMMAND_MAP = {
   automod: 'admin',
   audit: 'admin',
   ecoadmin: 'admin',
-  reload: 'admin',
-  restart: 'admin',
-  testboost: 'admin',
-  testbutton: 'admin',
-  testsecurity: 'admin',
 
   // Economía y Finanzas
   balance: 'economy',
@@ -243,13 +258,16 @@ function getCommandExample(cmdName) {
     sorteo: '/sorteo duracion: 2h ganadores: 1 premio: Nitro Classic',
     reminder: '/reminder tiempo: 30m mensaje: Estudiar para el examen',
     bumpreminderinfo: '/bumpreminderinfo',
-    manage: '/manage'
+    manage: '/manage',
+    dev: '/dev status',
+    host: '/host',
+    logs: '/logs filtro: all cantidad: 15'
   };
   return examples[cmdName] || `/${cmdName}`;
 }
 
 function getPermissionBadge(catId, cmdName) {
-  if (['reload', 'restart', 'testboost', 'testbutton', 'testsecurity'].includes(cmdName)) {
+  if (['reload', 'restart', 'testboost', 'testbutton', 'testsecurity', 'dev', 'host', 'logs'].includes(cmdName)) {
     return '`👑 Bot Owner / Desarrollador`';
   }
   if (catId === 'admin' || catId === 'config' || cmdName === 'ecoadmin' || cmdName === 'leveladmin' || cmdName === 'boostercolors') {
@@ -262,6 +280,8 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
   const client = interactionOrMessage.client;
   const user = isPrefix ? interactionOrMessage.author : interactionOrMessage.user;
   const commands = Array.from((client.commands || new Map()).values());
+  const isDevUser = isOwnerOrDev(user.id);
+  const activeCategories = isDevUser ? { ...CATEGORIES, ...DEV_CATEGORY } : { ...CATEGORIES };
 
   // === MODO INSPECCIÓN DETALLADA DE UN COMANDO ===
   if (query) {
@@ -270,7 +290,10 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
       (c.name && c.name.toLowerCase() === query.toLowerCase())
     );
 
-    if (!cmd) {
+    const cmdName = cmd?.data?.name || cmd?.name;
+    const catId = cmdName ? (COMMAND_MAP[cmdName] || 'utility') : null;
+
+    if (!cmd || (catId === 'dev' && !isDevUser)) {
       const errEmbed = new EmbedBuilder()
         .setColor(COLORS.error)
         .setTitle('❌ Comando No Encontrado')
@@ -282,9 +305,7 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
         : interactionOrMessage.reply({ embeds: [errEmbed], ephemeral: true });
     }
 
-    const cmdName = cmd.data?.name || cmd.name;
-    const catId = COMMAND_MAP[cmdName] || 'utility';
-    const catData = CATEGORIES[catId];
+    const catData = activeCategories[catId] || CATEGORIES.utility;
     const desc = cmd.data?.description || cmd.description || 'Sin descripción disponible.';
 
     const selectedBanner = getNextRotatedBannerImage();
@@ -321,18 +342,25 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
 
   // === MENÚ PRINCIPAL INTERACTIVO ===
   const categorized = {};
-  Object.keys(CATEGORIES).forEach(k => { categorized[k] = []; });
+  Object.keys(activeCategories).forEach(k => { categorized[k] = []; });
   
   for (const cmd of commands) {
     const cmdName = cmd.data?.name || cmd.name;
     const cat = COMMAND_MAP[cmdName] || 'utility';
-    categorized[cat].push({ 
-      name: cmdName, 
-      desc: cmd.data?.description || cmd.description || 'Sin descripción' 
-    });
+    if (cat === 'dev' && !isDevUser) continue;
+    if (categorized[cat]) {
+      categorized[cat].push({ 
+        name: cmdName, 
+        desc: cmd.data?.description || cmd.description || 'Sin descripción' 
+      });
+    }
   }
 
   Object.keys(categorized).forEach(k => categorized[k].sort((a, b) => a.name.localeCompare(b.name)));
+
+  const devNotice = isDevUser 
+    ? '\n> 👑 **Modo Developer/Owner:** Módulo de desarrollo y control del host desbloqueado.' 
+    : '';
 
   const mainEmbed = new EmbedBuilder()
     .setAuthor({ name: 'Centro de Ayuda y Comandos • Yujin' })
@@ -343,13 +371,14 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
       '• 🌟 **/leaderboard** — Clasificación global, semanal y diaria (Texto y Voz)\n' +
       '• 🔥 **/streak** — Gestiona tu racha de actividad diaria\n' +
       '• 💰 **/daily** / **/balance** — Recompensas y estado económico\n' +
-      '• 🛡️ **/warn** / **/timeout** / **/ban** — Moderación avanzada\n\n' +
+      '• 🛡️ **/warn** / **/timeout** / **/ban** — Moderación avanzada\n' +
+      devNotice + '\n\n' +
       '> 💡 *¿Buscas un comando específico? Usa `/help comando: <nombre>`*'
     )
     .setColor(0x5865F2)
     .addFields(
-      { name: '🗂️ Módulos', value: `\`${Object.keys(CATEGORIES).length} Categorías\``, inline: true },
-      { name: '⚡ Comandos', value: `\`${commands.length} Disponibles\``, inline: true },
+      { name: '🗂️ Módulos', value: `\`${Object.keys(activeCategories).length} Categorías\``, inline: true },
+      { name: '⚡ Comandos', value: `\`${Object.values(categorized).flat().length} Disponibles\``, inline: true },
       { name: '📡 Estado', value: '`🟢 100% Operativo`', inline: true }
     );
 
@@ -376,7 +405,7 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
     .setCustomId('help_category_select')
     .setPlaceholder('📂 Elige una categoría para explorar...')
     .addOptions(
-      Object.entries(CATEGORIES).map(([key, data]) => 
+      Object.entries(activeCategories).map(([key, data]) => 
         new StringSelectMenuOptionBuilder()
           .setLabel(data.name)
           .setDescription(data.desc.slice(0, 100))
@@ -415,8 +444,8 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
   collector.on('collect', async i => {
     if (i.customId === 'help_category_select') {
       const selected = i.values[0];
-      const catData = CATEGORIES[selected];
-      const catCommands = categorized[selected];
+      const catData = activeCategories[selected] || CATEGORIES.utility;
+      const catCommands = categorized[selected] || [];
 
       const listFormatted = catCommands.length > 0
         ? catCommands.map(c => `• **\`/${c.name}\`** — ${c.desc}`).join('\n')
