@@ -150,8 +150,8 @@ function init(client, options = {}) {
     res.end(JSON.stringify({ error: 'Endpoint no encontrado' }));
   });
 
-  server.listen(PORT, () => {
-    logger.info(`🌐 [GitHub Webhook & Health] Servidor escuchando en el puerto ${PORT} (Rama: ${TARGET_BRANCH})`);
+  server.listen(PORT, '0.0.0.0', () => {
+    logger.info(`🌐 [GitHub Webhook & Health] Servidor escuchando en http://0.0.0.0:${PORT} (Rama: ${TARGET_BRANCH})`);
   });
 
   return server;
