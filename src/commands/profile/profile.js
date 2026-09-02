@@ -122,7 +122,7 @@ function lightenHex(hex, amount = 0.25) {
   } catch { return '#ff6b6b'; }
 }
 
-function drawAutoScaledText(ctx, text, x, y, maxW, initialSize, weight = 'bold', fontFace = '"Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", "Helvetica Neue", Arial, sans-serif') {
+function drawAutoScaledText(ctx, text, x, y, maxW, initialSize, weight = 'bold', fontFace = FONT_FALLBACKS) {
   let size = initialSize;
   ctx.font = `${weight} ${size}px ${fontFace}`;
   while (ctx.measureText(text).width > maxW && size > 16) {
@@ -373,7 +373,7 @@ module.exports = {
         ctx.fill();
 
         ctx.fillStyle = '#ffffff';
-        ctx.font = `bold ${Math.floor(12 * SCALE)}px "Segoe UI", "Helvetica Neue", Arial, sans-serif`;
+        ctx.font = `bold ${Math.floor(12 * SCALE)}px ${FONT_FALLBACKS}`;
         ctx.textAlign = 'center';
         ctx.fillText('BOOSTER', bx + bW / 2, by + Math.floor(18 * SCALE));
         ctx.textAlign = 'left';
@@ -384,7 +384,7 @@ module.exports = {
       let nextY = infoStartY + Math.floor(10 * SCALE);
       if (profileData.title) {
         nextY += Math.floor(24 * SCALE);
-        ctx.font = `italic ${Math.floor(18 * SCALE)}px "Segoe UI", "Helvetica Neue", Arial, sans-serif`;
+        ctx.font = `italic ${Math.floor(18 * SCALE)}px ${FONT_FALLBACKS}`;
         ctx.fillStyle = '#cbd5e1';
         const cleanTitle = profileData.title.length > 35 ? profileData.title.slice(0, 32) + '...' : profileData.title;
         ctx.fillText(`“${cleanTitle}”`, infoX, nextY);
@@ -407,7 +407,7 @@ module.exports = {
       ctx.stroke();
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = `bold ${Math.floor(18 * SCALE)}px "Segoe UI", "Helvetica Neue", Arial, sans-serif`;
+      ctx.font = `bold ${Math.floor(18 * SCALE)}px ${FONT_FALLBACKS}`;
       ctx.textAlign = 'center';
       ctx.fillText(`RANK #${rank}`, infoX + cardW / 2, badgeCardsY + Math.floor(29 * SCALE));
       ctx.restore();
@@ -424,14 +424,14 @@ module.exports = {
       ctx.stroke();
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = `bold ${Math.floor(18 * SCALE)}px "Segoe UI", "Helvetica Neue", Arial, sans-serif`;
+      ctx.font = `bold ${Math.floor(18 * SCALE)}px ${FONT_FALLBACKS}`;
       ctx.textAlign = 'center';
       ctx.fillText(`NIVEL ${userData.level || 0}`, lvlCardX + cardW / 2, badgeCardsY + Math.floor(29 * SCALE));
       ctx.restore();
 
       // 7. Estadísticas del usuario
       const statsY = badgeCardsY + cardH + Math.floor(32 * SCALE);
-      ctx.font = `600 ${Math.floor(17 * SCALE)}px "Segoe UI", "Helvetica Neue", Arial, sans-serif`;
+      ctx.font = `600 ${Math.floor(17 * SCALE)}px ${FONT_FALLBACKS}`;
       ctx.fillStyle = '#e2e8f0';
 
       const messages = (userData.messages || 0).toLocaleString();
@@ -447,7 +447,7 @@ module.exports = {
 
       // Fecha de ingreso
       const joinDate = member.joinedAt?.toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' }) || '—';
-      ctx.font = `500 ${Math.floor(15 * SCALE)}px "Segoe UI", "Helvetica Neue", Arial, sans-serif`;
+      ctx.font = `500 ${Math.floor(15 * SCALE)}px ${FONT_FALLBACKS}`;
       ctx.fillStyle = '#94a3b8';
       ctx.fillText(`Miembro desde: ${joinDate}`, infoX, statsY + Math.floor(26 * SCALE));
 
@@ -531,7 +531,7 @@ module.exports = {
           ctx.fill();
 
           ctx.fillStyle = '#000000';
-          ctx.font = `bold ${Math.floor(9 * SCALE)}px "Segoe UI", "Helvetica Neue", Arial, sans-serif`;
+          ctx.font = `bold ${Math.floor(9 * SCALE)}px ${FONT_FALLBACKS}`;
           ctx.textAlign = 'center';
           ctx.fillText('DESTACADA', fx + featSize / 2, fy + featSize + Math.floor(3 * SCALE));
           ctx.textAlign = 'left';
@@ -581,7 +581,7 @@ module.exports = {
 
       // Texto de progreso con sombra de alto contraste
       ctx.save();
-      ctx.font = `bold ${Math.floor(16 * SCALE)}px "Segoe UI", "Helvetica Neue", Arial, sans-serif`;
+      ctx.font = `bold ${Math.floor(16 * SCALE)}px ${FONT_FALLBACKS}`;
       ctx.fillStyle = '#ffffff';
       ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
       ctx.shadowBlur = Math.floor(6 * SCALE);

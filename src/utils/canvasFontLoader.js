@@ -3,7 +3,7 @@ const path = require('path');
 const { GlobalFonts } = require('@napi-rs/canvas');
 const logger = require('./logger');
 
-const FONT_FALLBACKS = '"Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
+const FONT_FALLBACKS = '"Roboto", "Noto Sans JP", "Noto Sans CJK JP", "Noto Sans KR", "Noto Sans Arabic", "Noto Emoji", "Segoe UI Emoji", "Apple Color Emoji", "DejaVu Sans", "Liberation Sans", "Segoe UI", Arial, sans-serif';
 
 let initialized = false;
 
@@ -35,14 +35,32 @@ function initFonts() {
     if (fs.existsSync(localFontsDir)) {
       const localFiles = fs.readdirSync(localFontsDir);
       for (const file of localFiles) {
-        if (file.endsWith('.ttf') || file.endsWith('.otf')) {
+        if (file.endsWith('.ttf') || file.endsWith('.otf') || file.endsWith('.ttc')) {
           const fontPath = path.join(localFontsDir, file);
           try {
             GlobalFonts.registerFromPath(fontPath);
-            GlobalFonts.registerFromPath(fontPath, 'Segoe UI');
-            GlobalFonts.registerFromPath(fontPath, 'DejaVu Sans');
-            GlobalFonts.registerFromPath(fontPath, 'Arial');
-            GlobalFonts.registerFromPath(fontPath, 'sans-serif');
+
+            if (file.includes('Roboto')) {
+              GlobalFonts.registerFromPath(fontPath, 'Roboto');
+              GlobalFonts.registerFromPath(fontPath, 'Segoe UI');
+              GlobalFonts.registerFromPath(fontPath, 'DejaVu Sans');
+              GlobalFonts.registerFromPath(fontPath, 'Arial');
+              GlobalFonts.registerFromPath(fontPath, 'sans-serif');
+            } else if (file.includes('NotoSansJP') || file.includes('JP')) {
+              GlobalFonts.registerFromPath(fontPath, 'Noto Sans JP');
+              GlobalFonts.registerFromPath(fontPath, 'Noto Sans CJK JP');
+              GlobalFonts.registerFromPath(fontPath, 'Noto Sans CJK');
+            } else if (file.includes('NotoSansKR') || file.includes('KR')) {
+              GlobalFonts.registerFromPath(fontPath, 'Noto Sans KR');
+              GlobalFonts.registerFromPath(fontPath, 'Noto Sans CJK KR');
+            } else if (file.includes('Arabic')) {
+              GlobalFonts.registerFromPath(fontPath, 'Noto Sans Arabic');
+            } else if (file.includes('Emoji')) {
+              GlobalFonts.registerFromPath(fontPath, 'Noto Emoji');
+              GlobalFonts.registerFromPath(fontPath, 'Noto Color Emoji');
+              GlobalFonts.registerFromPath(fontPath, 'Segoe UI Emoji');
+              GlobalFonts.registerFromPath(fontPath, 'Apple Color Emoji');
+            }
           } catch (e) {
             logger.debug(`[FontLoader] Error al registrar fuente local ${file}: ${e.message}`);
           }
