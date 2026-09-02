@@ -46,5 +46,43 @@ module.exports = {
       logger.error('Error al aislar', { error: error.message });
       await interaction.reply({ content: '❌ Hubo un error al intentar aislar al usuario.', ephemeral: true });
     }
+  },
+
+  async executePrefix(message, args, client) {
+    if (!message.member?.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+      return message.reply('❌ No tienes permisos para aislar miembros.');
+    }
+    const targetUser = message.mentions.users.first() || (args[0] ? await client.users.fetch(args[0]).catch(() => null) : null);
+    if (!targetUser) {
+      return message.reply('❌ Uso: `&timeout @usuario <minutos> [razón]`');
+    }
+    const minutes = parseInt(args[1], 10);
+    if (isNaN(minutes) || minutes < 1 || minutes > 40320) {
+      return message.reply('❌ La duración debe ser un número entre 1 y 40320 minutos (28 días).');
+    }
+    const reason = args.slice(2).join(' ') || 'No especificada';
+
+    const targetMember = await message.guild.members.fetch(targetUser.id).catch(() => null);
+    if (!targetMember) {
+      return message.reply('❌ El usuario no está en el servidor.');
+    }
+
+    if (targetMember.roles.highest.position >= message.member.roles.highest.position && message.author.id !== message.guild.ownerId) {
+      return message.reply('❌ No puedes aislar a un usuario con un rol igual o superior al tuyo.');
+    }
+
+    try {
+      await targetMember.timeout(minutes * 60 * 1000, reason);
+      const embed = new EmbedBuilder()
+        .setColor(0xFFA500)
+        .setTitle('⏱️ Usuario Aislado')
+        .setDescription(`**${targetUser.tag}** ha sido aislado por **${minutes} minutos**.`)
+        .addFields({ name: 'Razón', value: reason })
+        .setTimestamp();
+      await message.reply({ embeds: [embed] });
+    } catch (error) {
+      logger.error('Error al aislar prefix', { error: error.message });
+      message.reply('❌ Hubo un error al intentar aislar al usuario. Revisa mis permisos.');
+    }
   }
 };

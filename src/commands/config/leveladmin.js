@@ -257,5 +257,64 @@ module.exports = {
       logger.error('leveladmin error:', err);
       return interaction.editReply('❌ Error en el comando');
     }
+  },
+
+  async executePrefix(message, args, client) {
+    if (!message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
+      return message.reply('❌ No tienes permisos de administrador.');
+    }
+    const sub = (args[0] || '').toLowerCase();
+    const cfg = readCfg();
+    const levels = readLevels();
+    const guildId = message.guild.id;
+    if (!levels.guilds) levels.guilds = {};
+    levels.guilds[guildId] = levels.guilds[guildId] || {};
+
+    if (sub === 'givexp' || sub === 'addxp') {
+      const user = message.mentions.users.first() || (args[1] ? await client.users.fetch(args[1]).catch(() => null) : null);
+      const amount = parseInt(args[2], 10);
+      if (!user || isNaN(amount) || amount <= 0) return message.reply('❌ Uso: `&leveladmin givexp @usuario <cantidad>`');
+      const current = levels.guilds[guildId][user.id] || { xp: 0, level: 0, messages: 0, voiceMinutes: 0 };
+      const totalBefore = totalXpFromLevel(current.level || 0, current.xp || 0);
+      const totalAfter = totalBefore + amount;
+      const { level: newLevel, xp: newXp } = levelFromTotalXp(totalAfter);
+      levels.guilds[guildId][user.id] = { ...current, xp: newXp, level: newLevel };
+      writeLevels(levels);
+      return message.reply(`✅ **+${amount} XP** otorgado a **${user.username}** (Nivel: **${newLevel}**, XP: ${newXp}/${xpToNext(newLevel)})`);
+    } else if (sub === 'takexp' || sub === 'removexp') {
+      const user = message.mentions.users.first() || (args[1] ? await client.users.fetch(args[1]).catch(() => null) : null);
+      const amount = parseInt(args[2], 10);
+      if (!user || isNaN(amount) || amount <= 0) return message.reply('❌ Uso: `&leveladmin takexp @usuario <cantidad>`');
+      const current = levels.guilds[guildId][user.id] || { xp: 0, level: 0, messages: 0, voiceMinutes: 0 };
+      const totalBefore = totalXpFromLevel(current.level || 0, current.xp || 0);
+      const totalAfter = Math.max(0, totalBefore - amount);
+      const { level: newLevel, xp: newXp } = levelFromTotalXp(totalAfter);
+      levels.guilds[guildId][user.id] = { ...current, xp: newXp, level: newLevel };
+      writeLevels(levels);
+      return message.reply(`✅ **-${amount} XP** quitado a **${user.username}** (Nivel: **${newLevel}**, XP: ${newXp}/${xpToNext(newLevel)})`);
+    } else if (sub === 'reset') {
+      const user = message.mentions.users.first() || (args[1] ? await client.users.fetch(args[1]).catch(() => null) : null);
+      if (!user) return message.reply('❌ Uso: `&leveladmin reset @usuario`');
+      delete levels.guilds[guildId][user.id];
+      writeLevels(levels);
+      return message.reply(`✅ Datos de niveles reseteados para **${user.username}**.`);
+    } else if (sub === 'setreward') {
+      const lvl = parseInt(args[1], 10);
+      const role = message.mentions.roles.first() || (args[2] ? await message.guild.roles.fetch(args[2]).catch(() => null) : null);
+      if (isNaN(lvl) || !role) return message.reply('❌ Uso: `&leveladmin setreward <nivel> @rol`');
+      cfg.levelRewards = cfg.levelRewards || {};
+      cfg.levelRewards[String(lvl)] = role.id;
+      writeCfg(cfg);
+      return message.reply(`✅ Recompensa registrada: Nivel **${lvl}** → **${role.name}**.`);
+    } else if (sub === 'delreward') {
+      const lvl = parseInt(args[1], 10);
+      if (isNaN(lvl)) return message.reply('❌ Uso: `&leveladmin delreward <nivel>`');
+      cfg.levelRewards = cfg.levelRewards || {};
+      delete cfg.levelRewards[String(lvl)];
+      writeCfg(cfg);
+      return message.reply(`✅ Recompensa eliminada para nivel **${lvl}**.`);
+    } else {
+      return message.reply('❌ Subcomandos de leveladmin: `givexp`, `takexp`, `reset`, `setreward`, `delreward`');
+    }
   }
 };

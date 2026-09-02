@@ -61,5 +61,60 @@ module.exports = {
       writeWarns(warns);
       await interaction.reply({ content: `✅ Advertencia \`${id}\` eliminada para ${target.tag}.` });
     }
+  },
+
+  async executePrefix(message, args, client) {
+    if (!message.member?.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+      return message.reply('❌ No tienes permisos para gestionar advertencias.');
+    }
+    const sub = (args[0] || '').toLowerCase();
+    const guildId = message.guild.id;
+    let warns = readWarns();
+    if (!warns[guildId]) warns[guildId] = {};
+
+    if (sub === 'add') {
+      const target = message.mentions.users.first() || (args[1] ? await client.users.fetch(args[1]).catch(() => null) : null);
+      if (!target) return message.reply('❌ Uso: `&warn add @usuario <razón>`');
+      const reason = args.slice(2).join(' ');
+      if (!reason) return message.reply('❌ Debes especificar una razón.');
+
+      if (!warns[guildId][target.id]) warns[guildId][target.id] = [];
+      const warnId = crypto.randomBytes(3).toString('hex');
+      warns[guildId][target.id].push({ id: warnId, reason, date: Date.now(), modId: message.author.id });
+      writeWarns(warns);
+
+      const emb = new EmbedBuilder().setColor(0xFFA500)
+        .setAuthor({ name: '⚠️ Nueva Advertencia (Warn)' })
+        .setThumbnail(target.displayAvatarURL({ dynamic: true }))
+        .addFields(
+          { name: '👤 Usuario', value: `<@${target.id}> (${target.tag})`, inline: true },
+          { name: '🛡️ Moderador', value: `<@${message.author.id}>`, inline: true },
+          { name: '📝 Razón', value: `> ${reason}`, inline: false }
+        )
+        .setFooter({ text: `Warn ID: ${warnId}` })
+        .setTimestamp();
+      await message.reply({ embeds: [emb] });
+      try { await target.send(`Has recibido una advertencia en **${message.guild.name}**. Razón: ${reason}`); } catch (e) {}
+    } else if (sub === 'list') {
+      const target = message.mentions.users.first() || (args[1] ? await client.users.fetch(args[1]).catch(() => null) : message.author);
+      const userWarns = warns[guildId]?.[target.id] || [];
+      if (userWarns.length === 0) return message.reply('✅ Este usuario no tiene advertencias.');
+
+      const emb = new EmbedBuilder().setColor(0x5865F2).setTitle(`📋 Advertencias de ${target.tag}`)
+        .setDescription(userWarns.map((w, i) => `**${i+1}.** [\`${w.id}\`] - ${w.reason} (Por: <@${w.modId}>)`).join('\n'));
+      await message.reply({ embeds: [emb] });
+    } else if (sub === 'remove') {
+      const target = message.mentions.users.first() || (args[1] ? await client.users.fetch(args[1]).catch(() => null) : null);
+      const id = args[2];
+      if (!target || !id) return message.reply('❌ Uso: `&warn remove @usuario <id_warn>`');
+      if (!warns[guildId]?.[target.id]) return message.reply('❌ ID no encontrado.');
+      const initLen = warns[guildId][target.id].length;
+      warns[guildId][target.id] = warns[guildId][target.id].filter(w => w.id !== id);
+      if (warns[guildId][target.id].length === initLen) return message.reply('❌ ID no encontrado.');
+      writeWarns(warns);
+      await message.reply(`✅ Advertencia \`${id}\` eliminada para ${target.tag}.`);
+    } else {
+      return message.reply('❌ Subcomandos de warn: `&warn add @usuario <razon>`, `&warn list @usuario`, `&warn remove @usuario <id>`');
+    }
   }
 };

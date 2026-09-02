@@ -345,5 +345,68 @@ module.exports = {
       logger.error('menuconfig error:', err);
       return interaction.reply({ content: '❌ Error interno.', ephemeral: true });
     }
+  },
+
+  async executePrefix(message, args, client) {
+    if (!message.member?.permissions.has(PermissionFlagsBits.Administrator) && !message.member?.permissions.has(PermissionFlagsBits.ManageRoles)) {
+      return message.reply('❌ Necesitas permisos de Administrador o Administrar roles.');
+    }
+    const sub = (args[0] || 'ver').toLowerCase();
+    const cfg = readConfig();
+
+    if (sub === 'ver' || sub === 'list') {
+      cfg.colors = cfg.colors || {};
+      const vip = cfg.vipRoleId ? `<@&${cfg.vipRoleId}>` : 'No configurado';
+      const list = Object.values(cfg.colors).length
+        ? Object.values(cfg.colors).map(c => `• ${c.name} → <@&${c.roleId}>`).join('\n')
+        : 'Sin colores configurados.';
+      const embed = new EmbedBuilder()
+        .setTitle('⚙️ Configuración del menú de colores')
+        .addFields(
+          { name: 'Rol requerido', value: vip, inline: false },
+          { name: 'Colores', value: list, inline: false }
+        )
+        .setColor('#8BD3FF')
+        .setTimestamp();
+      return message.reply({ embeds: [embed] });
+    }
+
+    if (sub === 'setvip') {
+      const role = message.mentions.roles.first() || (args[1] ? await message.guild.roles.fetch(args[1]).catch(() => null) : null);
+      if (!role) return message.reply('❌ Uso: `&menuconfig setvip @rol`');
+      cfg.vipRoleId = role.id;
+      writeConfig(cfg);
+      return message.reply(`✅ Rol requerido configurado: ${role.name}`);
+    }
+
+    if (sub === 'crear' || sub === 'send') {
+      cfg.colors = cfg.colors || {};
+      if (!cfg.vipRoleId) return message.reply('❌ Configura primero el rol requerido con `&menuconfig setvip @Rol`');
+      if (Object.keys(cfg.colors).length === 0) return message.reply('❌ No hay colores configurados.');
+
+      const options = [{ label: '❌ Quitar color', value: 'remove_color', description: 'Elimina tu color actual' }];
+      for (const [key, obj] of Object.entries(cfg.colors)) {
+        const label = obj.name.length > 100 ? obj.name.slice(0, 96) + '...' : obj.name;
+        options.push({ label, value: key, description: `Seleccionar ${obj.name}`.slice(0, 100) });
+      }
+
+      const row = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder()
+        .setCustomId('lco_color_menu')
+        .setPlaceholder('🎨 Selecciona tu color (solo 1)')
+        .setMinValues(1)
+        .setMaxValues(1)
+        .addOptions(options)
+      );
+
+      const embed = new EmbedBuilder()
+        .setTitle('🎨 Selector de colores')
+        .setDescription(`Selecciona **un** color. Necesitas el rol <@&${cfg.vipRoleId}> para usar este menú.`)
+        .setColor('#f4a4ff');
+
+      await message.channel.send({ embeds: [embed], components: [row] });
+      return message.reply('✅ Menú creado en este canal.');
+    }
+
+    return message.reply('❌ Subcomandos: `&menuconfig ver`, `&menuconfig setvip @rol`, `&menuconfig crear`');
   }
 };

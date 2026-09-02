@@ -22,5 +22,24 @@ module.exports = {
       writeSettings(settings);
       await interaction.reply({ content: `🕵️ **Logs de Auditoría** han sido DESACTIVADOS.`, ephemeral: true });
     }
+  },
+
+  async executePrefix(message, args, client) {
+    if (!message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
+      return message.reply('❌ No tienes permisos de administrador.');
+    }
+    const settings = readSettings();
+    if (!settings[message.guild.id]) settings[message.guild.id] = {};
+    const channel = message.mentions.channels.first() || (args[0] && args[0] !== 'off' && args[0] !== 'desactivar' ? await message.guild.channels.fetch(args[0]).catch(() => null) : null);
+
+    if (channel) {
+      settings[message.guild.id].auditChannel = channel.id;
+      writeSettings(settings);
+      return message.reply(`🕵️ **Logs de Auditoría** configurados en <#${channel.id}>.`);
+    } else {
+      delete settings[message.guild.id].auditChannel;
+      writeSettings(settings);
+      return message.reply('🕵️ **Logs de Auditoría** han sido DESACTIVADOS.');
+    }
   }
 };

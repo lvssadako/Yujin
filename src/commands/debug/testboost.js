@@ -54,5 +54,29 @@ module.exports = {
                 });
             }
         }
+    },
+
+    async executePrefix(message, args, client) {
+        if (!message.member?.permissions.has(PermissionFlagsBits.ManageGuild)) {
+            return message.reply('❌ No tienes permisos para gestionar el servidor.');
+        }
+        const config = readConfig();
+        const addedChannel = config.boostAddedChannelId ? 
+            message.guild.channels.cache.get(config.boostAddedChannelId) : 
+            message.guild.channels.cache.get(config.boostChannelId);
+
+        const removedChannel = config.boostRemovedChannelId ? 
+            message.guild.channels.cache.get(config.boostRemovedChannelId) : 
+            message.guild.channels.cache.get(config.boostChannelId);
+
+        let response = '**Estado de canales de boost:**\n';
+        response += `📥 Canal de boosts añadidos: ${addedChannel ? '✅ ' + addedChannel.toString() : '❌ No configurado'}\n`;
+        response += `📤 Canal de boosts removidos: ${removedChannel ? '✅ ' + removedChannel.toString() : '❌ No configurado'}\n\n`;
+        response += `**IDs configuradas:**\n`;
+        response += `⚙️ boostChannelId: \`${config.boostChannelId || 'no configurado'}\`\n`;
+        response += `⚙️ boostAddedChannelId: \`${config.boostAddedChannelId || 'no configurado'}\`\n`;
+        response += `⚙️ boostRemovedChannelId: \`${config.boostRemovedChannelId || 'no configurado'}\``;
+
+        return message.reply(response);
     }
 };

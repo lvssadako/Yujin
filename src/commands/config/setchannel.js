@@ -33,5 +33,26 @@ module.exports = {
     }
     saveChannel(tipo, channel.id);
     await interaction.reply({ content: `✅ Canal ${tipo.replace('ChannelId','')} establecido: <#${channel.id}>`, ephemeral: true });
+  },
+
+  async executePrefix(message, args, client) {
+    if (!message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
+      return message.reply('❌ No tienes permisos de administrador.');
+    }
+    const rawTipo = (args[0] || '').toLowerCase();
+    const typeMap = {
+      log: 'logChannelId',
+      logs: 'logChannelId',
+      mfa: 'mfaChannelId',
+      alerta: 'alertChannelId',
+      alertas: 'alertChannelId'
+    };
+    const tipo = typeMap[rawTipo];
+    const channel = message.mentions.channels.first() || (args[1] ? await message.guild.channels.fetch(args[1]).catch(() => null) : null);
+    if (!tipo || !channel) {
+      return message.reply('❌ Uso: `&setchannel <log|mfa|alerta> #canal`');
+    }
+    saveChannel(tipo, channel.id);
+    await message.reply(`✅ Canal ${rawTipo} establecido: <#${channel.id}>`);
   }
 };

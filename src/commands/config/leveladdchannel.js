@@ -30,5 +30,21 @@ module.exports = {
 
         writeConfig(config);
         return interaction.reply(`✅ Canal ${channel} agregado con multiplicador de XP x${multiplier}`);
+    },
+
+    async executePrefix(message, args, client) {
+        if (!message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
+            return message.reply('❌ No tienes permisos de administrador.');
+        }
+        const channel = message.mentions.channels.first() || (args[0] ? await message.guild.channels.fetch(args[0]).catch(() => null) : null);
+        const multiplier = parseFloat(args[1]);
+        if (!channel || isNaN(multiplier) || multiplier <= 0) {
+            return message.reply('❌ Uso: `&leveladdchannel #canal <multiplicador>`\n*Ejemplo:* `&leveladdchannel #general 1.5`');
+        }
+        const config = readConfig();
+        config.channels = config.channels || {};
+        config.channels[channel.id] = multiplier;
+        writeConfig(config);
+        return message.reply(`✅ Canal <#${channel.id}> agregado con multiplicador de XP x${multiplier}.`);
     }
 };

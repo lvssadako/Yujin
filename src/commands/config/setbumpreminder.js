@@ -39,5 +39,23 @@ module.exports = {
       content: `✅ Recordatorio de bump configurado para el canal <#${channel.id}> y el rol <@&${role.id}>.\n\nPuedes ver la configuración actual en cualquier momento usando /bumpreminderinfo.`,
       ephemeral: true
     });
+  },
+
+  async executePrefix(message, args, client) {
+    if (!message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
+      return message.reply('❌ No tienes permisos de administrador.');
+    }
+    const channel = message.mentions.channels.first() || (args[0] ? await message.guild.channels.fetch(args[0]).catch(() => null) : null);
+    const role = message.mentions.roles.first() || (args[1] ? await message.guild.roles.fetch(args[1]).catch(() => null) : null);
+    if (!channel || !role) {
+      return message.reply('❌ Uso: `&setbumpreminder #canal @rol`');
+    }
+    const config = readConfig();
+    config[message.guild.id] = {
+      channelId: channel.id,
+      roleId: role.id
+    };
+    writeConfig(config);
+    await message.reply(`✅ Recordatorio de bump configurado para el canal <#${channel.id}> y el rol <@&${role.id}>.`);
   }
 };

@@ -27,5 +27,20 @@ module.exports = {
         ephemeral: true
       });
     }
+  },
+
+  async executePrefix(message, args, client) {
+    const config = readConfig();
+    const guildId = message.guild.id;
+    const reminder = config[guildId];
+    if (reminder && reminder.channelId && reminder.roleId) {
+      await message.reply({
+        content: `🔔 El recordatorio de bump está configurado para el canal <#${reminder.channelId}> y el rol <@&${reminder.roleId}>.`
+      });
+    } else {
+      await message.reply({
+        content: '⚠️ No hay recordatorio de bump configurado en este servidor.'
+      });
+    }
   }
 };

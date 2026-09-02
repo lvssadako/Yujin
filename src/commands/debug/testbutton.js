@@ -12,5 +12,15 @@ module.exports = {
         .setStyle(ButtonStyle.Primary)
     );
     await interaction.reply({ content: 'Prueba el botón:', components: [row] });
+  },
+
+  async executePrefix(message, args, client) {
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('test_btn')
+        .setLabel('Pruébame')
+        .setStyle(ButtonStyle.Primary)
+    );
+    await message.reply({ content: 'Prueba el botón:', components: [row] });
   }
 };

@@ -29,5 +29,21 @@ module.exports = {
         } else {
             return interaction.reply(`⚠️ El canal ${channel} no está en la lista.`);
         }
+    },
+
+    async executePrefix(message, args, client) {
+        if (!message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
+            return message.reply('❌ No tienes permisos de administrador.');
+        }
+        const channel = message.mentions.channels.first() || (args[0] ? await message.guild.channels.fetch(args[0]).catch(() => null) : null);
+        if (!channel) return message.reply('❌ Uso: `&levelremovechannel #canal`');
+        const config = readConfig();
+        if (config.channels && config.channels[channel.id]) {
+            delete config.channels[channel.id];
+            writeConfig(config);
+            return message.reply(`✅ Canal <#${channel.id}> removido de la lista.`);
+        } else {
+            return message.reply(`⚠️ El canal <#${channel.id}> no está en la lista.`);
+        }
     }
 };

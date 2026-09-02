@@ -32,5 +32,27 @@ module.exports = {
       }
     };
     await onCriticalAction(ctx);
+  },
+
+  async executePrefix(message, args, client) {
+    const accion = args[0] || 'ban';
+    const basePoints = parseInt(args[1], 10) || 50;
+    const ctx = {
+      user: {
+        isAdmin: true,
+        actionHistory: ['ban'],
+        activeDays: [new Date().getDay()]
+      },
+      action: accion,
+      basePoints: basePoints,
+      time: new Date(),
+      recentActions: [],
+      bot: client,
+      config: { mfaChannelId: config.mfaChannelId },
+      executeAction: async () => {
+        await message.reply('✅ Acción permitida por el sistema de seguridad.');
+      }
+    };
+    await onCriticalAction(ctx);
   }
 };

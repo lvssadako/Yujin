@@ -16,5 +16,19 @@ module.exports = {
     writeSettings(settings);
     
     await interaction.reply({ content: `🛡️ **Automoderación** (Anti-Spam y Anti-Links) ha sido ${estado ? 'ACTIVADA ✅' : 'DESACTIVADA ❌'}.`, ephemeral: true });
+  },
+
+  async executePrefix(message, args, client) {
+    if (!message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
+      return message.reply('❌ No tienes permisos de administrador.');
+    }
+    const val = (args[0] || '').toLowerCase();
+    const estado = val === 'on' || val === 'true' || val === 'activar' || val === '1';
+    const settings = readSettings();
+    if (!settings[message.guild.id]) settings[message.guild.id] = {};
+    settings[message.guild.id].automodEnabled = estado;
+    writeSettings(settings);
+
+    return message.reply(`🛡️ **Automoderación** (Anti-Spam y Anti-Links) ha sido ${estado ? 'ACTIVADA ✅' : 'DESACTIVADA ❌'}.`);
   }
 };

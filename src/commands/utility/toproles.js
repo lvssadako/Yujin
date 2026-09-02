@@ -1,4 +1,4 @@
-﻿const logger = require('../../utils/logger');
+const logger = require('../../utils/logger');
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
@@ -204,6 +204,48 @@ module.exports = {
       await updateTopRoles(interaction.guild).catch(err => {
         logger.error('[toproles] Error en update after remove:', err);
       });
+    }
+  },
+
+  async executePrefix(message, args, client) {
+    if (!message.member?.permissions.has(PermissionFlagsBits.ManageRoles) && !message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
+      return message.reply('❌ No tienes permisos para gestionar roles de top.');
+    }
+    const sub = (args[0] || '').toLowerCase();
+    const config = readConfig();
+    config.topRoles = config.topRoles || {};
+
+    if (sub === 'list') {
+      const topRoles = config.topRoles || {};
+      if (Object.keys(topRoles).length === 0) return message.reply('📋 No hay roles de top configurados.');
+      let list = '**Roles de Top configurados:**\n';
+      for (const [pos, roleId] of Object.entries(topRoles).sort((a, b) => parseInt(a[0]) - parseInt(b[0]))) {
+        const role = await message.guild.roles.fetch(roleId).catch(() => null);
+        list += `• Top ${pos}: ${role ? role.toString() : `❌ Rol no encontrado (${roleId})`}\n`;
+      }
+      return message.reply(list);
+    } else if (sub === 'update') {
+      await updateTopRoles(message.guild);
+      return message.reply('✅ Roles de top actualizados manualmente.');
+    } else if (sub === 'set') {
+      const pos = parseInt(args[1], 10);
+      const role = message.mentions.roles.first() || (args[2] ? await message.guild.roles.fetch(args[2]).catch(() => null) : null);
+      if (isNaN(pos) || pos < 1 || pos > 10 || !role) {
+        return message.reply('❌ Uso: `&toproles set <posicion 1-10> @rol`');
+      }
+      config.topRoles[pos] = role.id;
+      saveConfig(config);
+      await message.reply(`✅ Rol ${role.name} configurado para Top ${pos}.`);
+      await updateTopRoles(message.guild).catch(() => {});
+    } else if (sub === 'remove') {
+      const pos = parseInt(args[1], 10);
+      if (isNaN(pos) || !config.topRoles[pos]) return message.reply('❌ Posición no válida o sin rol configurado.');
+      delete config.topRoles[pos];
+      saveConfig(config);
+      await message.reply(`✅ Rol de Top ${pos} eliminado.`);
+      await updateTopRoles(message.guild).catch(() => {});
+    } else {
+      return message.reply('❌ Subcomandos: `&toproles list`, `&toproles set <1-10> @rol`, `&toproles remove <1-10>`, `&toproles update`');
     }
   },
   

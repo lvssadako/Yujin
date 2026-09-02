@@ -195,5 +195,60 @@ module.exports = {
         });
       }
     }
+  },
+
+  async executePrefix(message, args, client) {
+    if (!message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
+      return message.reply('❌ No tienes permisos de administrador.');
+    }
+    const group = (args[0] || '').toLowerCase();
+    const action = (args[1] || '').toLowerCase();
+    const targetUser = message.mentions.users.first() || (args[2] ? await client.users.fetch(args[2]).catch(() => null) : null);
+    const guildId = message.guild.id;
+
+    if (group === 'economy' || group === 'eco') {
+      if (action === 'check') {
+        if (!targetUser) return message.reply('❌ Uso: `&manage economy check @usuario`');
+        const bal = getBalance(guildId, targetUser.id);
+        return message.reply(`**${targetUser.username}**\n🪙 Monedas: ${bal.coins}\n💎 Gemas: ${bal.gems || 0}`);
+      }
+      if (action === 'add') {
+        const type = (args[2] || 'coins').toLowerCase() === 'gems' ? 'gems' : 'coins';
+        const amount = parseInt(args[3], 10);
+        const user = message.mentions.users.first() || (args[4] ? await client.users.fetch(args[4]).catch(() => null) : targetUser);
+        if (isNaN(amount) || amount < 1 || !user) {
+          return message.reply('❌ Uso: `&manage economy add <coins|gems> <cantidad> @usuario`');
+        }
+        if (type === 'coins') addCoins(guildId, user.id, amount);
+        else addGems(guildId, user.id, amount);
+        return message.reply(`✅ Añadido ${amount} ${type === 'coins' ? '🪙' : '💎'} a ${user.username}`);
+      }
+      if (action === 'remove') {
+        const type = (args[2] || 'coins').toLowerCase() === 'gems' ? 'gems' : 'coins';
+        const amount = parseInt(args[3], 10);
+        const user = message.mentions.users.first() || targetUser;
+        if (isNaN(amount) || amount < 1 || !user) {
+          return message.reply('❌ Uso: `&manage economy remove <coins|gems> <cantidad> @usuario`');
+        }
+        const success = type === 'coins' ? removeCoins(guildId, user.id, amount) : removeGems(guildId, user.id, amount);
+        if (!success) return message.reply('❌ Fondos insuficientes.');
+        return message.reply(`✅ Quitado ${amount} ${type === 'coins' ? '🪙' : '💎'} de ${user.username}`);
+      }
+    } else if (group === 'chest' || group === 'cofre') {
+      if (action === 'add') {
+        const amount = parseInt(args[2], 10);
+        const user = message.mentions.users.first() || (args[3] ? await client.users.fetch(args[3]).catch(() => null) : null);
+        if (isNaN(amount) || amount < 1 || !user) return message.reply('❌ Uso: `&manage chest add <cantidad> @usuario`');
+        const total = addChests(guildId, user.id, amount);
+        return message.reply(`✅ Dado ${amount} cofre(s) a ${user.username}. Total actual: ${total}`);
+      }
+      if (action === 'check') {
+        if (!targetUser) return message.reply('❌ Uso: `&manage chest check @usuario`');
+        const count = getChestCount(guildId, targetUser.id);
+        return message.reply(`**${targetUser.username}** tiene **${count}** cofres.`);
+      }
+    }
+
+    return message.reply('❌ Uso: `&manage <economy|chest> <add|remove|check> ...`');
   }
 };

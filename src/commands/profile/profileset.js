@@ -270,5 +270,59 @@ module.exports = {
     return interaction.editReply({ embeds: [embed] });
   },
 
+  async executePrefix(message, args, client) {
+    if (args.length === 0) {
+      const panel = buildCustomizationPanel(message.guild.id, message.author.id, message.member);
+      return message.reply({ embeds: [panel.embed], components: panel.components });
+    }
+
+    const sub = (args[0] || '').toLowerCase();
+    const profiles = readProfiles();
+    const user = ensureUser(profiles, message.guild.id, message.author.id);
+    const levels = readLevels();
+    const lvlData = ensureUserData(levels, message.guild.id, message.author.id);
+    const { saveUserProfileBackground, deleteUserProfileBackground } = require('../../services/image/imageService');
+
+    if (sub === 'titulo' || sub === 'title') {
+      const title = args.slice(1).join(' ').slice(0, 32);
+      user.title = title;
+      writeProfiles(profiles);
+      return message.reply(`✅ Título actualizado: "${title || 'Ninguno'}"`);
+    } else if (sub === 'hex' || sub === 'color') {
+      const hex = args[1];
+      if (!hex || !/^#?[0-9a-f]{6}$/i.test(hex)) return message.reply('❌ Formato inválido. Usa: `&profileset hex #ff6b81`');
+      user.accent = hex.startsWith('#') ? hex : '#' + hex;
+      writeProfiles(profiles);
+      return message.reply(`✅ Color de acento actualizado a \`${user.accent}\``);
+    } else if (sub === 'bar' || sub === 'barra') {
+      const barColor = args[1];
+      if (!barColor || (barColor !== 'default' && !/^#?[0-9a-f]{6}$/i.test(barColor))) {
+        return message.reply('❌ Formato inválido. Usa: `&profileset bar #4ecdc4` o `&profileset bar default`');
+      }
+      user.barColor = barColor === 'default' ? '' : (barColor.startsWith('#') ? barColor : '#' + barColor);
+      writeProfiles(profiles);
+      return message.reply(`✅ Color de barra actualizado a \`${user.barColor || 'default'}\``);
+    } else if (sub === 'fondo' || sub === 'bg') {
+      const bgUrl = args[1];
+      if (!bgUrl || bgUrl === 'none' || bgUrl === 'quitar') {
+        user.bgUrl = '';
+        await deleteUserProfileBackground(message.guild.id, message.author.id);
+        writeProfiles(profiles);
+        return message.reply('✅ Fondo eliminado (restablecido a oscuro por defecto).');
+      }
+      if (!canUseCustomUrl(message.member, lvlData, user.streakDays)) {
+        return message.reply('🔒 Fondos personalizados por URL requieren ser **Booster**, tener **Nivel 5+** o una **Racha de 7+ días**.');
+      }
+      const saveResult = await saveUserProfileBackground(message.guild.id, message.author.id, bgUrl);
+      if (!saveResult.ok) return message.reply(`❌ Error con la imagen: ${saveResult.error}`);
+      user.bgUrl = bgUrl.trim();
+      writeProfiles(profiles);
+      return message.reply('✅ Fondo guardado y verificado con éxito.');
+    } else {
+      const panel = buildCustomizationPanel(message.guild.id, message.author.id, message.member);
+      return message.reply({ embeds: [panel.embed], components: panel.components });
+    }
+  },
+
   buildCustomizationPanel
 };

@@ -73,5 +73,43 @@ module.exports = {
     }
 
     return interaction.reply({ content: 'Subcomando desconocido.', ephemeral: true });
+  },
+
+  async executePrefix(message, args, client) {
+    const sub = (args[0] || 'list').toLowerCase();
+    const cfg = readCfg();
+
+    if (sub === 'list') {
+      const rewards = cfg.levelRewards || {};
+      const entries = Object.entries(rewards).map(([lvl, roleId]) => ({ lvl: Number(lvl), roleId })).sort((a, b) => a.lvl - b.lvl);
+      if (entries.length === 0) return message.reply('No hay recompensas por nivel configuradas.');
+
+      const embed = new EmbedBuilder().setTitle('🎁 Recompensas por nivel').setColor(0x8BD3FF).setTimestamp();
+      for (const e of entries) {
+        const role = message.guild.roles.cache.get(e.roleId);
+        embed.addFields({ name: `Nivel ${e.lvl}`, value: role ? `${role}` : 'Rol no encontrado', inline: false });
+      }
+      return message.reply({ embeds: [embed] });
+    }
+
+    if (!message.member?.permissions.has(PermissionFlagsBits.Administrator) && !message.member?.permissions.has(PermissionFlagsBits.ManageGuild)) {
+      return message.reply('❌ Necesitas permisos de Administrador para cambiar configuraciones.');
+    }
+
+    if (sub === 'setchannel') {
+      const channel = message.mentions.channels.first() || (args[1] ? await message.guild.channels.fetch(args[1]).catch(() => null) : null);
+      if (!channel) return message.reply('❌ Uso: `&levelrewards setchannel #canal`');
+      cfg.levelUpChannelId = channel.id;
+      writeCfg(cfg);
+      return message.reply(`✅ Canal de notificaciones establecido en: <#${channel.id}>.`);
+    }
+
+    if (sub === 'clearchannel') {
+      delete cfg.levelUpChannelId;
+      writeCfg(cfg);
+      return message.reply('✅ Canal de notificaciones eliminado.');
+    }
+
+    return message.reply('❌ Subcomandos: `&levelrewards list`, `&levelrewards setchannel #canal`, `&levelrewards clearchannel`');
   }
 };

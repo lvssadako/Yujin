@@ -344,5 +344,73 @@ module.exports = {
       );
 
     return interaction.reply({ embeds: [embed], ephemeral: true });
+  },
+
+  async executePrefix(message, args, client) {
+    const cfg = readConfig();
+    const profiles = readProfiles();
+    const userData = ensureUser(profiles, message.guild.id, message.author.id);
+    const { catalog, embed } = buildShopEmbed(cfg, userData);
+    const buyId = args[0];
+
+    if (buyId) {
+      const item = findItemById(catalog, buyId);
+      if (!item) return message.reply('❌ ID de item no válido.');
+
+      const finalPrice = getFinalPrice(item, userData);
+      const bal = getBalance(message.guild.id, message.author.id);
+      if (bal.coins < finalPrice) return message.reply('❌ Fondos insuficientes para esta compra.');
+
+      const success = subtractCoins(message.guild.id, message.author.id, finalPrice);
+      if (!success) return message.reply('❌ Error al procesar el pago.');
+
+      if (item.kind === 'bundle' && item.included?.length) {
+        item.included.forEach(includedId => {
+          const includedBoost = findItemById(catalog, includedId) || { ...((cfg.xpBoosts || {})[includedId] || {}), id: includedId };
+          if (!includedBoost || (!includedBoost.multiplier && !includedBoost.durationMs && !includedBoost.name)) return;
+          grantBoostToUser(message.guild.id, message.author.id, {
+            id: includedId,
+            multiplier: Number(includedBoost.multiplier) || 1,
+            durationMs: Number(includedBoost.durationMs) || 3600000
+          }, 1);
+        });
+      } else {
+        grantBoostToUser(message.guild.id, message.author.id, item, 1);
+      }
+
+      const purchaseEmbed = new EmbedBuilder()
+        .setTitle('✅ Compra Realizada')
+        .setColor(getRarityColor(item.rarity))
+        .setDescription(`Has adquirido con éxito: **${item.name}** por **${finalPrice} 🪙**.`)
+        .setTimestamp();
+
+      return message.reply({ embeds: [purchaseEmbed] });
+    }
+
+    const rows = [];
+    let row = new ActionRowBuilder();
+    let i = 0;
+    let rowCount = 0;
+
+    catalog.forEach(item => {
+      if (i > 0 && i % 5 === 0) {
+        rows.push(row);
+        row = new ActionRowBuilder();
+        rowCount++;
+        if (rowCount >= 5) return;
+      }
+      if (rowCount < 5) {
+        row.addComponents(
+          new ButtonBuilder()
+            .setCustomId(`shop_buy_${item.id}`)
+            .setLabel(item.name.length > 18 ? `${item.name.slice(0, 17)}…` : item.name)
+            .setStyle(item.featured ? ButtonStyle.Success : ButtonStyle.Primary)
+        );
+        i++;
+      }
+    });
+
+    if (row.components && row.components.length > 0 && rowCount < 5) rows.push(row);
+    return message.reply({ embeds: [embed], components: rows.length ? rows : [] });
   }
 };

@@ -27,5 +27,20 @@ module.exports = {
             .join('\n');
 
         return interaction.reply(`📋 Canales configurados:\n${channelList}`);
+    },
+
+    async executePrefix(message, args, client) {
+        const config = readConfig();
+        const channels = config.channels || {};
+
+        if (Object.keys(channels).length === 0) {
+            return message.reply('⚠️ No hay canales configurados para XP extra.');
+        }
+
+        const channelList = Object.entries(channels)
+            .map(([id, multiplier]) => `• <#${id}>: **x${multiplier}**`)
+            .join('\n');
+
+        return message.reply(`📋 **Canales de XP configurados:**\n${channelList}`);
     }
 };
