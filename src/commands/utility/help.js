@@ -13,9 +13,25 @@ const path = require('path');
 const logger = require('../../utils/logger');
 const { COLORS } = require('../../utils/embedFactory');
 
-// Banner local HD verificado y garantizado (16:9 widescreen)
+// Directorio de imágenes fuentes de Yujin
+const SOURCES_DIR = path.join(__dirname, '..', '..', '..', 'sources');
 const LOCAL_BANNER_PATH = path.join(__dirname, '..', '..', 'assets', 'banners', 'help_banner.jpg');
 const HELP_BANNER_URL = 'https://media1.giphy.com/media/bZCJM3KKbzqUIu9Mds/giphy.gif';
+
+function getHelpSourceImages() {
+  const sources = [];
+  try {
+    if (fs.existsSync(SOURCES_DIR)) {
+      const files = fs.readdirSync(SOURCES_DIR);
+      for (const file of files) {
+        if (/\.(jpe?g|png|webp|gif)$/i.test(file)) {
+          sources.push(path.join(SOURCES_DIR, file));
+        }
+      }
+    }
+  } catch {}
+  return sources;
+}
 
 const CATEGORIES = {
   admin: { 
@@ -121,6 +137,10 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
     const catData = CATEGORIES[catId];
     const desc = cmd.data?.description || cmd.description || 'Sin descripción disponible.';
 
+    const sources = getHelpSourceImages();
+    const thumbImg = sources.find(s => s.includes('IMG_5311')) || sources[0] || null;
+    const files = [];
+
     const detailEmbed = new EmbedBuilder()
       .setAuthor({ 
         name: `Guía de Comando • ${cmdName.toUpperCase()}`, 
@@ -135,13 +155,19 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
         { name: '💻 Sintaxis', value: `\`\`\`bash\n${cmd.usage || `/${cmdName}`}\n\`\`\``, inline: false },
         { name: '💡 Ejemplo de Uso', value: `\`\`\`bash\n${getCommandExample(cmdName)}\n\`\`\``, inline: false }
       )
-      .setThumbnail(client.user.displayAvatarURL({ size: 256 }))
       .setFooter({ text: `Yujin Bot • Módulo de ${catData.name}`, iconURL: client.user.displayAvatarURL() })
       .setTimestamp();
 
+    if (thumbImg && fs.existsSync(thumbImg)) {
+      files.push(new AttachmentBuilder(thumbImg, { name: 'help_thumb.jpg' }));
+      detailEmbed.setThumbnail('attachment://help_thumb.jpg');
+    } else {
+      detailEmbed.setThumbnail(client.user.displayAvatarURL({ size: 256 }));
+    }
+
     return isPrefix 
-      ? interactionOrMessage.reply({ embeds: [detailEmbed] }) 
-      : interactionOrMessage.reply({ embeds: [detailEmbed], ephemeral: true });
+      ? interactionOrMessage.reply({ embeds: [detailEmbed], files }) 
+      : interactionOrMessage.reply({ embeds: [detailEmbed], files, ephemeral: true });
   }
 
   // === MENÚ PRINCIPAL INTERACTIVO ===
@@ -181,12 +207,21 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
       { name: '📡 Estado', value: '`🟢 100% Operativo`', inline: true }
     );
 
+  const sources = getHelpSourceImages();
+  const mainBannerPath = sources.find(s => s.includes('IMG_6140')) || sources[0] || (fs.existsSync(LOCAL_BANNER_PATH) ? LOCAL_BANNER_PATH : null);
+  const thumbImgPath = sources.find(s => s.includes('IMG_5311')) || sources.find(s => s !== mainBannerPath) || null;
+
   const files = [];
-  if (fs.existsSync(LOCAL_BANNER_PATH)) {
-    files.push(new AttachmentBuilder(LOCAL_BANNER_PATH, { name: 'help_banner.jpg' }));
+  if (mainBannerPath && fs.existsSync(mainBannerPath)) {
+    files.push(new AttachmentBuilder(mainBannerPath, { name: 'help_banner.jpg' }));
     mainEmbed.setImage('attachment://help_banner.jpg');
   } else {
     mainEmbed.setImage(HELP_BANNER_URL);
+  }
+
+  if (thumbImgPath && fs.existsSync(thumbImgPath)) {
+    files.push(new AttachmentBuilder(thumbImgPath, { name: 'help_thumb.jpg' }));
+    mainEmbed.setThumbnail('attachment://help_thumb.jpg');
   }
 
   mainEmbed
@@ -260,6 +295,13 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
         })
         .setFooter({ text: `${catCommands.length} comandos disponibles • Yujin Bot`, iconURL: client.user.displayAvatarURL() })
         .setTimestamp();
+
+      if (thumbImgPath) {
+        catEmbed.setThumbnail('attachment://help_thumb.jpg');
+      }
+      if (mainBannerPath) {
+        catEmbed.setImage('attachment://help_banner.jpg');
+      }
 
       await i.update({ embeds: [catEmbed], components: [rowMenu, rowButtons] });
     } else if (i.customId === 'help_home') {
