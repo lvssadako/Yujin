@@ -283,8 +283,6 @@ function getPermissionBadge(catId, cmdName) {
   }
   return '`👤 Todos los miembros`';
 }
-  return '`👤 Todos los miembros`';
-}
 
 async function buildHelpInterface(interactionOrMessage, isPrefix = false, query = null) {
   const client = interactionOrMessage.client;
