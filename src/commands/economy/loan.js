@@ -28,25 +28,28 @@ async function handleTake(guildId, userId, amountStr) {
   addCoins(guildId, userId, amount);
   const newBal = getBalance(guildId, userId);
 
+  const initialInterest = result.initialInterest || Math.ceil(amount * 0.05);
+
   const embed = new EmbedBuilder()
     .setColor(0x5865F2)
     .setAuthor({ name: '🏦 Préstamo Aprobado' })
     .addFields(
-      { name: '💵 Monto Prestado', value: `> **${amount.toLocaleString()} 🪙**`, inline: false },
-      { name: '📊 Tasa de Interés Inicial', value: `> **5%** diario`, inline: true },
+      { name: '💵 Monto Recibido', value: `> **${amount.toLocaleString()} 🪙**`, inline: true },
+      { name: '🏷️ Interés Inicial (Apertura)', value: `> **${initialInterest.toLocaleString()} 🪙** *(5%)*`, inline: true },
+      { name: '📈 Deuda Inicial Total', value: `> **${result.loan.balance.toLocaleString()} 🪙**`, inline: true },
+      { name: '📊 Tasa Diaria Inicial', value: `> **5%** diario`, inline: true },
       { name: '👛 Tu Billetera Ahora', value: `> **${newBal.coins.toLocaleString()} 🪙**`, inline: true },
       {
-        name: '⚠️ Condiciones del Préstamo',
+        name: '⚠️ Condiciones y Advertencia de Transferencia',
         value:
-          '> El interés se aplica **cada 24 horas** y aumenta gradualmente con los días transcurridos.\n' +
-          '> • Días 1-3: **5%** · Días 4-6: **8%** · Días 7-10: **12%** · Día 11+: **18%**\n' +
-          '> 🛡️ **Techo de deuda:** Máximo **2.5x** del préstamo (los intereses se congelan al alcanzarlo).\n' +
-          '> Si la deuda supera **1.5x o 2.0x**, recibirás penalizaciones de ingresos en `/work` y `/fish`.\n' +
-          '> Usa `/loan repay` para hacer pagos y `/loan status` para ver tu deuda.',
+          '> • El interés se aplica **cada 24 horas** y aumenta gradualmente con los días.\n' +
+          '> • 🚫 **No transferible:** Los fondos de préstamos son personales. Transferir fondos teniendo deuda activa incurrirá en una **penalización de XP moderadamente alta**.\n' +
+          '> • 🛡️ **Techo de deuda:** Máximo **2.5x** del préstamo original.\n' +
+          '> • Usa `/loan repay` para hacer pagos y `/loan status` para consultar tu estado.',
         inline: false
       }
     )
-    .setFooter({ text: 'Paga a tiempo para evitar penalizaciones.' })
+    .setFooter({ text: 'Paga a tiempo para evitar penalizaciones e intereses crecientes.' })
     .setTimestamp();
 
   return { embed };
@@ -146,6 +149,7 @@ async function handleStatus(guildId, userId) {
 
   const fields = [
     { name: '📋 Principal Original', value: `> **${summary.principal.toLocaleString()} 🪙**`, inline: true },
+    { name: '🏷️ Interés Inicial', value: `> **${(summary.initialInterest || 0).toLocaleString()} 🪙**`, inline: true },
     {
       name: '📈 Deuda Actual',
       value: `> **${summary.balance.toLocaleString()} 🪙** *(x${debtRatio})*${summary.isCapped ? ' 🔒 *(Tope)*' : ''}`,
@@ -164,11 +168,19 @@ async function handleStatus(guildId, userId) {
       inline: true
     },
     {
-      name: `${penInfo.emoji} Penalización`,
+      name: `${penInfo.emoji} Penalización de Ingresos`,
       value: `> **Nivel ${summary.penaltyLevel}:** ${penInfo.label}`,
       inline: false
     }
   ];
+
+  if (summary.transferredWithActiveLoan > 0) {
+    fields.push({
+      name: '⚠️ Transferencias Registradas en Deuda',
+      value: `> Has transferido **${summary.transferredWithActiveLoan.toLocaleString()} 🪙** teniendo este préstamo activo.\n> Penalización acumulada: **-${(summary.xpPenaltyApplied || 0).toLocaleString()} XP**.`,
+      inline: false
+    });
+  }
 
   if (!summary.isCapped) {
     fields.push({

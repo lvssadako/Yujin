@@ -32,22 +32,25 @@ test('loan service: take loan, interest escalation, penalty and repayment', () =
   const guildId = 'test-guild-loan';
   const userId = 'test-user-loan';
 
-  // 1. Take loan
+  cleanupTestUser(guildId, userId);
+
+  // 1. Take loan with initial 5% interest
   const takeRes = takeLoan(guildId, userId, 1000);
   assert.equal(takeRes.success, true);
   assert.equal(takeRes.loan.active, true);
   assert.equal(takeRes.loan.principal, 1000);
-  assert.equal(takeRes.loan.balance, 1000);
+  assert.equal(takeRes.initialInterest, 50);
+  assert.equal(takeRes.loan.balance, 1050); // 1000 principal + 50 initial opening interest
 
   // Cannot take another loan while active
   const takeDuplicate = takeLoan(guildId, userId, 2000);
   assert.equal(takeDuplicate.success, false);
 
   // 2. Apply interest ticks and test escalation
-  // Tick 1 (5%)
+  // Tick 1 (5% of 1050 = 53)
   const tick1 = applyInterestTick(guildId, userId);
-  assert.equal(tick1.interestAdded, 50);
-  assert.equal(tick1.newBalance, 1050);
+  assert.equal(tick1.interestAdded, 53);
+  assert.equal(tick1.newBalance, 1103);
   assert.equal(tick1.penaltyLevel, 0);
 
   // Ticks 2 and 3
@@ -82,6 +85,8 @@ test('loan service: hard debt ceiling stops uncontrolled exponential growth', ()
   const guildId = 'test-guild-ceiling';
   const userId = 'test-user-ceiling';
 
+  cleanupTestUser(guildId, userId);
+
   takeLoan(guildId, userId, 1000);
   const maxCap = 1000 * MAX_DEBT_MULTIPLIER; // 2500
 
@@ -107,8 +112,11 @@ test('loan service: 24-hour time gating and batch processing', () => {
   const guildId = 'test-guild-scheduler';
   const userId = 'test-user-scheduler';
 
+  cleanupTestUser(guildId, userId);
+
   const startTime = 1000000;
-  takeLoan(guildId, userId, 1000);
+  const takeRes = takeLoan(guildId, userId, 1000, { now: startTime, initialInterestRate: 0 });
+  assert.equal(takeRes.success, true);
 
   // Calling applyInterestTick with force: false before 24h is skipped
   const skippedTick = applyInterestTick(guildId, userId, { force: false, now: startTime + 1000 });
@@ -138,6 +146,8 @@ test('loan service: partial repayment immediately reduces penalty level', () => 
   const guildId = 'test-guild-penalty';
   const userId = 'test-user-penalty';
 
+  cleanupTestUser(guildId, userId);
+
   takeLoan(guildId, userId, 1000);
 
   // Advance loan to ceiling (balance 2500, ratio 2.5, penalty 3)
@@ -156,6 +166,26 @@ test('loan service: partial repayment immediately reduces penalty level', () => 
   const repay2 = repayLoan(guildId, userId, 500);
   assert.equal(repay2.remaining, 1400);
   assert.equal(repay2.penaltyLevel, 0);
+
+  cleanupTestUser(guildId, userId);
+});
+
+test('loan service: recordLoanTransfer tracks funds transferred while active', () => {
+  const guildId = 'test-guild-transfers';
+  const userId = 'test-user-transfers';
+
+  cleanupTestUser(guildId, userId);
+
+  const { recordLoanTransfer } = require('../loanService');
+  takeLoan(guildId, userId, 2000);
+
+  const transferRecord = recordLoanTransfer(guildId, userId, 500, 750);
+  assert.equal(transferRecord.transferredWithActiveLoan, 500);
+  assert.equal(transferRecord.xpPenaltyApplied, 750);
+
+  const summary = getUserLoanSummary(guildId, userId);
+  assert.equal(summary.transferredWithActiveLoan, 500);
+  assert.equal(summary.xpPenaltyApplied, 750);
 
   cleanupTestUser(guildId, userId);
 });

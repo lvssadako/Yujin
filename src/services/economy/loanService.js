@@ -9,6 +9,7 @@ const LOANS_PATH = path.join(DATA_DIR, 'loans.json');
 const TICK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 horas por ciclo de interés
 const MAX_CATCHUP_DAYS = 7;                   // Límite de días si el bot estuvo desconectado
 const MAX_DEBT_MULTIPLIER = 2.5;              // Techo máximo de deuda (2.5x del monto prestado)
+const INITIAL_INTEREST_RATE = 0.05;           // Tasa de interés inicial (5% de apertura)
 
 // ─── Tasas de interés según días transcurridos (ticks) ────────────────────────
 // Ticks 1-3  → 5%   (inicio suave)
@@ -42,8 +43,11 @@ function sanitizeLoanEntry(loan) {
   if (!loan || typeof loan !== 'object' || !loan.active) return loan;
 
   loan.principal = Math.max(0, Math.floor(Number(loan.principal) || 0));
+  loan.initialInterest = Math.max(0, Math.floor(Number(loan.initialInterest) || 0));
   loan.balance = Math.max(0, Math.floor(Number(loan.balance) || 0));
   loan.tickCount = Math.max(0, Math.floor(Number(loan.tickCount) || 0));
+  loan.transferredWithActiveLoan = Math.max(0, Math.floor(Number(loan.transferredWithActiveLoan) || 0));
+  loan.xpPenaltyApplied = Math.max(0, Math.floor(Number(loan.xpPenaltyApplied) || 0));
   loan.createdAt = Number(loan.createdAt) || Date.now();
   loan.lastInterestTick = Number(loan.lastInterestTick) || loan.createdAt;
 
@@ -98,12 +102,15 @@ function ensureUserLoan(data, guildId, userId) {
   data.guilds[guildId][userId] = data.guilds[guildId][userId] || {
     active: false,
     principal: 0,
+    initialInterest: 0,
     balance: 0,
     interestRate: 0.05,
     createdAt: 0,
     lastInterestTick: 0,
     penaltyLevel: 0,
-    tickCount: 0
+    tickCount: 0,
+    transferredWithActiveLoan: 0,
+    xpPenaltyApplied: 0
   };
   return data.guilds[guildId][userId];
 }
@@ -120,10 +127,16 @@ function getLoan(guildId, userId) {
 }
 
 /**
- * Solicita un préstamo nuevo.
- * @returns {{ success: false, reason: string } | { success: true, loan: object }}
+ * Solicita un préstamo nuevo con cálculo de interés inicial de apertura.
+ * @param {string} guildId
+ * @param {string} userId
+ * @param {number|string} amount
+ * @param {object} [options]
+ * @param {number} [options.now=Date.now()]
+ * @param {number} [options.initialInterestRate=INITIAL_INTEREST_RATE]
+ * @returns {{ success: false, reason: string } | { success: true, loan: object, initialInterest: number }}
  */
-function takeLoan(guildId, userId, amount) {
+function takeLoan(guildId, userId, amount, options = {}) {
   const safeAmount = Math.floor(Number(amount));
   if (!Number.isFinite(safeAmount) || safeAmount < MIN_LOAN) {
     return { success: false, reason: `El préstamo mínimo es **${MIN_LOAN.toLocaleString()} 🪙**.` };
@@ -139,18 +152,24 @@ function takeLoan(guildId, userId, amount) {
     return { success: false, reason: 'Ya tienes un préstamo activo. Págalo primero antes de solicitar uno nuevo.' };
   }
 
-  const now = Date.now();
+  const now = options.now !== undefined ? Number(options.now) : Date.now();
+  const initialRate = options.initialInterestRate !== undefined ? Number(options.initialInterestRate) : INITIAL_INTEREST_RATE;
+  const initialInterest = Math.ceil(safeAmount * initialRate);
+
   loan.active = true;
   loan.principal = safeAmount;
-  loan.balance = safeAmount;
+  loan.initialInterest = initialInterest;
+  loan.balance = safeAmount + initialInterest;
   loan.interestRate = 0.05;
   loan.createdAt = now;
   loan.lastInterestTick = now;
-  loan.penaltyLevel = 0;
   loan.tickCount = 0;
+  loan.transferredWithActiveLoan = 0;
+  loan.xpPenaltyApplied = 0;
+  loan.penaltyLevel = calcPenaltyLevel(loan.balance, loan.principal);
 
   writeLoans(data);
-  return { success: true, loan: { ...loan } };
+  return { success: true, loan: { ...loan }, initialInterest };
 }
 
 /**
@@ -179,10 +198,13 @@ function repayLoan(guildId, userId, amount) {
     loan.active = false;
     loan.penaltyLevel = 0;
     loan.principal = 0;
+    loan.initialInterest = 0;
     loan.interestRate = 0.05;
     loan.tickCount = 0;
     loan.createdAt = 0;
     loan.lastInterestTick = 0;
+    loan.transferredWithActiveLoan = 0;
+    loan.xpPenaltyApplied = 0;
     cleared = true;
   } else {
     // Al amortizar deuda, recalcular y reducir inmediatamente la penalización
@@ -191,6 +213,62 @@ function repayLoan(guildId, userId, amount) {
 
   writeLoans(data);
   return { success: true, paid, remaining: loan.balance, cleared, penaltyLevel: loan.penaltyLevel };
+}
+
+/**
+ * Registra un intento o transferencia realizada mientras el usuario mantiene un préstamo activo.
+ * @param {string} guildId
+ * @param {string} userId
+ * @param {number} amount
+ * @param {number} [xpPenalty=0]
+ * @returns {object|null}
+ */
+function recordLoanTransfer(guildId, userId, amount, xpPenalty = 0) {
+  const data = readLoans();
+  const loan = ensureUserLoan(data, guildId, userId);
+  if (!loan.active) return null;
+
+  const safeAmount = Math.max(0, Math.floor(Number(amount) || 0));
+  const safePenalty = Math.max(0, Math.floor(Number(xpPenalty) || 0));
+
+  loan.transferredWithActiveLoan = (loan.transferredWithActiveLoan || 0) + safeAmount;
+  loan.xpPenaltyApplied = (loan.xpPenaltyApplied || 0) + safePenalty;
+
+  writeLoans(data);
+  return { ...loan };
+}
+
+/**
+ * Reinicia y cancela por completo la deuda de préstamo de un usuario (acción exclusiva dev/admin).
+ * @param {string} guildId
+ * @param {string} userId
+ * @returns {{ success: true, cleared: true, previousBalance: number, previousPrincipal: number } | { success: false, reason: string }}
+ */
+function resetLoan(guildId, userId) {
+  const data = readLoans();
+  const loan = ensureUserLoan(data, guildId, userId);
+
+  if (!loan.active) {
+    return { success: false, reason: 'El usuario no tiene ningún préstamo activo ni deudas pendientes.' };
+  }
+
+  const previousBalance = loan.balance;
+  const previousPrincipal = loan.principal;
+
+  loan.active = false;
+  loan.balance = 0;
+  loan.principal = 0;
+  loan.initialInterest = 0;
+  loan.interestRate = 0.05;
+  loan.tickCount = 0;
+  loan.penaltyLevel = 0;
+  loan.createdAt = 0;
+  loan.lastInterestTick = 0;
+  loan.transferredWithActiveLoan = 0;
+  loan.xpPenaltyApplied = 0;
+
+  writeLoans(data);
+  return { success: true, cleared: true, previousBalance, previousPrincipal };
 }
 
 /**
@@ -356,6 +434,7 @@ function getUserLoanSummary(guildId, userId, now = Date.now()) {
   return {
     active: true,
     principal: loan.principal,
+    initialInterest: loan.initialInterest || 0,
     balance: loan.balance,
     interestRate: loan.interestRate,
     tickCount: loan.tickCount,
@@ -365,7 +444,9 @@ function getUserLoanSummary(guildId, userId, now = Date.now()) {
     msUntilNextTick,
     createdAt: loan.createdAt,
     lastInterestTick: loan.lastInterestTick,
-    daysOverdue
+    daysOverdue,
+    transferredWithActiveLoan: loan.transferredWithActiveLoan || 0,
+    xpPenaltyApplied: loan.xpPenaltyApplied || 0
   };
 }
 
@@ -373,6 +454,8 @@ module.exports = {
   getLoan,
   takeLoan,
   repayLoan,
+  resetLoan,
+  recordLoanTransfer,
   applyInterestTick,
   processAllGuildLoans,
   getUserLoanSummary,
@@ -380,6 +463,7 @@ module.exports = {
   getRateForTick,
   TICK_INTERVAL_MS,
   MAX_DEBT_MULTIPLIER,
+  INITIAL_INTEREST_RATE,
   PENALTY_THRESHOLDS,
   INTEREST_SCHEDULE,
   MIN_LOAN,

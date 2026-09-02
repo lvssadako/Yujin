@@ -22,7 +22,29 @@ function writeJsonAtomic(filePath, data) {
   const payload = JSON.stringify(data, null, 2);
 
   fs.writeFileSync(tmpFile, payload, 'utf8');
-  fs.renameSync(tmpFile, filePath);
+
+  let maxRetries = 5;
+  while (maxRetries > 0) {
+    try {
+      fs.renameSync(tmpFile, filePath);
+      return filePath;
+    } catch (err) {
+      if ((err.code === 'EPERM' || err.code === 'EBUSY' || err.code === 'EACCES') && maxRetries > 1) {
+        maxRetries--;
+        const waitTill = Date.now() + 20;
+        while (Date.now() < waitTill) {}
+      } else {
+        try {
+          fs.copyFileSync(tmpFile, filePath);
+          try { fs.unlinkSync(tmpFile); } catch {}
+          return filePath;
+        } catch {
+          try { fs.unlinkSync(tmpFile); } catch {}
+          throw err;
+        }
+      }
+    }
+  }
   return filePath;
 }
 

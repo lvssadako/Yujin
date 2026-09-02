@@ -109,11 +109,13 @@ const COMMAND_MAP = {
   logs: 'dev',
   reload: 'dev',
   restart: 'dev',
+  resetloan: 'dev',
   testboost: 'dev',
   testbutton: 'dev',
   testsecurity: 'dev',
 
   // Moderación y Seguridad
+  addmoney: 'admin',
   ban: 'admin',
   unban: 'admin',
   kick: 'admin',
@@ -133,10 +135,12 @@ const COMMAND_MAP = {
   fish: 'economy',
   rob: 'economy',
   loan: 'economy',
+  pay: 'economy',
   transfer: 'economy',
   shop: 'economy',
   buy: 'economy',
   chest: 'economy',
+  top: 'economy',
   ecotop: 'economy',
 
   // Casino y Minijuegos
@@ -189,15 +193,16 @@ const COMMAND_MAP = {
 function getCommandExample(cmdName) {
   const examples = {
     // Admin
-    ban: '/ban usuario: @usuario razon: Spam masivo dias_borrado: 1',
-    unban: '/unban id: 123456789012345678 razon: Apelación aceptada',
+    addmoney: '/addmoney usuario: @usuario cantidad: 5000',
+    ban: '/ban user: @usuario reason: Spam masivo days: 1',
+    unban: '/unban target: 123456789012345678 reason: Apelación aceptada',
     kick: '/kick usuario: @usuario razon: Incumplimiento de normas',
     timeout: '/timeout usuario: @usuario minutos: 15 razon: Falta de respeto',
-    warn: '/warn accion: agregar usuario: @usuario razon: Advertencia por flood',
+    warn: '/warn sub: add usuario: @usuario razon: Advertencia por flood',
     clear: '/clear cantidad: 50 usuario: @usuario',
-    automod: '/automod estado: activar canal_logs: #logs-automod',
+    automod: '/automod',
     audit: '/audit canal: #auditoria-mensajes',
-    ecoadmin: '/ecoadmin dar usuario: @usuario cantidad: 5000',
+    ecoadmin: '/ecoadmin addmoney usuario: @usuario cantidad: 5000',
     reload: '/reload',
     restart: '/restart',
 
@@ -209,11 +214,13 @@ function getCommandExample(cmdName) {
     work: '/work',
     fish: '/fish',
     rob: '/rob usuario: @usuario',
-    loan: '/loan accion: solicitar monto: 10000 cuotas: 5',
-    transfer: '/transfer usuario: @amigo cantidad: 1500',
+    loan: '/loan take cantidad: 10000 | /loan repay cantidad: all | /loan status',
+    pay: '/pay destinatario: @amigo cantidad: 1500',
+    transfer: '/transfer destinatario: @amigo cantidad: 1500',
     shop: '/shop',
     buy: '/buy item: caña_pesca cantidad: 1',
     chest: '/chest tipo: mistico',
+    top: '/top tipo: coins',
     ecotop: '/ecotop',
 
     // Games
@@ -261,18 +268,21 @@ function getCommandExample(cmdName) {
     manage: '/manage',
     dev: '/dev status',
     host: '/host',
-    logs: '/logs filtro: all cantidad: 15'
+    logs: '/logs filtro: all cantidad: 15',
+    resetloan: '/resetloan usuario: @usuario'
   };
   return examples[cmdName] || `/${cmdName}`;
 }
 
 function getPermissionBadge(catId, cmdName) {
-  if (['reload', 'restart', 'testboost', 'testbutton', 'testsecurity', 'dev', 'host', 'logs'].includes(cmdName)) {
+  if (['reload', 'restart', 'testboost', 'testbutton', 'testsecurity', 'dev', 'host', 'logs', 'resetloan'].includes(cmdName)) {
     return '`👑 Bot Owner / Desarrollador`';
   }
-  if (catId === 'admin' || catId === 'config' || cmdName === 'ecoadmin' || cmdName === 'leveladmin' || cmdName === 'boostercolors') {
+  if (catId === 'admin' || catId === 'config' || cmdName === 'addmoney' || cmdName === 'ecoadmin' || cmdName === 'leveladmin' || cmdName === 'boostercolors') {
     return '`🛡️ Administrador / Moderador`';
   }
+  return '`👤 Todos los miembros`';
+}
   return '`👤 Todos los miembros`';
 }
 

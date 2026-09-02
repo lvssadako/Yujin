@@ -10,7 +10,7 @@ describe('GitHub Webhook Service', () => {
   const TEST_SECRET = 'my_test_secret_123';
   const TEST_BRANCH = 'refactor/structure';
 
-  before((done) => {
+  before(async () => {
     process.env.PORT = String(TEST_PORT);
     process.env.GITHUB_WEBHOOK_SECRET = TEST_SECRET;
     process.env.GITHUB_BRANCH = TEST_BRANCH;
@@ -26,14 +26,12 @@ describe('GitHub Webhook Service', () => {
       branch: TEST_BRANCH
     });
 
-    setTimeout(done, 50);
+    await new Promise(r => setTimeout(r, 50));
   });
 
-  after((done) => {
+  after(async () => {
     if (server && server.close) {
-      server.close(done);
-    } else {
-      done();
+      await new Promise(r => server.close(r));
     }
   });
 

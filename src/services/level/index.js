@@ -196,6 +196,40 @@ function addXp(guildId, userId, baseXp, source = 'text') {
   return { gained, multiplier: mult, level: data.level, xp: data.xp, leveledUp, leveledUpCount };
 }
 
+function removeXp(guildId, userId, amount) {
+  const levels = readLevels();
+  const data = ensureUserData(levels, guildId, userId);
+  const penalty = Math.max(0, Math.floor(Number(amount) || 0));
+  if (penalty <= 0) {
+    return { deducted: 0, level: data.level, xp: data.xp, levelsLost: 0 };
+  }
+
+  let remainingPenalty = penalty;
+  let levelsLost = 0;
+
+  while (remainingPenalty > 0) {
+    if (data.xp >= remainingPenalty) {
+      data.xp -= remainingPenalty;
+      remainingPenalty = 0;
+    } else {
+      remainingPenalty -= data.xp;
+      if (data.level > 0) {
+        data.level -= 1;
+        levelsLost++;
+        data.xp = xpToNext(data.level);
+      } else {
+        data.xp = 0;
+        remainingPenalty = 0;
+      }
+    }
+  }
+
+  writeLevels(levels);
+  return { deducted: penalty, level: data.level, xp: data.xp, levelsLost };
+}
+
+const penalizeXp = removeXp;
+
 function getLeaderboard(guildId, timeframe = 'global', category = 'general', limit = 10) {
   const levels = readLevels();
   const guildData = levels.guilds?.[guildId] || levels[guildId] || {};
@@ -282,6 +316,8 @@ const levelService = {
   addMessageCount,
   getXpMultiplier,
   addXp,
+  removeXp,
+  penalizeXp,
   getLeaderboard,
   getDayKey,
   getWeekKey

@@ -6,7 +6,7 @@ const { isOwnerOrDev, getStaffRole, getOwnerIds, getDeveloperIds } = require('..
 const { createSuccessEmbed, createErrorEmbed } = require('../../utils/embedFactory');
 const { reloadCommandRegistry, syncSlashCommands } = require('../../loaders/commandLoader');
 const { economyService } = require('../../services/economy');
-const { getLoan, repayLoan, applyInterestTick, getUserLoanSummary } = require('../../services/economy/loanService');
+const { getLoan, repayLoan, resetLoan, applyInterestTick, getUserLoanSummary } = require('../../services/economy/loanService');
 const logger = require('../../utils/logger');
 
 // ─── Helpers de formato y seguridad ──────────────────────────────────────────
@@ -271,18 +271,19 @@ async function handleLoan(guildId, targetUser, action) {
     return { embed };
   }
 
-  if (action === 'clear') {
+  if (action === 'clear' || action === 'reset') {
     const loan = getLoan(guildId, userId);
-    if (!loan || !loan.active) return { error: '❌ El usuario no tiene préstamos activos para limpiar.' };
-    repayLoan(guildId, userId, loan.balance + 1000);
+    if (!loan || !loan.active) return { error: '❌ El usuario no tiene préstamos activos para limpiar o reiniciar.' };
+    const res = resetLoan(guildId, userId);
+    if (!res.success) return { error: `❌ ${res.reason}` };
     const embed = createSuccessEmbed(
-      '🧹 Préstamo Liquidado por Dev',
-      `El préstamo del usuario <@${userId}> ha sido liquidado y reseteado a 0.`
+      '🧹 Préstamo Liquidado y Reiniciado por Dev',
+      `El préstamo del usuario <@${userId}> ha sido liquidado y reseteado a 0.\nDeuda previa cancelada: **${res.previousBalance.toLocaleString()} 🪙**.`
     );
     return { embed };
   }
 
-  return { error: '❌ Acción de préstamo no reconocida (`status`, `tick`, `clear`).' };
+  return { error: '❌ Acción de préstamo no reconocida (`status`, `tick`, `clear`, `reset`).' };
 }
 
 // ─── Slash Command & Prefix Definition ────────────────────────────────────────
@@ -347,12 +348,13 @@ module.exports = {
         .setDescription('Inspecciona o manipula préstamos para pruebas.')
         .addStringOption(opt =>
           opt.setName('accion')
-            .setDescription('Acción (status, tick, clear)')
+            .setDescription('Acción (status, tick, clear, reset)')
             .setRequired(true)
             .addChoices(
               { name: 'Ver estado (status)', value: 'status' },
               { name: 'Forzar tick de interés (tick)', value: 'tick' },
-              { name: 'Liquidar/Limpiar préstamo (clear)', value: 'clear' }
+              { name: 'Liquidar/Limpiar préstamo (clear)', value: 'clear' },
+              { name: 'Resetear préstamo por completo (reset)', value: 'reset' }
             )
         )
         .addUserOption(opt =>
