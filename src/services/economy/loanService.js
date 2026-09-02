@@ -5,9 +5,14 @@ const { readJsonSafe, writeJsonAtomic } = require('../../utils/jsonStore');
 const DATA_DIR = path.join(__dirname, '..', '..', '..', 'data');
 const LOANS_PATH = path.join(DATA_DIR, 'loans.json');
 
+// ─── Constantes de Configuración del Préstamo ────────────────────────────────
+const TICK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 horas por ciclo de interés
+const MAX_CATCHUP_DAYS = 7;                   // Límite de días si el bot estuvo desconectado
+const MAX_DEBT_MULTIPLIER = 2.5;              // Techo máximo de deuda (2.5x del monto prestado)
+
 // ─── Tasas de interés según días transcurridos (ticks) ────────────────────────
 // Ticks 1-3  → 5%   (inicio suave)
-// Ticks 4-6  → 8%   (empieza a subir)
+// Ticks 4-6  → 8%   (subida moderada)
 // Ticks 7-10 → 12%  (urgente)
 // Ticks 11+  → 18%  (crítico)
 const INTEREST_SCHEDULE = [
@@ -18,14 +23,14 @@ const INTEREST_SCHEDULE = [
 ];
 
 // ─── Umbrales de penalización (deuda / principal) ─────────────────────────────
-// Level 0 → sin penalización
-// Level 1 → advertencia         (deuda >= 2x principal)
-// Level 2 → ingresos -50%       (deuda >= 3x principal)
-// Level 3 → ingresos -75%       (deuda >= 5x principal)
+// Level 0 → sin penalización        (deuda < 1.5x principal)
+// Level 1 → advertencia             (deuda >= 1.5x principal)
+// Level 2 → ingresos -50%           (deuda >= 2.0x principal)
+// Level 3 → ingresos -75% y congelado en tope (deuda >= 2.5x principal)
 const PENALTY_THRESHOLDS = [
-  { level: 3, multiplier: 5 },
-  { level: 2, multiplier: 3 },
-  { level: 1, multiplier: 2 }
+  { level: 3, multiplier: 2.5 },
+  { level: 2, multiplier: 2.0 },
+  { level: 1, multiplier: 1.5 }
 ];
 
 const MIN_LOAN = 500;
@@ -33,10 +38,51 @@ const MAX_LOAN = 100_000;
 
 // ─── Helpers de IO ─────────────────────────────────────────────────────────────
 
+function sanitizeLoanEntry(loan) {
+  if (!loan || typeof loan !== 'object' || !loan.active) return loan;
+
+  loan.principal = Math.max(0, Math.floor(Number(loan.principal) || 0));
+  loan.balance = Math.max(0, Math.floor(Number(loan.balance) || 0));
+  loan.tickCount = Math.max(0, Math.floor(Number(loan.tickCount) || 0));
+  loan.createdAt = Number(loan.createdAt) || Date.now();
+  loan.lastInterestTick = Number(loan.lastInterestTick) || loan.createdAt;
+
+  const maxBalance = Math.floor(loan.principal * MAX_DEBT_MULTIPLIER);
+  if (loan.balance > maxBalance) {
+    loan.balance = maxBalance;
+  }
+
+  loan.penaltyLevel = calcPenaltyLevel(loan.balance, loan.principal);
+  loan.interestRate = getRateForTick(loan.tickCount);
+  return loan;
+}
+
 function readLoans() {
   const data = readJsonSafe(LOANS_PATH, { guilds: {} });
   if (!data || typeof data !== 'object') return { guilds: {} };
   data.guilds = data.guilds || {};
+
+  let needsSave = false;
+  for (const guildId of Object.keys(data.guilds)) {
+    const guild = data.guilds[guildId];
+    if (guild && typeof guild === 'object') {
+      for (const userId of Object.keys(guild)) {
+        const entry = guild[userId];
+        if (entry && entry.active) {
+          const original = JSON.stringify(entry);
+          sanitizeLoanEntry(entry);
+          if (JSON.stringify(entry) !== original) {
+            needsSave = true;
+          }
+        }
+      }
+    }
+  }
+
+  if (needsSave) {
+    writeLoans(data);
+  }
+
   return data;
 }
 
@@ -109,7 +155,7 @@ function takeLoan(guildId, userId, amount) {
 
 /**
  * Realiza un pago parcial o total del préstamo.
- * @returns {{ success: false, reason: string } | { success: true, paid: number, remaining: number, cleared: boolean }}
+ * @returns {{ success: false, reason: string } | { success: true, paid: number, remaining: number, cleared: boolean, penaltyLevel: number }}
  */
 function repayLoan(guildId, userId, amount) {
   const data = readLoans();
@@ -135,11 +181,16 @@ function repayLoan(guildId, userId, amount) {
     loan.principal = 0;
     loan.interestRate = 0.05;
     loan.tickCount = 0;
+    loan.createdAt = 0;
+    loan.lastInterestTick = 0;
     cleared = true;
+  } else {
+    // Al amortizar deuda, recalcular y reducir inmediatamente la penalización
+    loan.penaltyLevel = calcPenaltyLevel(loan.balance, loan.principal);
   }
 
   writeLoans(data);
-  return { success: true, paid, remaining: loan.balance, cleared };
+  return { success: true, paid, remaining: loan.balance, cleared, penaltyLevel: loan.penaltyLevel };
 }
 
 /**
@@ -165,22 +216,60 @@ function calcPenaltyLevel(balance, principal) {
 }
 
 /**
- * Aplica un tick de interés a un préstamo activo.
- * Debe llamarse una vez por día (desde el scheduler).
- * @returns {{ interestAdded: number, newBalance: number, newRate: number, penaltyLevel: number }}
+ * Aplica un tick de interés a un préstamo individual.
+ * @param {string} guildId
+ * @param {string} userId
+ * @param {object} [options]
+ * @param {boolean} [options.force=true] Si es false, respeta el intervalo de 24h
+ * @param {number} [options.now=Date.now()]
+ * @returns {{ interestAdded: number, newBalance: number, newRate: number, penaltyLevel: number, isCapped?: boolean, skipped?: boolean } | null}
  */
-function applyInterestTick(guildId, userId) {
+function applyInterestTick(guildId, userId, { force = true, now = Date.now() } = {}) {
   const data = readLoans();
   const loan = ensureUserLoan(data, guildId, userId);
 
   if (!loan.active) return null;
 
+  // Si no se fuerza, verificar si han transcurrido 24 horas
+  if (!force && loan.lastInterestTick > 0) {
+    const elapsed = now - loan.lastInterestTick;
+    if (elapsed < TICK_INTERVAL_MS) {
+      return {
+        interestAdded: 0,
+        newBalance: loan.balance,
+        newRate: loan.interestRate,
+        penaltyLevel: loan.penaltyLevel,
+        isCapped: loan.balance >= Math.floor(loan.principal * MAX_DEBT_MULTIPLIER),
+        skipped: true
+      };
+    }
+  }
+
+  const maxBalance = Math.floor(loan.principal * MAX_DEBT_MULTIPLIER);
+
+  if (loan.balance >= maxBalance) {
+    loan.balance = maxBalance;
+    loan.lastInterestTick = now;
+    loan.penaltyLevel = calcPenaltyLevel(loan.balance, loan.principal);
+    writeLoans(data);
+    return {
+      interestAdded: 0,
+      newBalance: loan.balance,
+      newRate: loan.interestRate,
+      penaltyLevel: loan.penaltyLevel,
+      isCapped: true
+    };
+  }
+
   loan.tickCount = (loan.tickCount || 0) + 1;
   loan.interestRate = getRateForTick(loan.tickCount);
 
-  const interestAdded = Math.ceil(loan.balance * loan.interestRate);
+  const rawInterest = Math.ceil(loan.balance * loan.interestRate);
+  const roomToCap = Math.max(0, maxBalance - loan.balance);
+  const interestAdded = Math.min(rawInterest, roomToCap);
+
   loan.balance += interestAdded;
-  loan.lastInterestTick = Date.now();
+  loan.lastInterestTick = now;
   loan.penaltyLevel = calcPenaltyLevel(loan.balance, loan.principal);
 
   writeLoans(data);
@@ -188,26 +277,61 @@ function applyInterestTick(guildId, userId) {
     interestAdded,
     newBalance: loan.balance,
     newRate: loan.interestRate,
-    penaltyLevel: loan.penaltyLevel
+    penaltyLevel: loan.penaltyLevel,
+    isCapped: loan.balance >= maxBalance
   };
 }
 
 /**
- * Procesa todos los préstamos activos de un servidor.
- * @returns {number} cantidad de préstamos procesados
+ * Procesa todos los préstamos activos de un servidor de manera atómica y controlada por tiempo.
+ * @param {string} guildId
+ * @param {number} [now=Date.now()]
+ * @returns {number} cantidad de préstamos a los que se les aplicó interés
  */
-function processAllGuildLoans(guildId) {
+function processAllGuildLoans(guildId, now = Date.now()) {
   const data = readLoans();
-  const guild = data.guilds[guildId] || {};
+  const guild = data.guilds[guildId];
+  if (!guild || typeof guild !== 'object') return 0;
+
   let processed = 0;
+  let modified = false;
 
   for (const userId of Object.keys(guild)) {
     const loan = guild[userId];
-    if (loan && loan.active) {
-      // applyInterestTick lee y escribe individualmente
-      applyInterestTick(guildId, userId);
-      processed++;
+    if (!loan || !loan.active) continue;
+
+    const lastTick = loan.lastInterestTick || loan.createdAt || 0;
+    const elapsed = now - lastTick;
+
+    // Si aún no han transcurrido 24 horas, no hacer nada
+    if (elapsed < TICK_INTERVAL_MS) continue;
+
+    const maxBalance = Math.floor(loan.principal * MAX_DEBT_MULTIPLIER);
+    const elapsedDays = Math.min(Math.floor(elapsed / TICK_INTERVAL_MS), MAX_CATCHUP_DAYS);
+
+    if (elapsedDays <= 0) continue;
+
+    for (let d = 0; d < elapsedDays; d++) {
+      if (loan.balance < maxBalance) {
+        loan.tickCount = (loan.tickCount || 0) + 1;
+        loan.interestRate = getRateForTick(loan.tickCount);
+
+        const rawInterest = Math.ceil(loan.balance * loan.interestRate);
+        const roomToCap = Math.max(0, maxBalance - loan.balance);
+        const interestAdded = Math.min(rawInterest, roomToCap);
+
+        loan.balance += interestAdded;
+      }
     }
+
+    loan.lastInterestTick = now;
+    loan.penaltyLevel = calcPenaltyLevel(loan.balance, loan.principal);
+    processed++;
+    modified = true;
+  }
+
+  if (modified) {
+    writeLoans(data);
   }
 
   return processed;
@@ -216,13 +340,17 @@ function processAllGuildLoans(guildId) {
 /**
  * Devuelve un resumen legible del préstamo de un usuario.
  */
-function getUserLoanSummary(guildId, userId) {
+function getUserLoanSummary(guildId, userId, now = Date.now()) {
   const loan = getLoan(guildId, userId);
   if (!loan || !loan.active) {
     return { active: false };
   }
 
-  const dayMs = 86400000;
+  const maxBalance = Math.floor(loan.principal * MAX_DEBT_MULTIPLIER);
+  const isCapped = loan.balance >= maxBalance;
+  const lastTick = loan.lastInterestTick || loan.createdAt || now;
+  const elapsed = Math.max(0, now - lastTick);
+  const msUntilNextTick = isCapped ? 0 : Math.max(0, TICK_INTERVAL_MS - (elapsed % TICK_INTERVAL_MS));
   const daysOverdue = loan.tickCount || 0;
 
   return {
@@ -232,6 +360,11 @@ function getUserLoanSummary(guildId, userId) {
     interestRate: loan.interestRate,
     tickCount: loan.tickCount,
     penaltyLevel: loan.penaltyLevel,
+    maxBalance,
+    isCapped,
+    msUntilNextTick,
+    createdAt: loan.createdAt,
+    lastInterestTick: loan.lastInterestTick,
     daysOverdue
   };
 }
@@ -242,5 +375,13 @@ module.exports = {
   repayLoan,
   applyInterestTick,
   processAllGuildLoans,
-  getUserLoanSummary
+  getUserLoanSummary,
+  calcPenaltyLevel,
+  getRateForTick,
+  TICK_INTERVAL_MS,
+  MAX_DEBT_MULTIPLIER,
+  PENALTY_THRESHOLDS,
+  INTEREST_SCHEDULE,
+  MIN_LOAN,
+  MAX_LOAN
 };

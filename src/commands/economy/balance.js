@@ -13,13 +13,15 @@ async function renderBalance(guildId, target) {
     // Mostrar info de préstamo si existe
     let loanField = null;
     try {
-      const { getLoan } = require('../../services/economy/loanService');
+      const { getLoan, MAX_DEBT_MULTIPLIER } = require('../../services/economy/loanService');
       const loan = getLoan(guildId, target.id);
       if (loan && loan.active) {
         const penaltyDesc = ['Sin penalización', '⚠️ Advertencia', '🔶 Ingresos -50%', '🔴 Ingresos -75%'];
+        const isCapped = loan.balance >= Math.floor(loan.principal * (MAX_DEBT_MULTIPLIER || 2.5));
+        const cappedTag = isCapped ? ' 🔒 *(Tope)*' : '';
         loanField = {
           name: '🏦 Préstamo Activo',
-          value: `> **Deuda:** ${loan.balance.toLocaleString()} 🪙 *(principal: ${loan.principal.toLocaleString()})*\n> **Interés:** ${(loan.interestRate * 100).toFixed(0)}% · Día ${loan.tickCount}\n> **Penalización:** ${penaltyDesc[loan.penaltyLevel] || 'Sin penalización'}`,
+          value: `> **Deuda:** ${loan.balance.toLocaleString()} 🪙 *(principal: ${loan.principal.toLocaleString()})*${cappedTag}\n> **Interés:** ${(loan.interestRate * 100).toFixed(0)}% · Día ${loan.tickCount}\n> **Penalización:** ${penaltyDesc[loan.penaltyLevel] || 'Sin penalización'}`,
           inline: false
         };
       }

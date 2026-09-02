@@ -4,8 +4,8 @@ const { processAllGuildLoans } = require('./loanService');
 let _scheduler = null;
 let _earlyRun = null;
 
-const INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 horas
-const STARTUP_DELAY_MS = 10_000;           // 10 segundos tras arrancar
+const INTERVAL_MS = 60 * 60 * 1000;      // Revisión horaria para procesar préstamos que cumplan sus 24h
+const STARTUP_DELAY_MS = 10_000;         // 10 segundos tras arrancar para verificar préstamos pendientes
 
 /**
  * Arranca el scheduler de intereses de préstamos.
@@ -17,6 +17,7 @@ function startLoanInterestScheduler(client) {
 
   async function runTick() {
     try {
+      if (!client || !client.guilds || !client.guilds.cache) return;
       const guilds = client.guilds.cache;
       let totalProcessed = 0;
 
@@ -26,20 +27,20 @@ function startLoanInterestScheduler(client) {
       }
 
       if (totalProcessed > 0) {
-        logger.info(`[LoanScheduler] Tick de interés completado. Préstamos procesados: ${totalProcessed}`);
+        logger.info(`[LoanScheduler] Tick de interés completado. Préstamos actualizados: ${totalProcessed}`);
       }
     } catch (err) {
       logger.error('[LoanScheduler] Error en tick de interés', { error: err.message, stack: err.stack });
     }
   }
 
-  // Ejecución inicial diferida (por si el bot arrancó mientras había préstamos pendientes)
+  // Ejecución inicial diferida (comprueba de forma segura sin duplicar si ya pasaron 24h)
   _earlyRun = setTimeout(runTick, STARTUP_DELAY_MS);
 
-  // Ejecución recurrente cada 24 horas
+  // Ejecución periódica cada 1 hora
   _scheduler = setInterval(runTick, INTERVAL_MS);
 
-  logger.info('[LoanScheduler] Scheduler de intereses iniciado (cada 24h).');
+  logger.info('[LoanScheduler] Scheduler de intereses iniciado (revisión horaria con ciclo de 24h por préstamo).');
 }
 
 /**

@@ -98,12 +98,13 @@ Bot integral de Discord para gestión comunitaria avanzada, diseñado con arquit
     - Días 1 a 3: **5%** diario (inicio accesible).
     - Días 4 a 6: **8%** diario (primer incremento).
     - Días 7 a 10: **12%** diario (urgencia).
-    - Día 11+: **18%** diario (tasa máxima acumulativa).
+    - Día 11+: **18%** diario (tasa máxima de mora).
+  - **🛡️ Techo Máximo de Deuda ($2.5\times$)**: La deuda nunca excederá $2.5\times$ el principal solicitado; al alcanzar el techo, los intereses se congelan automáticamente.
   - **Sistema de Penalizaciones Automáticas**:
-    - **Nivel 1** (Deuda $\ge 2\times$): Advertencia visual en perfil y balance.
-    - **Nivel 2** (Deuda $\ge 3\times$): Reducción del **50% en ganancias** de `/work` y `/fish`.
-    - **Nivel 3** (Deuda $\ge 5\times$): Reducción del **75% en ganancias** de `/work` y `/fish`.
-  - **Scheduler Automático de 24 Horas**: Aplica intereses y actualiza penalizaciones de forma desatendida con arranque seguro y *graceful shutdown*.
+    - **Nivel 1** (Deuda $\ge 1.5\times$): Advertencia visual en perfil, balance y estado.
+    - **Nivel 2** (Deuda $\ge 2.0\times$): Reducción del **50% en ganancias** de `/work` y `/fish`.
+    - **Nivel 3** (Deuda $\ge 2.5\times$): Reducción del **75% en ganancias** de `/work` y `/fish` + congelamiento de intereses en el techo máximo.
+  - **Scheduler Automático de 24 Horas Idempotente**: Aplica intereses individualmente cada 24 horas por préstamo, evitando duplicaciones por reinicios del bot, con catch-up seguro y *graceful shutdown*.
 - **Trabajo y Actividades**:
   - `/work` (`&work`): Trabajo remunerado cada 4 horas (con mensajes aleatorios y penalización por mora).
   - `/fish` (`&fish`): Pesca deportiva cada 1 hora con caña de pescar adquirible en `/buy`.

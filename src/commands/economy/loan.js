@@ -5,10 +5,10 @@ const { takeLoan, repayLoan, getUserLoanSummary } = require('../../services/econ
 // ─── Constantes de penalización ───────────────────────────────────────────────
 
 const PENALTY_INFO = [
-  { emoji: '✅', label: 'Sin penalización',          color: 0x57F287 },
-  { emoji: '⚠️', label: 'Advertencia — deuda creciente', color: 0xF1C40F },
-  { emoji: '🔶', label: 'Penalización media — Trabajo/Pesca al 50%', color: 0xE67E22 },
-  { emoji: '🔴', label: 'Penalización severa — Trabajo/Pesca al 25%', color: 0xED4245 }
+  { emoji: '✅', label: 'Sin penalización',                          color: 0x57F287 },
+  { emoji: '⚠️', label: 'Advertencia — deuda creciente (>= 1.5x)',   color: 0xF1C40F },
+  { emoji: '🔶', label: 'Penalización media — Trabajo/Pesca al 50% (>= 2.0x)', color: 0xE67E22 },
+  { emoji: '🔴', label: 'Penalización severa — Trabajo/Pesca al 25% (techo 2.5x)', color: 0xED4245 }
 ];
 
 // ─── Subcomando: take ─────────────────────────────────────────────────────────
@@ -38,9 +38,10 @@ async function handleTake(guildId, userId, amountStr) {
       {
         name: '⚠️ Condiciones del Préstamo',
         value:
-          '> El interés se aplica **diariamente** y aumenta con el tiempo.\n' +
+          '> El interés se aplica **cada 24 horas** y aumenta gradualmente con los días transcurridos.\n' +
           '> • Días 1-3: **5%** · Días 4-6: **8%** · Días 7-10: **12%** · Día 11+: **18%**\n' +
-          '> Si la deuda supera **2x, 3x o 5x** el préstamo original, recibirás penalizaciones de ingresos.\n' +
+          '> 🛡️ **Techo de deuda:** Máximo **2.5x** del préstamo (los intereses se congelan al alcanzarlo).\n' +
+          '> Si la deuda supera **1.5x o 2.0x**, recibirás penalizaciones de ingresos en `/work` y `/fish`.\n' +
           '> Usa `/loan repay` para hacer pagos y `/loan status` para ver tu deuda.',
         inline: false
       }
@@ -118,7 +119,7 @@ async function handleRepay(guildId, userId, amountStr) {
       { name: '👛 Tu Balance', value: `> **${newBal.coins.toLocaleString()} 🪙**`, inline: true },
       { name: `${penInfo.emoji} Estado Actual`, value: `> ${penInfo.label}`, inline: false }
     )
-    .setFooter({ text: 'Sigue pagando para evitar penalizaciones mayores.' })
+    .setFooter({ text: 'Sigue pagando para reducir intereses y penalizaciones.' })
     .setTimestamp();
 
   return { embed };
@@ -141,26 +142,46 @@ async function handleStatus(guildId, userId) {
 
   const penInfo = PENALTY_INFO[summary.penaltyLevel] || PENALTY_INFO[0];
   const debtRatio = summary.principal > 0 ? (summary.balance / summary.principal).toFixed(2) : '—';
+  const hoursToNext = Math.max(0, Math.ceil((summary.msUntilNextTick || 0) / (60 * 60 * 1000)));
+
+  const fields = [
+    { name: '📋 Principal Original', value: `> **${summary.principal.toLocaleString()} 🪙**`, inline: true },
+    {
+      name: '📈 Deuda Actual',
+      value: `> **${summary.balance.toLocaleString()} 🪙** *(x${debtRatio})*${summary.isCapped ? ' 🔒 *(Tope)*' : ''}`,
+      inline: true
+    },
+    { name: '💹 Tasa de Interés', value: `> **${(summary.interestRate * 100).toFixed(0)}%** diario`, inline: true },
+    { name: '📅 Días Transcurridos', value: `> **${summary.tickCount}** día${summary.tickCount !== 1 ? 's' : ''}`, inline: true },
+    {
+      name: '⏰ Próximo Cobro',
+      value: summary.isCapped ? '> 🔒 **Intereses congelados** (tope alcanzado)' : `> En aprox. **${hoursToNext}h**`,
+      inline: true
+    },
+    {
+      name: '🛡️ Techo Máximo',
+      value: `> **${summary.maxBalance.toLocaleString()} 🪙** *(x2.5)*`,
+      inline: true
+    },
+    {
+      name: `${penInfo.emoji} Penalización`,
+      value: `> **Nivel ${summary.penaltyLevel}:** ${penInfo.label}`,
+      inline: false
+    }
+  ];
+
+  if (!summary.isCapped) {
+    fields.push({
+      name: '📊 Próxima Tasa',
+      value: getNextRateInfo(summary.tickCount),
+      inline: false
+    });
+  }
 
   const embed = new EmbedBuilder()
-    .setColor(penInfo.color)
+    .setColor(summary.isCapped ? 0xED4245 : penInfo.color)
     .setAuthor({ name: '🏦 Estado del Préstamo' })
-    .addFields(
-      { name: '📋 Principal Original', value: `> **${summary.principal.toLocaleString()} 🪙**`, inline: true },
-      { name: '📈 Deuda Actual', value: `> **${summary.balance.toLocaleString()} 🪙** *(x${debtRatio})*`, inline: true },
-      { name: '💹 Tasa de Interés', value: `> **${(summary.interestRate * 100).toFixed(0)}%** diario`, inline: true },
-      { name: '📅 Días Transcurridos', value: `> **${summary.tickCount}** día${summary.tickCount !== 1 ? 's' : ''}`, inline: true },
-      {
-        name: `${penInfo.emoji} Penalización`,
-        value: `> **Nivel ${summary.penaltyLevel}:** ${penInfo.label}`,
-        inline: false
-      },
-      {
-        name: '📊 Próxima Tasa',
-        value: getNextRateInfo(summary.tickCount),
-        inline: false
-      }
-    )
+    .addFields(fields)
     .setFooter({ text: 'Usa /loan repay <cantidad|all> para realizar un pago.' })
     .setTimestamp();
 
