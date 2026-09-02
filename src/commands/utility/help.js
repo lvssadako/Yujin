@@ -33,6 +33,18 @@ function getHelpSourceImages() {
   return sources;
 }
 
+let helpImageRotationIndex = 0;
+
+function getNextRotatedHelpImage() {
+  const sources = getHelpSourceImages();
+  if (sources.length === 0) {
+    return fs.existsSync(LOCAL_BANNER_PATH) ? LOCAL_BANNER_PATH : null;
+  }
+  const imgPath = sources[helpImageRotationIndex % sources.length];
+  helpImageRotationIndex = (helpImageRotationIndex + 1) % sources.length;
+  return imgPath;
+}
+
 const CATEGORIES = {
   admin: { 
     name: 'Moderación y Seguridad', 
@@ -137,8 +149,7 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
     const catData = CATEGORIES[catId];
     const desc = cmd.data?.description || cmd.description || 'Sin descripción disponible.';
 
-    const sources = getHelpSourceImages();
-    const thumbImg = sources.find(s => s.includes('IMG_5311')) || sources[0] || null;
+    const selectedBanner = getNextRotatedHelpImage();
     const files = [];
 
     const detailEmbed = new EmbedBuilder()
@@ -155,14 +166,13 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
         { name: '💻 Sintaxis', value: `\`\`\`bash\n${cmd.usage || `/${cmdName}`}\n\`\`\``, inline: false },
         { name: '💡 Ejemplo de Uso', value: `\`\`\`bash\n${getCommandExample(cmdName)}\n\`\`\``, inline: false }
       )
+      .setThumbnail(client.user.displayAvatarURL({ size: 256 }))
       .setFooter({ text: `Yujin Bot • Módulo de ${catData.name}`, iconURL: client.user.displayAvatarURL() })
       .setTimestamp();
 
-    if (thumbImg && fs.existsSync(thumbImg)) {
-      files.push(new AttachmentBuilder(thumbImg, { name: 'help_thumb.jpg' }));
-      detailEmbed.setThumbnail('attachment://help_thumb.jpg');
-    } else {
-      detailEmbed.setThumbnail(client.user.displayAvatarURL({ size: 256 }));
+    if (selectedBanner && fs.existsSync(selectedBanner)) {
+      files.push(new AttachmentBuilder(selectedBanner, { name: 'help_banner.jpg' }));
+      detailEmbed.setImage('attachment://help_banner.jpg');
     }
 
     return isPrefix 
@@ -201,27 +211,20 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
       '> 💡 *¿Buscas un comando específico? Usa `/help comando: <nombre>`*'
     )
     .setColor(0x5865F2)
+    .setThumbnail(client.user.displayAvatarURL({ size: 256 }))
     .addFields(
       { name: '🗂️ Módulos', value: `\`${Object.keys(CATEGORIES).length} Categorías\``, inline: true },
       { name: '⚡ Comandos', value: `\`${commands.length} Disponibles\``, inline: true },
       { name: '📡 Estado', value: '`🟢 100% Operativo`', inline: true }
     );
 
-  const sources = getHelpSourceImages();
-  const mainBannerPath = sources.find(s => s.includes('IMG_6140')) || sources[0] || (fs.existsSync(LOCAL_BANNER_PATH) ? LOCAL_BANNER_PATH : null);
-  const thumbImgPath = sources.find(s => s.includes('IMG_5311')) || sources.find(s => s !== mainBannerPath) || null;
-
+  const selectedBanner = getNextRotatedHelpImage();
   const files = [];
-  if (mainBannerPath && fs.existsSync(mainBannerPath)) {
-    files.push(new AttachmentBuilder(mainBannerPath, { name: 'help_banner.jpg' }));
+  if (selectedBanner && fs.existsSync(selectedBanner)) {
+    files.push(new AttachmentBuilder(selectedBanner, { name: 'help_banner.jpg' }));
     mainEmbed.setImage('attachment://help_banner.jpg');
   } else {
     mainEmbed.setImage(HELP_BANNER_URL);
-  }
-
-  if (thumbImgPath && fs.existsSync(thumbImgPath)) {
-    files.push(new AttachmentBuilder(thumbImgPath, { name: 'help_thumb.jpg' }));
-    mainEmbed.setThumbnail('attachment://help_thumb.jpg');
   }
 
   mainEmbed
@@ -289,6 +292,7 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
         .setTitle(`${catData.emoji} Módulo de ${catData.name}`)
         .setDescription(`> *${catData.desc}*\n\n${listFormatted}`)
         .setColor(catData.color)
+        .setThumbnail(client.user.displayAvatarURL({ size: 256 }))
         .addFields({
           name: '💡 ¿Cómo usar?',
           value: 'Escribe el comando con `/` o usa `/help comando: <nombre>` para ver ejemplos detallados.'
@@ -296,10 +300,7 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
         .setFooter({ text: `${catCommands.length} comandos disponibles • Yujin Bot`, iconURL: client.user.displayAvatarURL() })
         .setTimestamp();
 
-      if (thumbImgPath) {
-        catEmbed.setThumbnail('attachment://help_thumb.jpg');
-      }
-      if (mainBannerPath) {
+      if (selectedBanner) {
         catEmbed.setImage('attachment://help_banner.jpg');
       }
 
