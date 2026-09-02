@@ -5,6 +5,7 @@ const { SlashCommandBuilder, AttachmentBuilder, ActionRowBuilder, ButtonBuilder,
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const { readProfiles, ensureUser } = require('../../utils/profileStore');
 const { readConfig } = require('../../utils/configCache');
+const { normalizeExternalImageUrl } = require('../../utils/urlSafety');
 const { readLevels, ensureUserData, xpToNext, getUserRank } = require('../../services/level').levelService;
 const { initFonts, FONT_FALLBACKS } = require('../../utils/canvasFontLoader');
 
@@ -146,6 +147,8 @@ module.exports = {
       let targetUser = interaction.user;
       if (interaction.options && typeof interaction.options.getUser === 'function') {
         targetUser = interaction.options.getUser('usuario') || interaction.user;
+      } else if (interaction.targetUser) {
+        targetUser = interaction.targetUser;
       }
       const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
       if (!member) return interaction.editReply('❌ Usuario no encontrado en este servidor.');
@@ -217,22 +220,18 @@ module.exports = {
       const userBgUrl = getProfileBackgroundUrl(profileData);
       if (userBgUrl) {
         try {
-          let bgImg = null;
           const buf = await fetchBuffer(userBgUrl);
           if (buf) {
-            bgImg = await loadImage(buf);
-          } else {
-            bgImg = await loadImage(userBgUrl);
-          }
-
-          if (bgImg) {
-            ctx.save();
-            const opacity = Number(profileData.bgOpacity);
-            ctx.globalAlpha = Number.isFinite(opacity) ? Math.max(0.1, Math.min(1, opacity)) : 0.75;
-            roundRect(ctx, panelX, panelY, panelW, panelH, radius);
-            ctx.clip();
-            drawImageCover(ctx, bgImg, panelX, panelY, panelW, panelH);
-            ctx.restore();
+            const bgImg = await loadImage(buf);
+            if (bgImg) {
+              ctx.save();
+              const opacity = Number(profileData.bgOpacity);
+              ctx.globalAlpha = Number.isFinite(opacity) ? Math.max(0.1, Math.min(1, opacity)) : 0.75;
+              roundRect(ctx, panelX, panelY, panelW, panelH, radius);
+              ctx.clip();
+              drawImageCover(ctx, bgImg, panelX, panelY, panelW, panelH);
+              ctx.restore();
+            }
           }
         } catch (e) {
           logger.warn('[profile] Background error:', e?.message || e);
@@ -592,7 +591,8 @@ module.exports = {
       const buffer = canvas.toBuffer('image/png');
       const attach = new AttachmentBuilder(buffer, { name: 'profile.png' });
 
-      const isSelf = targetUser.id === (interaction.user?.id || interaction.author?.id);
+      const callerId = interaction.author?.id || interaction.user?.id;
+      const isSelf = Boolean(callerId && targetUser.id === callerId);
       const components = [];
       if (isSelf) {
         components.push(
@@ -636,7 +636,9 @@ module.exports = {
     const fakeInteraction = {
       guild: message.guild,
       guildId: message.guild.id,
-      user: targetUser,
+      user: message.author,
+      author: message.author,
+      targetUser: targetUser,
       deferReply: async () => {},
       editReply: async (data) => message.reply(data),
       reply: async (data) => message.reply(data),
