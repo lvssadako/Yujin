@@ -48,77 +48,213 @@ function getNextRotatedBannerImage() {
 }
 
 const CATEGORIES = {
-  admin: { 
-    name: 'Moderación y Seguridad', 
-    desc: 'Comandos de protección, expulsión, baneo y limpieza.', 
-    emoji: '🛡️', 
-    color: 0xED4245 
+  level: { 
+    name: 'Niveles, Perfiles y Rachas', 
+    desc: 'Tarjetas HD, experiencia, leaderboard, perfiles personalizados, insignias y rachas.', 
+    emoji: '✨', 
+    color: 0x57F287 
   },
   economy: { 
     name: 'Economía y Finanzas', 
-    desc: 'Balance, transferencias, daily, cofres y tiendas.', 
+    desc: 'Billetera, banco, daily, trabajo, pesca, robos, tiendas, préstamos y transferencias.', 
     emoji: '💰', 
     color: 0xF1C40F 
   },
   games: { 
-    name: 'Juegos y Casino', 
-    desc: 'Minijuegos de azar: Blackjack, ruleta, coinflip y slots.', 
+    name: 'Casino y Minijuegos', 
+    desc: 'Blackjack 21, ruleta, tragamonedas, coinflip, crash y duelos de reacción.', 
     emoji: '🎲', 
     color: 0x9B59B6 
   },
-  level: { 
-    name: 'Niveles, Perfil y Rachas', 
-    desc: 'Rangos, experiencia, leaderboard, rachas y tarjetas HD.', 
-    emoji: '✨', 
-    color: 0x57F287 
+  utility: { 
+    name: 'Utilidades y Comunidad', 
+    desc: 'Información de usuarios, sorteos, recordatorios, centro de ayuda y herramientas.', 
+    emoji: '🧭', 
+    color: 0x5865F2 
   },
   boost: { 
-    name: 'Servidor y Boosts', 
-    desc: 'Beneficios, multiplicadores y recompensas a Boosters.', 
+    name: 'Boosters y Servidor', 
+    desc: 'Ventajas a boosters, multiplicadores activos de XP y menú de autoroles de colores.', 
     emoji: '🚀', 
     color: 0xF47FFF 
   },
+  admin: { 
+    name: 'Moderación y Seguridad', 
+    desc: 'Sanciones (ban/kick/timeout/warn), limpieza de mensajes, automod y auditoría.', 
+    emoji: '🛡️', 
+    color: 0xED4245 
+  },
   config: { 
-    name: 'Configuración Administrativa', 
-    desc: 'Ajustes del servidor, canales de nivel y recompensas.', 
+    name: 'Configuración del Servidor', 
+    desc: 'Ajustes maestros, canales de logs, recompensas de nivel, top roles y recordatorios.', 
     emoji: '⚙️', 
     color: 0x95A5A6 
-  },
-  utility: { 
-    name: 'Utilidades y Herramientas', 
-    desc: 'Información general, recordatorios, ping y ayuda.', 
-    emoji: '🧭', 
-    color: 0x5865F2 
   }
 };
 
 const COMMAND_MAP = {
-  ban: 'admin', kick: 'admin', timeout: 'admin', clear: 'admin', unban: 'admin', warn: 'admin',
-  balance: 'economy', chest: 'economy', daily: 'economy', shop: 'economy', transfer: 'economy', ecotop: 'economy',
-  blackjack: 'games', coinflip: 'games', crash: 'games', reactduel: 'games', ruleta: 'games', slots: 'games',
-  level: 'level', leaderboard: 'level', badge: 'level', profile: 'level', profileset: 'level', racha: 'level', streak: 'level', streaks: 'level',
-  boosters: 'boost', boostxp: 'boost',
-  leveladdchannel: 'config', leveladmin: 'config', levellistchannels: 'config', levelremovechannel: 'config', levelrewards: 'config', menuconfig: 'config', setboostchannel: 'config', setbumpreminder: 'config', setchannel: 'config',
-  bumpreminderinfo: 'utility', help: 'utility', manage: 'utility', toproles: 'utility', info: 'utility', ping: 'utility', reminder: 'utility'
+  // Moderación y Seguridad
+  ban: 'admin',
+  unban: 'admin',
+  kick: 'admin',
+  timeout: 'admin',
+  warn: 'admin',
+  clear: 'admin',
+  automod: 'admin',
+  audit: 'admin',
+  ecoadmin: 'admin',
+  reload: 'admin',
+  restart: 'admin',
+  testboost: 'admin',
+  testbutton: 'admin',
+  testsecurity: 'admin',
+
+  // Economía y Finanzas
+  balance: 'economy',
+  bal: 'economy',
+  bank: 'economy',
+  daily: 'economy',
+  work: 'economy',
+  fish: 'economy',
+  rob: 'economy',
+  loan: 'economy',
+  transfer: 'economy',
+  shop: 'economy',
+  buy: 'economy',
+  chest: 'economy',
+  ecotop: 'economy',
+
+  // Casino y Minijuegos
+  blackjack: 'games',
+  ruleta: 'games',
+  slots: 'games',
+  coinflip: 'games',
+  crash: 'games',
+  reactduel: 'games',
+
+  // Niveles, Perfiles y Rachas
+  level: 'level',
+  profile: 'level',
+  profileset: 'level',
+  badge: 'level',
+  leaderboard: 'level',
+  streak: 'level',
+  racha: 'level',
+  streaks: 'level',
+
+  // Boosters y Servidor
+  boosters: 'boost',
+  boostsxp: 'boost',
+  boostxp: 'boost',
+  boostercolors: 'boost',
+
+  // Configuración del Servidor
+  setchannel: 'config',
+  setboostchannel: 'config',
+  setbumpreminder: 'config',
+  leveladmin: 'config',
+  levelrewards: 'config',
+  leveladdchannel: 'config',
+  levelremovechannel: 'config',
+  levellistchannels: 'config',
+  toproles: 'config',
+  menuconfig: 'config',
+
+  // Utilidades y Comunidad
+  help: 'utility',
+  info: 'utility',
+  userinfo: 'utility',
+  sorteo: 'utility',
+  reminder: 'utility',
+  bumpreminderinfo: 'utility',
+  manage: 'utility',
+  ping: 'utility'
 };
 
 function getCommandExample(cmdName) {
   const examples = {
+    // Admin
+    ban: '/ban usuario: @usuario razon: Spam masivo dias_borrado: 1',
+    unban: '/unban id: 123456789012345678 razon: Apelación aceptada',
+    kick: '/kick usuario: @usuario razon: Incumplimiento de normas',
+    timeout: '/timeout usuario: @usuario minutos: 15 razon: Falta de respeto',
+    warn: '/warn accion: agregar usuario: @usuario razon: Advertencia por flood',
+    clear: '/clear cantidad: 50 usuario: @usuario',
+    automod: '/automod estado: activar canal_logs: #logs-automod',
+    audit: '/audit canal: #auditoria-mensajes',
+    ecoadmin: '/ecoadmin dar usuario: @usuario cantidad: 5000',
+    reload: '/reload',
+    restart: '/restart',
+
+    // Economy
+    balance: '/balance usuario: @usuario',
+    bal: '/bal',
+    bank: '/bank accion: depositar cantidad: 2000',
+    daily: '/daily',
+    work: '/work',
+    fish: '/fish',
+    rob: '/rob usuario: @usuario',
+    loan: '/loan accion: solicitar monto: 10000 cuotas: 5',
+    transfer: '/transfer usuario: @amigo cantidad: 1500',
+    shop: '/shop',
+    buy: '/buy item: caña_pesca cantidad: 1',
+    chest: '/chest tipo: mistico',
+    ecotop: '/ecotop',
+
+    // Games
+    blackjack: '/blackjack apuesta: 1000',
     ruleta: '/ruleta apuesta: 500 opcion: rojo',
-    coinflip: '/coinflip apuesta: 100 cara_cruz: cara',
-    timeout: '/timeout usuario: @miembro minutos: 10 razon: spam',
-    clear: '/clear cantidad: 50',
-    transfer: '/transfer usuario: @amigo cantidad: 1000',
-    profile: '/profile usuario: @miembro',
-    streak: '/streak',
+    slots: '/slots apuesta: 250',
+    coinflip: '/coinflip apuesta: 500 cara_cruz: cara',
+    crash: '/crash apuesta: 1000',
+    reactduel: '/reactduel usuario: @rival apuesta: 2000',
+
+    // Level & Profile & Streak
+    level: '/level usuario: @usuario',
+    profile: '/profile usuario: @usuario',
+    profileset: '/profileset fondo_url: https://... color_acento: #ff6b81 color_barra: #4ecdc4',
+    badge: '/badge accion: equipar id: booster_oro slot: 1',
     leaderboard: '/leaderboard periodo: semanal categoria: general',
-    balance: '/balance usuario: @miembro'
+    streak: '/streak',
+    racha: '/racha',
+    streaks: '/streaks',
+
+    // Boost
+    boosters: '/boosters',
+    boostsxp: '/boostsxp',
+    boostercolors: '/boostercolors canal: #roles-colores',
+
+    // Config
+    setchannel: '/setchannel tipo: logs canal: #canal-logs',
+    setboostchannel: '/setboostchannel canal: #anuncios-boosts',
+    setbumpreminder: '/setbumpreminder canal: #bump rol: @BumpReminder',
+    leveladmin: '/leveladmin opcion: xp_rate valor: 1.5',
+    levelrewards: '/levelrewards accion: agregar nivel: 10 rol: @Nivel10',
+    leveladdchannel: '/leveladdchannel canal: #general multiplicador: 2',
+    levelremovechannel: '/levelremovechannel canal: #general',
+    levellistchannels: '/levellistchannels',
+    toproles: '/toproles tipo: top1 rol: @Top1Chat',
+    menuconfig: '/menuconfig',
+
+    // Utility
+    help: '/help comando: profile',
+    info: '/info usuario: @usuario',
+    userinfo: '/userinfo usuario: @usuario',
+    sorteo: '/sorteo duracion: 2h ganadores: 1 premio: Nitro Classic',
+    reminder: '/reminder tiempo: 30m mensaje: Estudiar para el examen',
+    bumpreminderinfo: '/bumpreminderinfo',
+    manage: '/manage'
   };
   return examples[cmdName] || `/${cmdName}`;
 }
 
-function getPermissionBadge(catId) {
-  if (catId === 'admin' || catId === 'config') return '`🛡️ Administrador / Moderador`';
+function getPermissionBadge(catId, cmdName) {
+  if (['reload', 'restart', 'testboost', 'testbutton', 'testsecurity'].includes(cmdName)) {
+    return '`👑 Bot Owner / Desarrollador`';
+  }
+  if (catId === 'admin' || catId === 'config' || cmdName === 'ecoadmin' || cmdName === 'leveladmin' || cmdName === 'boostercolors') {
+    return '`🛡️ Administrador / Moderador`';
+  }
   return '`👤 Todos los miembros`';
 }
 
@@ -161,7 +297,7 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
       .setColor(catData.color)
       .addFields(
         { name: '📂 Módulo', value: `**${catData.name}**`, inline: true },
-        { name: '🔒 Permisos Requeridos', value: getPermissionBadge(catId), inline: true },
+        { name: '🔒 Permisos Requeridos', value: getPermissionBadge(catId, cmdName), inline: true },
         { name: '💻 Sintaxis', value: `\`\`\`bash\n${cmd.usage || `/${cmdName}`}\n\`\`\``, inline: false },
         { name: '💡 Ejemplo de Uso', value: `\`\`\`bash\n${getCommandExample(cmdName)}\n\`\`\``, inline: false }
       )
