@@ -51,13 +51,18 @@ async function handleProfileInteraction(interaction) {
     const selected = interaction.values[0];
     const profiles = readProfiles();
     const user = ensureUser(profiles, guildId, userId);
+    const { saveUserProfileBackground, deleteUserProfileBackground } = require('../image/imageService');
 
     if (selected === 'bg_preset_none') {
       user.bgUrl = '';
+      await deleteUserProfileBackground(guildId, userId);
     } else {
       const presetId = selected.replace('bg_preset_', '');
       const wallpaper = WALLPAPER_PRESETS[presetId];
-      if (wallpaper) user.bgUrl = wallpaper.url;
+      if (wallpaper) {
+        user.bgUrl = wallpaper.url;
+        await saveUserProfileBackground(guildId, userId, wallpaper.url);
+      }
     }
 
     writeProfiles(profiles);
@@ -243,23 +248,27 @@ async function handleProfileInteraction(interaction) {
       const url = interaction.fields.getTextInputValue('url_input').trim();
       const profiles = readProfiles();
       const user = ensureUser(profiles, guildId, userId);
+      const { saveUserProfileBackground, deleteUserProfileBackground } = require('../image/imageService');
 
       if (!url) {
         user.bgUrl = '';
+        await deleteUserProfileBackground(guildId, userId);
         writeProfiles(profiles);
         const panel = buildCustomizationPanel(guildId, userId, member);
-        return interaction.reply({ content: '🖼️ Fondo eliminado.', embeds: [panel.embed], components: panel.components, ephemeral: true });
+        return interaction.reply({ content: '🖼️ Fondo eliminado (Fondo oscuro por defecto).', embeds: [panel.embed], components: panel.components, ephemeral: true });
       }
 
-      const validated = normalizeExternalImageUrl(url);
-      if (!validated) {
-        return interaction.reply({ content: '❌ La URL ingresada no es válida o segura.', ephemeral: true });
+      await interaction.deferReply({ ephemeral: true });
+
+      const saveResult = await saveUserProfileBackground(guildId, userId, url);
+      if (!saveResult.ok) {
+        return interaction.editReply({ content: `❌ Error al cargar la imagen: ${saveResult.error || 'URL no válida.'}` });
       }
 
-      user.bgUrl = validated;
+      user.bgUrl = url;
       writeProfiles(profiles);
       const panel = buildCustomizationPanel(guildId, userId, member);
-      return interaction.reply({ content: '✅ Fondo personalizado guardado con éxito.', embeds: [panel.embed], components: panel.components, ephemeral: true });
+      return interaction.editReply({ content: `✅ Fondo personalizado verificado y guardado con éxito (${Math.round((saveResult.size || 0) / 1024)} KB).`, embeds: [panel.embed], components: panel.components });
     }
   }
 

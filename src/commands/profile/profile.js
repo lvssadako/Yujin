@@ -217,11 +217,12 @@ module.exports = {
       roundRect(ctx, panelX, panelY, panelW, panelH, radius);
       ctx.fill();
 
-      // Wallpaper personalizado
+      // Wallpaper personalizado (Desde caché local ultrarrápido o descarga segura)
       const userBgUrl = getProfileBackgroundUrl(profileData);
       if (userBgUrl) {
         try {
-          const buf = await fetchBuffer(userBgUrl);
+          const { getUserProfileBackgroundBuffer } = require('../../services/image/imageService');
+          const buf = await getUserProfileBackgroundBuffer(interaction.guildId, targetUser.id, userBgUrl);
           if (buf) {
             const bgImg = await loadImage(buf);
             if (bgImg) {

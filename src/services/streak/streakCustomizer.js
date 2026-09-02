@@ -238,21 +238,25 @@ async function handleStreakCustomizerInteraction(interaction) {
   if (interaction.isModalSubmit()) {
     if (interaction.customId === 'streak_modal_bg_url') {
       const url = interaction.fields.getTextInputValue('streak_url_input').trim();
+      const { saveUserStreakBackground, deleteUserStreakBackground } = require('../image/imageService');
 
       if (!url) {
+        await deleteUserStreakBackground(guildId, userId);
         setGlobalStreakCustomization(userId, { streakBgUrl: '', streakTemplate: 'none' });
         const panel = buildStreakCustomizationPanel(guildId, userId, member);
         return interaction.reply({ content: '🖼️ Fondo eliminado. Ahora se usa el diseño base.', embeds: [panel.embed], components: panel.components, ephemeral: true });
       }
 
-      const validated = normalizeExternalImageUrl(url);
-      if (!validated) {
-        return interaction.reply({ content: '❌ La URL ingresada no es válida o segura.', ephemeral: true });
+      await interaction.deferReply({ ephemeral: true });
+
+      const saveResult = await saveUserStreakBackground(guildId, userId, url);
+      if (!saveResult.ok) {
+        return interaction.editReply({ content: `❌ Error al cargar la imagen: ${saveResult.error || 'URL no válida.'}` });
       }
 
-      setGlobalStreakCustomization(userId, { streakBgUrl: validated, streakTemplate: 'custom' });
+      setGlobalStreakCustomization(userId, { streakBgUrl: url, streakTemplate: 'custom' });
       const panel = buildStreakCustomizationPanel(guildId, userId, member);
-      return interaction.reply({ content: '✅ Fondo global de racha actualizado con éxito.', embeds: [panel.embed], components: panel.components, ephemeral: true });
+      return interaction.editReply({ content: `✅ Fondo global de racha verificado y guardado con éxito (${Math.round((saveResult.size || 0) / 1024)} KB).`, embeds: [panel.embed], components: panel.components });
     }
 
     if (interaction.customId === 'streak_modal_accent') {

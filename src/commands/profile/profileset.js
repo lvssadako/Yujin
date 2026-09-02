@@ -229,24 +229,28 @@ module.exports = {
       }
     }
 
+    const { saveUserProfileBackground, deleteUserProfileBackground } = require('../../services/image/imageService');
+
     if (bgPreset) {
       if (bgPreset === 'none') {
         user.bgUrl = '';
-        changes.push('🖼️ **Fondo:** Eliminado (Fondo por defecto).');
+        await deleteUserProfileBackground(interaction.guildId, interaction.user.id);
+        changes.push('🖼️ **Fondo:** Eliminado (Fondo oscuro por defecto).');
       } else if (WALLPAPER_PRESETS[bgPreset]) {
         user.bgUrl = WALLPAPER_PRESETS[bgPreset].url;
+        await saveUserProfileBackground(interaction.guildId, interaction.user.id, user.bgUrl);
         changes.push(`🖼️ **Fondo:** ${WALLPAPER_PRESETS[bgPreset].name}`);
       }
     } else if (bgUrl) {
       if (!canUseCustomUrl(interaction.member, lvlData, user.streakDays)) {
         return interaction.editReply('🔒 **Acceso Denegado:** Los fondos personalizados por URL requieren ser **Booster**, tener **Nivel 5+** o una **Racha de 7+ días**.');
       }
-      const validatedBg = normalizeExternalImageUrl(bgUrl);
-      if (!validatedBg) {
-        return interaction.editReply('❌ La URL de imagen no es válida o segura. Sube tu imagen a sitios públicos como Catbox o Discord.');
+      const saveResult = await saveUserProfileBackground(interaction.guildId, interaction.user.id, bgUrl);
+      if (!saveResult.ok) {
+        return interaction.editReply(`❌ Error con la URL de fondo: ${saveResult.error || 'No se pudo procesar la imagen.'}`);
       }
-      user.bgUrl = validatedBg;
-      changes.push('🖼️ **Fondo URL:** Actualizado con éxito.');
+      user.bgUrl = bgUrl.trim();
+      changes.push(`🖼️ **Fondo URL:** Guardado y verificado con éxito (${Math.round((saveResult.size || 0) / 1024)} KB).`);
     }
 
     if (opacity !== null) {

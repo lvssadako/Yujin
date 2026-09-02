@@ -117,7 +117,8 @@ async function generateStreakCard(user, status, botName = 'Bot') {
   // 2. Imagen de fondo / Wallpaper personalizado (si está configurado)
   if (streakBgUrl) {
     try {
-      const bgBuf = await fetchAvatarBuffer(streakBgUrl);
+      const { getUserStreakBackgroundBuffer } = require('../image/imageService');
+      const bgBuf = await getUserStreakBackgroundBuffer('global', user.id, streakBgUrl);
       if (bgBuf) {
         const bgImg = await loadImage(bgBuf);
         ctx.save();
