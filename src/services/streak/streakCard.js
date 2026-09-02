@@ -197,11 +197,12 @@ async function generateStreakCard(user, status, botName = 'Bot') {
     ctx.fillText('AVATAR', avX + 15, avY + 75);
   }
 
-  // 6. Nombre de usuario
+  // 6. Nombre de usuario (Display Name / Nickname)
   const textX = avX + avSize + 28;
   ctx.fillStyle = '#FFFFFF';
   ctx.font = 'bold 34px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
-  const usernameDisplay = user.username.length > 18 ? user.username.slice(0, 17) + '…' : user.username;
+  const rawName = user.displayName || user.globalName || user.username || 'Usuario';
+  const usernameDisplay = rawName.length > 18 ? rawName.slice(0, 17) + '…' : rawName;
   ctx.fillText(usernameDisplay, textX, avY + 40);
 
   // Badge del Nivel de Fuego (Pastilla superior derecha)

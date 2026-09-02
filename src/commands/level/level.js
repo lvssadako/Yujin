@@ -4,9 +4,23 @@ const path = require('path');
 const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const { readLevels, xpToNext, getUserRank } = require('../../services/level').levelService;
+const { readProfiles, ensureUser } = require('../../utils/profileStore');
 const { initFonts, FONT_FALLBACKS } = require('../../utils/canvasFontLoader');
 
 initFonts();
+
+function lightenHex(hex, amount = 0.35) {
+  try {
+    const h = String(hex || '#C45A78').replace('#', '');
+    const n = parseInt(h, 16);
+    let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    r = Math.min(255, Math.round(r + (255 - r) * amount));
+    g = Math.min(255, Math.round(g + (255 - g) * amount));
+    b = Math.min(255, Math.round(b + (255 - b) * amount));
+    const toHex = v => v.toString(16).padStart(2, '0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  } catch { return '#F8B5A0'; }
+}
 
 const dataDir = path.join(__dirname, '..', 'data');
 const levelsPath = path.join(dataDir, 'levels.json');
@@ -107,12 +121,25 @@ module.exports = {
         ctx.fill();
       }
 
-      // Username and tag
+      const member = interaction.guild ? await interaction.guild.members.fetch(targetUser.id).catch(() => null) : null;
+      const serverDisplayName = member?.displayName || targetUser.displayName || targetUser.globalName || targetUser.username;
+
+      const profiles = readProfiles();
+      const userProfile = ensureUser(profiles, guildId, targetUser.id);
+      const barColor = userProfile.barColor || userProfile.accent || '#C45A78';
+
+      // Username and tag (Server Nickname con auto-escalado)
       const nameX = avX + avSize + 28;
       const nameY = avY + 70;
       ctx.fillStyle = '#FBE5E3';
-      ctx.font = `bold 50px ${FONT_FALLBACKS}`;
-      ctx.fillText(`${targetUser.username}`, nameX, nameY);
+      let nameSize = 50;
+      ctx.font = `bold ${nameSize}px ${FONT_FALLBACKS}`;
+      const maxNameW = panelW - (nameX - panelX) - 180;
+      while (ctx.measureText(serverDisplayName).width > maxNameW && nameSize > 22) {
+        nameSize -= 2;
+        ctx.font = `bold ${nameSize}px ${FONT_FALLBACKS}`;
+      }
+      ctx.fillText(serverDisplayName, nameX, nameY);
 
       // Rank badge
       ctx.fillStyle = '#E6B655';
@@ -123,10 +150,10 @@ module.exports = {
       ctx.fillText(`Rank #${rank}`, panelX + panelW - 132, avY + 20);
 
       // Level box
-      ctx.fillStyle = '#C45A78';
+      ctx.fillStyle = barColor;
       roundRect(ctx, panelX + panelW - 150, avY + 50, 110, 44, 10);
       ctx.fill();
-      ctx.fillStyle = '#44011fff';
+      ctx.fillStyle = '#ffffff';
       ctx.font = `bold 20px ${FONT_FALLBACKS}`;
       ctx.fillText(`Nivel ${userData.level}`, panelX + panelW - 132, avY + 80);
 
@@ -142,11 +169,11 @@ module.exports = {
       ctx.fill();
 
       // fill
-      const fillW = Math.max(0, Math.min(1, (userData.xp || 0) / need)) * barW;
+      const fillW = Math.max(0, Math.min(1, (userData.xp || 0) / (need || 1))) * barW;
       if (fillW > 0) {
         const grad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
-        grad.addColorStop(0, '#C45A78');
-        grad.addColorStop(1, '#F8B5A0');
+        grad.addColorStop(0, barColor);
+        grad.addColorStop(1, lightenHex(barColor, 0.35));
         ctx.fillStyle = grad;
         roundRect(ctx, barX, barY, fillW, barH, barH/2);
         ctx.fill();

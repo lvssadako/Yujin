@@ -109,6 +109,28 @@ async function handleProfileInteraction(interaction) {
     return interaction.showModal(modal);
   }
 
+  // 5.5. Botón: Color de Barra de Progreso (Modal)
+  if (interaction.isButton() && interaction.customId === 'profile_btn_bar_color') {
+    const profiles = readProfiles();
+    const user = ensureUser(profiles, guildId, userId);
+
+    const modal = new ModalBuilder()
+      .setCustomId('profile_modal_bar_color')
+      .setTitle('📊 Color de Barra de Progreso');
+
+    const input = new TextInputBuilder()
+      .setCustomId('bar_color_input')
+      .setLabel('Código Hex o "default" (#RRGGBB)')
+      .setStyle(TextInputStyle.Short)
+      .setValue(user.barColor || '')
+      .setMaxLength(7)
+      .setPlaceholder('Ej: #00FFCC o default')
+      .setRequired(false);
+
+    modal.addComponents(new ActionRowBuilder().addComponents(input));
+    return interaction.showModal(modal);
+  }
+
   // 6. Botón: Fondo Custom URL (Modal)
   if (interaction.isButton() && interaction.customId === 'profile_btn_custom_bg') {
     const profiles = readProfiles();
@@ -191,6 +213,29 @@ async function handleProfileInteraction(interaction) {
         return interaction.reply({ content: `✅ Color acento actualizado a: **\`${cleanHex}\`**`, embeds: [panel.embed], components: panel.components, ephemeral: true });
       } else {
         return interaction.reply({ content: '❌ Formato hexadecimal no válido (usa ej. `#FF0055`).', ephemeral: true });
+      }
+    }
+
+    if (interaction.customId === 'profile_modal_bar_color') {
+      const barInput = interaction.fields.getTextInputValue('bar_color_input').trim();
+      const profiles = readProfiles();
+      const user = ensureUser(profiles, guildId, userId);
+
+      if (!barInput || barInput.toLowerCase() === 'default' || barInput.toLowerCase() === 'none' || barInput.toLowerCase() === 'reset') {
+        user.barColor = '';
+        writeProfiles(profiles);
+        const panel = buildCustomizationPanel(guildId, userId, member);
+        return interaction.reply({ content: '📊 Color de barra restablecido a color de acento por defecto.', embeds: [panel.embed], components: panel.components, ephemeral: true });
+      }
+
+      if (/^#?[0-9a-f]{6}$/i.test(barInput)) {
+        const cleanHex = barInput.startsWith('#') ? barInput : '#' + barInput;
+        user.barColor = cleanHex;
+        writeProfiles(profiles);
+        const panel = buildCustomizationPanel(guildId, userId, member);
+        return interaction.reply({ content: `✅ Color de barra actualizado a: **\`${cleanHex}\`**`, embeds: [panel.embed], components: panel.components, ephemeral: true });
+      } else {
+        return interaction.reply({ content: '❌ Formato hexadecimal no válido (usa ej. `#00FFCC` o escribe `default`).', ephemeral: true });
       }
     }
 

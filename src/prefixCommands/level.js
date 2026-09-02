@@ -6,9 +6,23 @@ const logger = require('../utils/logger');
 
 const dataDir = path.join(__dirname, '..', '..', 'data');
 const { readLevels, ensureUserData, xpToNext, getUserRank } = require('../services/level').levelService;
-const { initFonts } = require('../utils/canvasFontLoader');
+const { readProfiles, ensureUser } = require('../utils/profileStore');
+const { initFonts, FONT_FALLBACKS } = require('../utils/canvasFontLoader');
 
 initFonts();
+
+function lightenHex(hex, amount = 0.35) {
+  try {
+    const h = String(hex || '#C45A78').replace('#', '');
+    const n = parseInt(h, 16);
+    let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    r = Math.min(255, Math.round(r + (255 - r) * amount));
+    g = Math.min(255, Math.round(g + (255 - g) * amount));
+    b = Math.min(255, Math.round(b + (255 - b) * amount));
+    const toHex = v => v.toString(16).padStart(2, '0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  } catch { return '#F8B5A0'; }
+}
 
 const { normalizeExternalImageUrl } = require('../utils/urlSafety');
 
@@ -146,27 +160,40 @@ module.exports = {
         ctx.fill();
       }
 
-      // Username
+      const targetMember = await message.guild.members.fetch(targetUser.id).catch(() => null);
+      const serverDisplayName = targetMember?.displayName || targetUser.displayName || targetUser.globalName || targetUser.username;
+
+      const profiles = readProfiles();
+      const userProfile = ensureUser(profiles, message.guild.id, targetUser.id);
+      const barColor = userProfile.barColor || userProfile.accent || '#C45A78';
+
+      // Username (Server Nickname con auto-escalado)
       const nameX = avX + avSize + 28;
       const nameY = avY + 70;
       ctx.fillStyle = '#FBE5E3';
-      ctx.font = 'bold 50px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
-      ctx.fillText(`${targetUser.username}`, nameX, nameY);
+      let nameSize = 50;
+      ctx.font = `bold ${nameSize}px ${FONT_FALLBACKS}`;
+      const maxNameW = panelW - (nameX - panelX) - 180;
+      while (ctx.measureText(serverDisplayName).width > maxNameW && nameSize > 22) {
+        nameSize -= 2;
+        ctx.font = `bold ${nameSize}px ${FONT_FALLBACKS}`;
+      }
+      ctx.fillText(serverDisplayName, nameX, nameY);
 
       // Rank box
       ctx.fillStyle = '#FFB86B';
       roundRect(ctx, panelX + panelW - 150, avY - 10, 110, 48, 12);
       ctx.fill();
       ctx.fillStyle = '#0b0c0c';
-      ctx.font = 'bold 20px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
+      ctx.font = `bold 20px ${FONT_FALLBACKS}`;
       ctx.fillText(`Rank #${rank}`, panelX + panelW - 132, avY + 20);
 
       // Level box
-      ctx.fillStyle = '#C45A78';
+      ctx.fillStyle = barColor;
       roundRect(ctx, panelX + panelW - 150, avY + 50, 110, 44, 10);
       ctx.fill();
-      ctx.fillStyle = '#44011fff';
-      ctx.font = 'bold 20px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold 20px ${FONT_FALLBACKS}`;
       ctx.fillText(`Level ${userData.level || 0}`, panelX + panelW - 132, avY + 80);
 
       // Progress bar
@@ -179,23 +206,23 @@ module.exports = {
       roundRect(ctx, barX, barY, barW, barH, barH / 2);
       ctx.fill();
 
-      const fillW = Math.max(0, Math.min(1, (userData.xp || 0) / need)) * barW;
+      const fillW = Math.max(0, Math.min(1, (userData.xp || 0) / (need || 1))) * barW;
       if (fillW > 0) {
         const grad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
-        grad.addColorStop(0, '#C45A78');
-        grad.addColorStop(1, '#F8B5A0');
+        grad.addColorStop(0, barColor);
+        grad.addColorStop(1, lightenHex(barColor, 0.35));
         ctx.fillStyle = grad;
         roundRect(ctx, barX, barY, fillW, barH, barH / 2);
         ctx.fill();
       }
 
       // Progress text
-      ctx.font = '17px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
+      ctx.font = `17px ${FONT_FALLBACKS}`;
       ctx.fillStyle = '#D7B8C2';
       ctx.fillText(`${userData.xp || 0} / ${need} XP • ${percent}%`, barX + barW + 12, barY + barH - 6);
 
       // Footer (server name)
-      ctx.font = '20px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
+      ctx.font = `20px ${FONT_FALLBACKS}`;
       ctx.fillStyle = '#D7B8C2';
       ctx.fillText(`${message.guild.name}`, panelX + 36, panelY + panelH - 16);
 

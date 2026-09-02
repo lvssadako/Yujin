@@ -2,6 +2,7 @@ const { SlashCommandBuilder, AttachmentBuilder, ActionRowBuilder, ButtonBuilder,
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const logger = require('../../utils/logger');
 const { levelService } = require('../../services/level');
+const { readProfiles, ensureUser } = require('../../utils/profileStore');
 const { normalizeExternalImageUrl } = require('../../utils/urlSafety');
 const { initFonts } = require('../../utils/canvasFontLoader');
 
@@ -164,19 +165,30 @@ async function renderLeaderboardCanvas(guild, leaderboardEntries, timeframe, cat
     let avatarBuf = null;
     let username = entry.id;
 
+    const profiles = readProfiles();
+    const userProfile = ensureUser(profiles, guild.id, entry.id);
+    const userBarColor = userProfile.barColor || userProfile.accent || THEME.accentA;
+
     try {
-      const user = await client.users.fetch(entry.id).catch(() => null);
-      if (user) {
-        username = user.displayName || user.username;
-        const avatarUrl = user.displayAvatarURL({ extension: 'png', size: 256 });
+      const member = guild.members.cache.get(entry.id) || await guild.members.fetch(entry.id).catch(() => null);
+      if (member) {
+        username = member.displayName || member.user?.displayName || member.user?.username;
+        const avatarUrl = member.user.displayAvatarURL({ extension: 'png', size: 256 });
         avatarBuf = await fetchAvatarBuffer(avatarUrl);
+      } else {
+        const user = await client.users.fetch(entry.id).catch(() => null);
+        if (user) {
+          username = user.displayName || user.username;
+          const avatarUrl = user.displayAvatarURL({ extension: 'png', size: 256 });
+          avatarBuf = await fetchAvatarBuffer(avatarUrl);
+        }
       }
     } catch {}
 
     const borderColor = (i < 3) ? THEME.rankColors[i] : '#35373C';
     await drawCircularAvatar(ctx, avatarBuf, avX, avY, avatarSize, borderColor);
 
-    // Username
+    // Username (Server Display Name)
     const nameX = avX + avatarSize + 22;
     const nameY = y + 45;
     ctx.fillStyle = THEME.text;
@@ -219,7 +231,7 @@ async function renderLeaderboardCanvas(guild, leaderboardEntries, timeframe, cat
       const fillW = Math.floor(percent * barW);
       if (fillW > 0) {
         const g = ctx.createLinearGradient(barX, 0, barX + barW, 0);
-        g.addColorStop(0, THEME.accentA);
+        g.addColorStop(0, userBarColor);
         g.addColorStop(1, THEME.accentB);
         ctx.fillStyle = g;
         roundRect(ctx, barX, barY, fillW, barH, 6);

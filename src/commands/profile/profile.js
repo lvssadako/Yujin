@@ -172,6 +172,7 @@ module.exports = {
       const profileData = {
         title: userProfile.title || '',
         accent: userProfile.accent || '#e94560',
+        barColor: userProfile.barColor || userProfile.accent || '#e94560',
         bgUrl: userProfile.bgUrl || '',
         bgOpacity: typeof userProfile.bgOpacity === 'number' ? userProfile.bgOpacity : 0.75,
         equippedBadges: userProfile.equippedBadges || [],
@@ -348,10 +349,11 @@ module.exports = {
       const rightAreaLimit = panelX + panelW - Math.floor(40 * SCALE);
       const maxNameWidth = (featuredBadge ? rightAreaLimit - 150 * SCALE : rightAreaLimit) - infoX - (isBooster ? 130 * SCALE : 0);
 
-      // Nombre del usuario con auto-escalado
+      // Nombre del usuario dentro del servidor (Server display name / nickname)
+      const serverDisplayName = member?.displayName || targetUser.displayName || targetUser.globalName || targetUser.username;
       ctx.fillStyle = '#ffffff';
-      const actualNameSize = drawAutoScaledText(ctx, targetUser.username, infoX, infoStartY, maxNameWidth, Math.floor(38 * SCALE), 'bold');
-      const nameWidth = ctx.measureText(targetUser.username).width;
+      const actualNameSize = drawAutoScaledText(ctx, serverDisplayName, infoX, infoStartY, maxNameWidth, Math.floor(38 * SCALE), 'bold');
+      const nameWidth = ctx.measureText(serverDisplayName).width;
 
       // Badge de Booster si aplica
       if (isBooster) {
@@ -556,9 +558,10 @@ module.exports = {
       // Relleno de progreso
       const fillW = Math.max(0, Math.min(1, (userData.xp || 0) / (need || 1))) * barW;
       if (fillW > 0) {
+        const barColor = profileData.barColor || profileData.accent;
         const fillGrad = ctx.createLinearGradient(barX, barY, barX + fillW, barY);
-        fillGrad.addColorStop(0, profileData.accent);
-        fillGrad.addColorStop(1, lightenHex(profileData.accent, 0.35));
+        fillGrad.addColorStop(0, barColor);
+        fillGrad.addColorStop(1, lightenHex(barColor, 0.35));
 
         ctx.save();
         ctx.fillStyle = fillGrad;

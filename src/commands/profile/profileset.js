@@ -20,9 +20,10 @@ function buildCustomizationPanel(guildId, userId, member) {
   const lvlData = ensureUserData(levels, guildId, userId);
 
   const isUnlocked = canUseCustomUrl(member, lvlData, user.streakDays);
+  const serverName = member?.displayName || member?.user?.displayName || member?.user?.username || 'Usuario';
 
   const embed = new EmbedBuilder()
-    .setAuthor({ name: `🎨 Estudio de Personalización de Perfil: ${member.user.username}`, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
+    .setAuthor({ name: `🎨 Estudio de Personalización de Perfil: ${serverName}`, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
     .setColor(user.accent || '#E94560')
     .setDescription('Personaliza cada aspecto de tu tarjeta de perfil visual en tiempo real usando los controles abajo.')
     .addFields(
@@ -34,6 +35,11 @@ function buildCustomizationPanel(guildId, userId, member) {
       {
         name: '🎨 Color de Acento',
         value: `> **\`${user.accent || '#E94560'}\`**`,
+        inline: true
+      },
+      {
+        name: '📊 Color de Barra',
+        value: user.barColor ? `> **\`${user.barColor}\`**` : '> *Igual al color de acento*',
         inline: true
       },
       {
@@ -90,17 +96,22 @@ function buildCustomizationPanel(guildId, userId, member) {
       .addOptions(bgOptions)
   );
 
-  // Botones de acción
+  // Botones de acción (5 botones máximo por ActionRow)
   const btnRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('profile_btn_title')
-      .setLabel('Cambiar Título')
+      .setLabel('Título')
       .setEmoji('🏷️')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId('profile_btn_hex')
       .setLabel('Color Hex')
       .setEmoji('🎨')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('profile_btn_bar_color')
+      .setLabel('Color Barra')
+      .setEmoji('📊')
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId('profile_btn_custom_bg')
@@ -140,6 +151,7 @@ module.exports = {
         )
     )
     .addStringOption(o => o.setName('color_hex').setDescription('Color acento personalizado (ej: #00ffaa)').setRequired(false))
+    .addStringOption(o => o.setName('color_barra').setDescription('Color de barra de progreso (ej: #00ffaa, o "default")').setRequired(false))
     .addStringOption(o =>
       o.setName('fondo_preset')
         .setDescription('Elige un wallpaper predefinido')
@@ -160,7 +172,7 @@ module.exports = {
 
   async execute(interaction) {
     // Si no se pasaron opciones, abrir el panel interactivo visual
-    const hasOptions = ['titulo', 'tema', 'color_hex', 'fondo_preset', 'fondo_url', 'opacidad'].some(
+    const hasOptions = ['titulo', 'tema', 'color_hex', 'color_barra', 'fondo_preset', 'fondo_url', 'opacidad'].some(
       opt => interaction.options.get(opt) !== null
     );
 
@@ -179,6 +191,7 @@ module.exports = {
     const title = interaction.options.getString('titulo');
     const theme = interaction.options.getString('tema');
     const hex = interaction.options.getString('color_hex');
+    const barColorOption = interaction.options.getString('color_barra');
     const bgPreset = interaction.options.getString('fondo_preset');
     let bgUrl = interaction.options.getString('fondo_url');
     const opacity = interaction.options.getInteger('opacidad');
@@ -199,6 +212,20 @@ module.exports = {
         changes.push(`🎨 **Color Hex:** \`${user.accent}\``);
       } else {
         return interaction.editReply('❌ Formato de color hexadecimal inválido. Usa formato `#RRGGBB` (ej: `#00ffcc`).');
+      }
+    }
+
+    if (barColorOption !== null) {
+      const lower = barColorOption.trim().toLowerCase();
+      if (lower === 'default' || lower === 'none' || lower === 'reset' || lower === '') {
+        user.barColor = '';
+        changes.push('📊 **Color de Barra:** Restablecido a color de acento.');
+      } else if (/^#?[0-9a-f]{6}$/i.test(barColorOption.trim())) {
+        const cleanBarHex = barColorOption.trim().startsWith('#') ? barColorOption.trim() : '#' + barColorOption.trim();
+        user.barColor = cleanBarHex;
+        changes.push(`📊 **Color de Barra:** \`${cleanBarHex}\``);
+      } else {
+        return interaction.editReply('❌ Formato de color de barra inválido. Usa formato `#RRGGBB` (ej: `#00ffcc`) o `default`.');
       }
     }
 
