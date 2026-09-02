@@ -5,8 +5,10 @@ const { SlashCommandBuilder, AttachmentBuilder, ActionRowBuilder, ButtonBuilder,
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const { readProfiles, ensureUser } = require('../../utils/profileStore');
 const { readConfig } = require('../../utils/configCache');
-const { normalizeExternalImageUrl } = require('../../utils/urlSafety');
 const { readLevels, ensureUserData, xpToNext, getUserRank } = require('../../services/level').levelService;
+const { initFonts, FONT_FALLBACKS } = require('../../utils/canvasFontLoader');
+
+initFonts();
 
 // Descargar buffer de imagen de forma limpia y directa
 async function fetchBuffer(url) {

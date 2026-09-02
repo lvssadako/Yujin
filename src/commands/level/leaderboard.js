@@ -3,6 +3,9 @@ const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const logger = require('../../utils/logger');
 const { levelService } = require('../../services/level');
 const { normalizeExternalImageUrl } = require('../../utils/urlSafety');
+const { initFonts } = require('../../utils/canvasFontLoader');
+
+initFonts();
 
 const THEME = {
   panel: '#1E1F22',

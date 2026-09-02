@@ -5,8 +5,10 @@ const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const logger = require('../utils/logger');
 
 const dataDir = path.join(__dirname, '..', '..', 'data');
-const levelsPath = path.join(dataDir, 'levels.json');
 const { readLevels, ensureUserData, xpToNext, getUserRank } = require('../services/level').levelService;
+const { initFonts } = require('../utils/canvasFontLoader');
+
+initFonts();
 
 const { normalizeExternalImageUrl } = require('../utils/urlSafety');
 

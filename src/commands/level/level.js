@@ -4,7 +4,9 @@ const path = require('path');
 const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const { readLevels, xpToNext, getUserRank } = require('../../services/level').levelService;
-const { FONT_FALLBACKS } = require('../../utils/canvasFontLoader');
+const { initFonts, FONT_FALLBACKS } = require('../../utils/canvasFontLoader');
+
+initFonts();
 
 const dataDir = path.join(__dirname, '..', 'data');
 const levelsPath = path.join(dataDir, 'levels.json');

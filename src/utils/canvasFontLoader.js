@@ -7,41 +7,63 @@ const FONT_FALLBACKS = '"Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans
 
 let initialized = false;
 
+function walkDirForFonts(dir) {
+  if (!fs.existsSync(dir)) return [];
+  let results = [];
+  try {
+    const list = fs.readdirSync(dir);
+    for (const file of list) {
+      const fullPath = path.join(dir, file);
+      const stat = fs.statSync(fullPath);
+      if (stat && stat.isDirectory()) {
+        results = results.concat(walkDirForFonts(fullPath));
+      } else if (file.endsWith('.ttf') || file.endsWith('.otf') || file.endsWith('.ttc')) {
+        results.push(fullPath);
+      }
+    }
+  } catch {}
+  return results;
+}
+
 function initFonts() {
   if (initialized) return FONT_FALLBACKS;
   initialized = true;
 
   try {
-    // Si estamos en Linux / Unix, intentar cargar fuentes de directorios comunes del sistema
-    const linuxFontDirs = [
-      '/usr/share/fonts',
-      '/usr/local/share/fonts',
-      '/usr/share/fonts/truetype',
-      '/usr/share/fonts/opentype',
-      path.join(process.env.HOME || '', '.fonts'),
-      path.join(process.env.HOME || '', '.local/share/fonts')
-    ];
-
-    let loadedAny = false;
-    for (const fontDir of linuxFontDirs) {
-      if (fs.existsSync(fontDir)) {
-        try {
-          GlobalFonts.loadFontsFromDir(fontDir);
-          loadedAny = true;
-        } catch (e) {
-          logger.debug(`[FontLoader] No se pudo cargar desde ${fontDir}: ${e.message}`);
+    // 1. Registrar fuentes empaquetadas en assets/fonts/ con alias explícitos
+    const localFontsDir = path.join(__dirname, '..', '..', 'assets', 'fonts');
+    if (fs.existsSync(localFontsDir)) {
+      const localFiles = fs.readdirSync(localFontsDir);
+      for (const file of localFiles) {
+        if (file.endsWith('.ttf') || file.endsWith('.otf')) {
+          const fontPath = path.join(localFontsDir, file);
+          try {
+            GlobalFonts.registerFromPath(fontPath);
+            GlobalFonts.registerFromPath(fontPath, 'Segoe UI');
+            GlobalFonts.registerFromPath(fontPath, 'DejaVu Sans');
+            GlobalFonts.registerFromPath(fontPath, 'Arial');
+            GlobalFonts.registerFromPath(fontPath, 'sans-serif');
+          } catch (e) {
+            logger.debug(`[FontLoader] Error al registrar fuente local ${file}: ${e.message}`);
+          }
         }
       }
     }
 
-    // Directorio local de fuentes en assets/fonts si existiera
-    const localFontsDir = path.join(__dirname, '..', '..', 'assets', 'fonts');
-    if (fs.existsSync(localFontsDir)) {
-      try {
-        GlobalFonts.loadFontsFromDir(localFontsDir);
-        loadedAny = true;
-      } catch (e) {
-        logger.debug(`[FontLoader] Error cargando fuentes locales: ${e.message}`);
+    // 2. Escaneo recursivo de fuentes del sistema Linux / Unix
+    const linuxFontDirs = [
+      '/usr/share/fonts',
+      '/usr/local/share/fonts',
+      path.join(process.env.HOME || '', '.fonts'),
+      path.join(process.env.HOME || '', '.local/share/fonts')
+    ];
+
+    for (const fontDir of linuxFontDirs) {
+      const foundFonts = walkDirForFonts(fontDir);
+      for (const fontPath of foundFonts) {
+        try {
+          GlobalFonts.registerFromPath(fontPath);
+        } catch {}
       }
     }
 
