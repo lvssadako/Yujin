@@ -139,6 +139,13 @@ try {
 require('./events/bumpTimersLoader')(client);
 require('./services/giveaways/giveawayManager').init(client);
 
+// Servidor de Webhooks y Healthcheck para Azure y despliegues automáticos de GitHub
+try {
+  require('./services/webhook/githubWebhookService').init(client);
+} catch (e) {
+  logger.error('Error inicializando el servidor de Webhook de GitHub', { error: e.message });
+}
+
 // Prefijo de comandos
 const PREFIX = '&';
 
