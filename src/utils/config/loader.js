@@ -22,7 +22,19 @@ function loadAndValidateConfig(filePath) {
   const fullPath = path.resolve(filePath);
 
   if (!fs.existsSync(fullPath)) {
-    throw new Error(`Config file not found: ${fullPath}`);
+    const dir = path.dirname(fullPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const defaultConfig = {
+      bumpReminder: { enabled: false },
+      roleXpBonuses: {}
+    };
+    try {
+      fs.writeFileSync(fullPath, JSON.stringify(defaultConfig, null, 2), 'utf8');
+      logger.warn(`Config file not found at ${fullPath}. Generated default config template.`);
+      return validateConfig(defaultConfig);
+    } catch {
+      return validateConfig(defaultConfig);
+    }
   }
 
   try {
