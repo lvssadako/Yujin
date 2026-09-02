@@ -15,33 +15,35 @@ const { COLORS } = require('../../utils/embedFactory');
 
 // Directorio de imágenes fuentes de Yujin
 const SOURCES_DIR = path.join(__dirname, '..', '..', '..', 'sources');
+const AVATAR_PATH = path.join(SOURCES_DIR, 'avatar.jpg');
 const LOCAL_BANNER_PATH = path.join(__dirname, '..', '..', 'assets', 'banners', 'help_banner.jpg');
 const HELP_BANNER_URL = 'https://media1.giphy.com/media/bZCJM3KKbzqUIu9Mds/giphy.gif';
 
-function getHelpSourceImages() {
-  const sources = [];
+function getHelpBannerImages() {
+  const banners = [];
   try {
     if (fs.existsSync(SOURCES_DIR)) {
       const files = fs.readdirSync(SOURCES_DIR);
       for (const file of files) {
+        if (/^avatar\./i.test(file)) continue; // avatar.jpg se reserva para el thumbnail cuadrado
         if (/\.(jpe?g|png|webp|gif)$/i.test(file)) {
-          sources.push(path.join(SOURCES_DIR, file));
+          banners.push(path.join(SOURCES_DIR, file));
         }
       }
     }
   } catch {}
-  return sources;
+  return banners;
 }
 
 let helpImageRotationIndex = 0;
 
-function getNextRotatedHelpImage() {
-  const sources = getHelpSourceImages();
-  if (sources.length === 0) {
+function getNextRotatedBannerImage() {
+  const banners = getHelpBannerImages();
+  if (banners.length === 0) {
     return fs.existsSync(LOCAL_BANNER_PATH) ? LOCAL_BANNER_PATH : null;
   }
-  const imgPath = sources[helpImageRotationIndex % sources.length];
-  helpImageRotationIndex = (helpImageRotationIndex + 1) % sources.length;
+  const imgPath = banners[helpImageRotationIndex % banners.length];
+  helpImageRotationIndex = (helpImageRotationIndex + 1) % banners.length;
   return imgPath;
 }
 
@@ -149,14 +151,11 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
     const catData = CATEGORIES[catId];
     const desc = cmd.data?.description || cmd.description || 'Sin descripción disponible.';
 
-    const selectedBanner = getNextRotatedHelpImage();
+    const selectedBanner = getNextRotatedBannerImage();
     const files = [];
 
     const detailEmbed = new EmbedBuilder()
-      .setAuthor({ 
-        name: `Guía de Comando • ${cmdName.toUpperCase()}`, 
-        iconURL: client.user.displayAvatarURL() 
-      })
+      .setAuthor({ name: `Guía de Comando • ${cmdName.toUpperCase()}` })
       .setTitle(`${catData.emoji} \`/${cmdName}\``)
       .setDescription(`> *${desc}*`)
       .setColor(catData.color)
@@ -166,9 +165,13 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
         { name: '💻 Sintaxis', value: `\`\`\`bash\n${cmd.usage || `/${cmdName}`}\n\`\`\``, inline: false },
         { name: '💡 Ejemplo de Uso', value: `\`\`\`bash\n${getCommandExample(cmdName)}\n\`\`\``, inline: false }
       )
-      .setThumbnail(client.user.displayAvatarURL({ size: 256 }))
-      .setFooter({ text: `Yujin Bot • Módulo de ${catData.name}`, iconURL: client.user.displayAvatarURL() })
+      .setFooter({ text: `Yujin Bot • Módulo de ${catData.name}` })
       .setTimestamp();
+
+    if (fs.existsSync(AVATAR_PATH)) {
+      files.push(new AttachmentBuilder(AVATAR_PATH, { name: 'avatar.jpg' }));
+      detailEmbed.setThumbnail('attachment://avatar.jpg');
+    }
 
     if (selectedBanner && fs.existsSync(selectedBanner)) {
       files.push(new AttachmentBuilder(selectedBanner, { name: 'help_banner.jpg' }));
@@ -196,10 +199,7 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
   Object.keys(categorized).forEach(k => categorized[k].sort((a, b) => a.name.localeCompare(b.name)));
 
   const mainEmbed = new EmbedBuilder()
-    .setAuthor({ 
-      name: 'Centro de Ayuda y Comandos • Yujin', 
-      iconURL: client.user.displayAvatarURL() 
-    })
+    .setAuthor({ name: 'Centro de Ayuda y Comandos • Yujin' })
     .setTitle('✨ Explora todas las funciones')
     .setDescription(
       'Bienvenido al panel central de **Yujin**. Selecciona una categoría en el menú desplegable para ver la descripción de cada herramienta.\n\n' +
@@ -211,15 +211,20 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
       '> 💡 *¿Buscas un comando específico? Usa `/help comando: <nombre>`*'
     )
     .setColor(0x5865F2)
-    .setThumbnail(client.user.displayAvatarURL({ size: 256 }))
     .addFields(
       { name: '🗂️ Módulos', value: `\`${Object.keys(CATEGORIES).length} Categorías\``, inline: true },
       { name: '⚡ Comandos', value: `\`${commands.length} Disponibles\``, inline: true },
       { name: '📡 Estado', value: '`🟢 100% Operativo`', inline: true }
     );
 
-  const selectedBanner = getNextRotatedHelpImage();
+  const selectedBanner = getNextRotatedBannerImage();
   const files = [];
+
+  if (fs.existsSync(AVATAR_PATH)) {
+    files.push(new AttachmentBuilder(AVATAR_PATH, { name: 'avatar.jpg' }));
+    mainEmbed.setThumbnail('attachment://avatar.jpg');
+  }
+
   if (selectedBanner && fs.existsSync(selectedBanner)) {
     files.push(new AttachmentBuilder(selectedBanner, { name: 'help_banner.jpg' }));
     mainEmbed.setImage('attachment://help_banner.jpg');
@@ -228,10 +233,7 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
   }
 
   mainEmbed
-    .setFooter({ 
-      text: `Solicitado por ${user.tag}`, 
-      iconURL: user.displayAvatarURL() 
-    })
+    .setFooter({ text: `Solicitado por ${user.tag}` })
     .setTimestamp();
 
   const selectMenu = new StringSelectMenuBuilder()
@@ -285,20 +287,20 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
         : '*No hay comandos registrados en este módulo.*';
 
       const catEmbed = new EmbedBuilder()
-        .setAuthor({ 
-          name: `Directorio de Comandos • ${catData.name}`, 
-          iconURL: client.user.displayAvatarURL() 
-        })
+        .setAuthor({ name: `Directorio de Comandos • ${catData.name}` })
         .setTitle(`${catData.emoji} Módulo de ${catData.name}`)
         .setDescription(`> *${catData.desc}*\n\n${listFormatted}`)
         .setColor(catData.color)
-        .setThumbnail(client.user.displayAvatarURL({ size: 256 }))
         .addFields({
           name: '💡 ¿Cómo usar?',
           value: 'Escribe el comando con `/` o usa `/help comando: <nombre>` para ver ejemplos detallados.'
         })
-        .setFooter({ text: `${catCommands.length} comandos disponibles • Yujin Bot`, iconURL: client.user.displayAvatarURL() })
+        .setFooter({ text: `${catCommands.length} comandos disponibles • Yujin Bot` })
         .setTimestamp();
+
+      if (fs.existsSync(AVATAR_PATH)) {
+        catEmbed.setThumbnail('attachment://avatar.jpg');
+      }
 
       if (selectedBanner) {
         catEmbed.setImage('attachment://help_banner.jpg');
