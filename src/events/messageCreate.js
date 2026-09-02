@@ -12,7 +12,7 @@ const BUMP_SUCCESS_TEXT = 'Bump done!';
 const processedBumps = new Map();
 
 // Configuración de recordatorio (canal y rol)
-const configPath = path.join(__dirname, '..', 'data', 'bump_reminder.json');
+const configPath = path.join(__dirname, '..', '..', 'data', 'bump_reminder.json');
 function readConfig() {
   try { return JSON.parse(fs.readFileSync(configPath, 'utf8')); }
   catch { return {}; }

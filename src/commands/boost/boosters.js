@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 
-const dataDir = path.join(__dirname, '..', 'data');
+const dataDir = path.join(__dirname, '..', '..', '..', 'data');
 const boostsPath = path.join(dataDir, 'boosts.json');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 function readBoosts() { try { return JSON.parse(fs.readFileSync(boostsPath, 'utf8')); } catch { return {}; } }

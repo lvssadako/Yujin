@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+﻿const { SlashCommandBuilder } = require('discord.js');
 const { readProfiles, ensureUser } = require('../../utils/profileStore');
 
 module.exports = {
@@ -12,18 +12,31 @@ module.exports = {
     const profiles = readProfiles();
     const u = ensureUser(profiles, interaction.guildId, user.id);
     let msg = '';
-    if (u.xpBoostsActive.length) {
+    
+    if (Array.isArray(u.xpBoostsActive) && u.xpBoostsActive.length > 0) {
       msg += '**Boost activo:**\n';
-      msg += u.xpBoostsActive.map(b =>
-        `${b.id}: ${b.multiplier}x termina <t:${Math.floor(b.expiresAt/1000)}:R>`).join('\n');
+      msg += u.xpBoostsActive.map(b => {
+        const mult = typeof b.multiplier === 'number' ? b.multiplier : 1;
+        const timeStr = typeof b.expiresAt === 'number' && !isNaN(b.expiresAt)
+          ? `termina <t:${Math.floor(b.expiresAt / 1000)}:R>`
+          : 'activo';
+        return `• **${b.id || 'Boost'}**: ${mult}x (${timeStr})`;
+      }).join('\n');
     } else {
       msg += 'Sin boosts activos.';
     }
-    if (u.xpBoostsQueue && u.xpBoostsQueue.length) {
+
+    if (Array.isArray(u.xpBoostsQueue) && u.xpBoostsQueue.length > 0) {
       msg += '\n\n**En cola:**\n';
-      msg += u.xpBoostsQueue.map((b, i) =>
-        `${i+1}. ${b.id}: ${b.multiplier}x por ${(b.durationMs/3600000).toFixed(1)}h`).join('\n');
+      msg += u.xpBoostsQueue.map((b, i) => {
+        const mult = typeof b.multiplier === 'number' ? b.multiplier : 1;
+        const durHours = typeof b.durationMs === 'number' && !isNaN(b.durationMs)
+          ? `${(b.durationMs / 3600000).toFixed(1)}h`
+          : '1h';
+        return `${i + 1}. **${b.id || 'Boost'}**: ${mult}x por ${durHours}`;
+      }).join('\n');
     }
-    return interaction.reply(msg);
+
+    return interaction.reply({ content: msg, ephemeral: true });
   }
 };

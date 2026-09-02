@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const MISSIONS_FILE = path.join(__dirname, '..', 'data', 'missions.json');
+const MISSIONS_FILE = path.join(__dirname, '..', '..', 'data', 'missions.json');
 
 function readMissions() {
   if (!fs.existsSync(MISSIONS_FILE)) {

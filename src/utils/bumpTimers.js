@@ -1,7 +1,7 @@
 // Utilidad para manejar timers de bump persistentes
 const fs = require('fs');
 const path = require('path');
-const timersPath = path.join(__dirname, '..', 'data', 'bump_timers.json');
+const timersPath = path.join(__dirname, '..', '..', 'data', 'bump_timers.json');
 
 function readTimers() {
   try {

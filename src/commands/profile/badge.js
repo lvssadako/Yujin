@@ -201,7 +201,7 @@ module.exports = {
     profiles.badges ||= {};
 
     if (['create', 'edit', 'delete', 'give', 'revoke'].includes(sub)) {
-      if (!interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild)) {
+      if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
         return interaction.editReply('❌ Necesitas permisos de administrador');
       }
     }
@@ -1119,5 +1119,10 @@ module.exports = {
       const list = newBadges.map(b => `${b.icon || '🏅'} **${b.name}**`).join('\n');
       return interaction.editReply(`✅ Nuevos logros:\n${list}`);
     }
+  },
+
+  async executePrefix(message, args, client) {
+    const prefixCmd = require('../../prefixCommands/badges');
+    return prefixCmd.execute(message, args, client);
   }
 };

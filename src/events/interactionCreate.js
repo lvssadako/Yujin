@@ -32,6 +32,12 @@ module.exports = (client) => {
         return;
       }
 
+      if (interaction.customId?.startsWith('booster_color_')) {
+        const boosterColorService = require('../services/boost/boosterColorService');
+        await boosterColorService.handleInteraction(interaction);
+        return;
+      }
+
       // BOTONES
       if (interaction.isButton()) {
                 // Botón de compra de boost XP en /shop

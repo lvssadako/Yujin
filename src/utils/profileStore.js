@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { readJsonSafe, writeJsonAtomic } = require('./jsonStore');
 
-const dataDir = path.join(__dirname, '..', 'data');
+const dataDir = path.join(__dirname, '..', '..', 'data');
 const profilePath = path.join(dataDir, 'profile.json');
 
 function readProfiles() {

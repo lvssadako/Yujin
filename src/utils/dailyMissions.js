@@ -4,7 +4,7 @@ const path = require('path');
 const { readConfig } = require('./configCache');
 const { secureRandom } = require('./cryptoRandom');
 
-const dataDir = path.join(__dirname, '..', 'data');
+const dataDir = path.join(__dirname, '..', '..', 'data');
 const filePath = path.join(dataDir, 'daily_missions.json');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 

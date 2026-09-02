@@ -1,9 +1,9 @@
-const logger = require('./logger');
+﻿const logger = require('./logger');
 const fs = require('fs');
 const path = require('path');
 const { readJsonSafe, writeJsonAtomic } = require('./jsonStore');
 
-const dataDir = path.join(__dirname, '..', 'data');
+const dataDir = path.join(__dirname, '..', '..', 'data');
 const econPath = path.join(dataDir, 'economy.json');
 
 function asSafeNumber(value, fallback = 0) {
@@ -18,6 +18,7 @@ function readEconomy() {
   parsed.guilds = parsed.guilds || {};
   return parsed;
 }
+
 function writeEconomy(obj) {
   fs.mkdirSync(dataDir, { recursive: true });
   writeJsonAtomic(econPath, obj || { guilds: {} });
@@ -61,7 +62,6 @@ function removeCoins(guildId, userId, amount) {
   if (u.coins < a) return false;
   u.coins -= a;
   writeEconomy(econ);
-  // misión coins_spent
   try {
     const { updateMissionProgress } = require('./dailyMissions');
     const client = require('../index').client;

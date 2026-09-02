@@ -8,7 +8,7 @@ const { createBoostEmbed, createInfoEmbed } = require('../utils/embedFactory');
 const { readJsonSafe, writeJsonAtomic } = require('../utils/jsonStore');
 const { readConfig } = require('../utils/configCache');
 
-const dataDir = path.join(__dirname, '..', 'data');
+const dataDir = path.join(__dirname, '..', '..', 'data');
 const boostsPath = path.join(dataDir, 'boosts.json');
 
 let boostTrackerInterval = null;

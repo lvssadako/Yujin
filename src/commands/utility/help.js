@@ -5,13 +5,17 @@ const {
   StringSelectMenuBuilder, 
   StringSelectMenuOptionBuilder, 
   ButtonBuilder, 
-  ButtonStyle 
+  ButtonStyle,
+  AttachmentBuilder 
 } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
 const logger = require('../../utils/logger');
 const { COLORS } = require('../../utils/embedFactory');
 
-// Banner oficial verificado y seguro (Unsplash CDN de alta velocidad)
-const HELP_BANNER_URL = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80';
+// Banner local HD verificado y garantizado (16:9 widescreen)
+const LOCAL_BANNER_PATH = path.join(__dirname, '..', '..', 'assets', 'banners', 'help_banner.jpg');
+const HELP_BANNER_URL = 'https://media1.giphy.com/media/bZCJM3KKbzqUIu9Mds/giphy.gif';
 
 const CATEGORIES = {
   admin: { 
@@ -175,8 +179,17 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
       { name: '🗂️ Módulos', value: `\`${Object.keys(CATEGORIES).length} Categorías\``, inline: true },
       { name: '⚡ Comandos', value: `\`${commands.length} Disponibles\``, inline: true },
       { name: '📡 Estado', value: '`🟢 100% Operativo`', inline: true }
-    )
-    .setImage(HELP_BANNER_URL)
+    );
+
+  const files = [];
+  if (fs.existsSync(LOCAL_BANNER_PATH)) {
+    files.push(new AttachmentBuilder(LOCAL_BANNER_PATH, { name: 'help_banner.jpg' }));
+    mainEmbed.setImage('attachment://help_banner.jpg');
+  } else {
+    mainEmbed.setImage(HELP_BANNER_URL);
+  }
+
+  mainEmbed
     .setFooter({ 
       text: `Solicitado por ${user.tag}`, 
       iconURL: user.displayAvatarURL() 
@@ -212,9 +225,9 @@ async function buildHelpInterface(interactionOrMessage, isPrefix = false, query 
 
   let msg;
   if (isPrefix) {
-    msg = await interactionOrMessage.reply({ embeds: [mainEmbed], components: [rowMenu, rowButtons] });
+    msg = await interactionOrMessage.reply({ embeds: [mainEmbed], components: [rowMenu, rowButtons], files });
   } else {
-    await interactionOrMessage.reply({ embeds: [mainEmbed], components: [rowMenu, rowButtons] });
+    await interactionOrMessage.reply({ embeds: [mainEmbed], components: [rowMenu, rowButtons], files });
     msg = await interactionOrMessage.fetchReply();
   }
 

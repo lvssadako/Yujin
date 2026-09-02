@@ -3,7 +3,7 @@ const logger = require('./logger');
 const { secureRandomInt } = require('./cryptoRandom');
 const { readJsonSafe, writeJsonAtomic } = require('./jsonStore');
 
-const SHOP_FILE = path.join(__dirname, '../data/badgeShop.json');
+const SHOP_FILE = path.join(__dirname, '../../data/badgeShop.json');
 
 const DEFAULT_SHOP = {
   rotation: [],

@@ -1,8 +1,8 @@
-const fs = require('fs');
+﻿const fs = require('fs');
 const path = require('path');
 const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 
-const dataDir = path.join(__dirname, '..', 'data');
+const dataDir = path.join(__dirname, '..', '..', 'data');
 const boostsPath = path.join(dataDir, 'boosts.json');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 function readBoosts() { try { return JSON.parse(fs.readFileSync(boostsPath, 'utf8')); } catch { return {}; } }
@@ -38,8 +38,13 @@ module.exports = {
 
     const list = boosters.first(25);
     const usersCol = list.map(m => `<@${m.id}>`).join('\n') || '—';
-    const sinceCol = list.map(m => (m.premiumSince ? new Date(m.premiumSince).toLocaleString() : '—')).join('\n') || '—';
-    const countCol = list.map(m => String(Number(allCounts[m.id] || 0))).join('\n') || '—';
+    const sinceCol = list.map(m => (m.premiumSince ? new Date(m.premiumSince).toLocaleDateString() : '—')).join('\n') || '—';
+    const countCol = list.map(m => {
+      const entry = allCounts[m.id];
+      if (entry && typeof entry === 'object' && typeof entry.count === 'number') return String(entry.count);
+      if (typeof entry === 'number' && !isNaN(entry)) return String(entry);
+      return '1';
+    }).join('\n') || '—';
 
     const embed = new EmbedBuilder()
       .setTitle('🔰 Boosters del servidor')

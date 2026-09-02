@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const economyPath = path.join(__dirname, '..', 'data', 'economy.json');
-const backupDir = path.join(__dirname, '..', 'data');
+const economyPath = path.join(__dirname, '..', '..', 'data', 'economy.json');
+const backupDir = path.join(__dirname, '..', '..', 'data');
 
 function backupEconomyDaily() {
   if (!fs.existsSync(economyPath)) return;

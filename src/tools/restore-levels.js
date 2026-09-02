@@ -7,7 +7,7 @@ if (!src) {
   process.exit(1);
 }
 
-const levelsPath = path.join(__dirname, '..', 'data', 'levels.json');
+const levelsPath = path.join(__dirname, '..', '..', 'data', 'levels.json');
 
 function normalize(input) {
   const out = { guilds: {} };
@@ -51,7 +51,7 @@ const parsed = JSON.parse(raw);
 // Backup del levels.json actual por si acaso
 try {
   const stamp = Date.now();
-  const bak = path.join(__dirname, '..', 'data', `levels.json.pre-restore.${stamp}.bak`);
+  const bak = path.join(__dirname, '..', '..', 'data', `levels.json.pre-restore.${stamp}.bak`);
   if (fs.existsSync(levelsPath)) fs.copyFileSync(levelsPath, bak);
   console.log('Backup del levels.json actual:', path.basename(bak));
 } catch {}

@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { SlashCommandBuilder, ChannelType, PermissionFlagsBits } = require('discord.js');
 
-const configPath = path.join(__dirname, '..', 'data', 'config.json');
+const configPath = path.join(__dirname, '..', '..', '..', 'data', 'config.json');
 
 function readConfig() {
     try { return JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch { return {}; }

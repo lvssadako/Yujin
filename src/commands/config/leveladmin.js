@@ -5,9 +5,9 @@ const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { validateRoleForAssignment } = require('../../utils/roleValidation');
 const { validateChannelForSending } = require('../../utils/channelValidation');
 
-const dataDir = path.join(__dirname, '..', 'data');
+const dataDir = path.join(__dirname, '..', '..', '..', 'data');
 const levelsPath = path.join(dataDir, 'levels.json');
-const cfgPath = path.join(__dirname, '..', 'config.json');
+const cfgPath = path.join(__dirname, '..', '..', '..', 'config.json');
 
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 

@@ -22,7 +22,7 @@ for (const key in data) {
     Object.assign(migrated.guilds, data.guilds);
   } else if (/^\d{17,19}$/.test(key)) {
     // Es un guild ID (17-19 dígitos)
-    migrated.guilds[key] = data[key];
+    migrated.guilds[key] = { ...(migrated.guilds[key] || {}), ...data[key] };
   }
 }
 

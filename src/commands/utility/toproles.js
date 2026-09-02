@@ -1,16 +1,15 @@
-const logger = require('../../utils/logger');
+﻿const logger = require('../../utils/logger');
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
-const dataDir = path.join(__dirname, '..', 'data');
+const dataDir = path.join(__dirname, '..', '..', '..', 'data');
 const levelsPath = path.join(dataDir, 'levels.json');
-const cfgPath = path.join(__dirname, '..', 'config.json');
+const cfgPath = path.join(__dirname, '..', '..', '..', 'config.json');
 
 function readLevels() {
   try {
     const data = JSON.parse(fs.readFileSync(levelsPath, 'utf8'));
-    // Retornar estructura compatible (guilds o raíz)
     return data.guilds || data;
   } catch {
     return {};

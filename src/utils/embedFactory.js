@@ -1,6 +1,8 @@
 const { EmbedBuilder } = require('discord.js');
 
 const COLORS = {
+  primary: 0x5865f2,    // Blurple
+  blurple: 0x5865f2,    // Blurple
   success: 0x2ecc71,    // Green
   error: 0xe74c3c,      // Red
   info: 0x3498db,       // Blue

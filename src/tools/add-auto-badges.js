@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const file = path.join(__dirname, '..', 'data', 'profile.json');
+const file = path.join(__dirname, '..', '..', 'data', 'profile.json');
 
 const raw = fs.readFileSync(file, 'utf8');
 const data = JSON.parse(raw);
