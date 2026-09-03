@@ -1,6 +1,7 @@
 const path = require('path');
-const { readJsonSafe, deepMerge } = require('./jsonStore');
+const { readJsonSafe, writeJsonAtomic, deepMerge } = require('./jsonStore');
 const { validateConfig } = require('./config/loader');
+const logger = require('./logger');
 
 const defaultPath = path.join(__dirname, '..', '..', 'config', 'default.json');
 const rootLegacyPath = path.join(__dirname, '..', '..', 'config.json');
@@ -22,4 +23,27 @@ function readConfig() {
   }
 }
 
-module.exports = { readConfig };
+function writeConfig(updaterOrConfig) {
+  const current = readConfig();
+  let updated = typeof updaterOrConfig === 'function' ? updaterOrConfig(current) : updaterOrConfig;
+  if (!updated || typeof updated !== 'object') updated = current;
+
+  // Save to data/config.json (central data directory)
+  writeJsonAtomic(dataPath, updated);
+  // Also keep rootLegacyPath synced
+  try {
+    writeJsonAtomic(rootLegacyPath, updated);
+  } catch (err) {
+    logger.debug('[configCache] Could not sync root config.json:', err?.message);
+  }
+
+  return updated;
+}
+
+module.exports = {
+  readConfig,
+  writeConfig,
+  defaultPath,
+  rootLegacyPath,
+  dataPath
+};

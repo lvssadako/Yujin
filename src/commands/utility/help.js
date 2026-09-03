@@ -172,6 +172,7 @@ const COMMAND_MAP = {
   // Configuración del Servidor
   setchannel: 'config',
   setboostchannel: 'config',
+  setlevelchannel: 'config',
   setbumpreminder: 'config',
   leveladmin: 'config',
   levelrewards: 'config',
@@ -253,6 +254,7 @@ function getCommandExample(cmdName) {
     // Config
     setchannel: '/setchannel tipo: logs canal: #canal-logs',
     setboostchannel: '/setboostchannel canal: #anuncios-boosts',
+    setlevelchannel: '/setlevelchannel set canal: #nivel-anuncios | /setlevelchannel remove',
     setbumpreminder: '/setbumpreminder canal: #bump rol: @BumpReminder',
     leveladmin: '/leveladmin opcion: xp_rate valor: 1.5',
     levelrewards: '/levelrewards accion: agregar nivel: 10 rol: @Nivel10',
