@@ -66,7 +66,7 @@ module.exports = {
       const userData = guildData[targetUser.id] || { xp: 0, level: 0 };
       const need = xpToNext(userData.level);
       const percent = need > 0 ? Math.floor((userData.xp / need) * 100) : 0;
-      const rank = getUserRank(guildId, targetUser.id, levels) || '—';
+      const rank = getUserRank(guildId, targetUser.id, levels, interaction.guild) || '—';
 
       // Canvas design
       const width = 900;

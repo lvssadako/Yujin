@@ -209,12 +209,20 @@ function setStreakAlertPreference(guildId, userId, disabled) {
   return u.streakAlertsDisabled;
 }
 
-function getStreakLeaderboard(guildId, limit = 10) {
+function getStreakLeaderboard(guildId, limit = 10, guild = null) {
   const profiles = readProfiles();
   const guildUsers = profiles.users?.[guildId] || {};
   const { today } = getLocalDayInfo();
 
   const activeUsers = Object.entries(guildUsers)
+    .filter(([userId]) => {
+      if (guild) {
+        const member = guild.members?.cache?.get(userId);
+        const user = guild.client?.users?.cache?.get(userId) || member?.user;
+        if (user?.bot) return false;
+      }
+      return true;
+    })
     .map(([userId, data]) => ({
       userId,
       streakDays: data.streakDisabled ? 0 : (Number(data.streakDays) || 0),

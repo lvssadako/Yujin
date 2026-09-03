@@ -43,8 +43,14 @@ async function updateTopRoles(guild) {
       return;
     }
 
-    // Ordenar usuarios por NIVEL primero, luego XP como desempate
+    // Ordenar usuarios por NIVEL primero, luego XP como desempate (excluyendo bots)
     const sortedUsers = Object.entries(guildLevels)
+      .filter(([id]) => {
+        const member = guild.members?.cache?.get(id);
+        const user = guild.client?.users?.cache?.get(id) || member?.user;
+        if (user?.bot) return false;
+        return true;
+      })
       .map(([id, data]) => ({ id, level: data.level || 0, xp: data.xp || 0 }))
       .sort((a, b) => {
         if (b.level !== a.level) return b.level - a.level; // Por nivel descendente

@@ -88,11 +88,20 @@ function getCategorySubtitle(category) {
 }
 
 async function renderLeaderboardCanvas(guild, leaderboardEntries, timeframe, category, client) {
+  const filteredEntries = (leaderboardEntries || []).filter(e => {
+    if (guild) {
+      const member = guild.members?.cache?.get(e.id);
+      const user = (client || guild.client)?.users?.cache?.get(e.id) || member?.user;
+      if (user?.bot) return false;
+    }
+    return true;
+  });
+
   const width = 1200;
   const rowH = 100;
   const headerH = 150;
   const gap = 14;
-  const count = Math.max(1, leaderboardEntries.length);
+  const count = Math.max(1, filteredEntries.length);
   const height = headerH + count * (rowH + gap) + 40;
 
   const canvas = createCanvas(width, height);
@@ -121,7 +130,7 @@ async function renderLeaderboardCanvas(guild, leaderboardEntries, timeframe, cat
   ctx.fillText(`${getTimeframeTitle(timeframe)} • ${getCategorySubtitle(category)}`, 45, 110);
 
   // If empty
-  if (leaderboardEntries.length === 0) {
+  if (filteredEntries.length === 0) {
     ctx.fillStyle = THEME.textDim;
     ctx.font = '24px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
     ctx.textAlign = 'center';
@@ -133,8 +142,8 @@ async function renderLeaderboardCanvas(guild, leaderboardEntries, timeframe, cat
   const startY = headerH + 10;
   const avatarSize = 74;
 
-  for (let i = 0; i < leaderboardEntries.length; i++) {
-    const entry = leaderboardEntries[i];
+  for (let i = 0; i < filteredEntries.length; i++) {
+    const entry = filteredEntries[i];
     const y = startY + i * (rowH + gap);
 
     // Card background
@@ -338,7 +347,7 @@ module.exports = {
     let currentCategory = interaction.options?.getString('categoria') || 'general';
 
     const renderCurrent = async () => {
-      const entries = levelService.getLeaderboard(interaction.guildId, currentTimeframe, currentCategory, 10);
+      const entries = levelService.getLeaderboard(interaction.guildId, currentTimeframe, currentCategory, 10, interaction.guild);
       const buffer = await renderLeaderboardCanvas(interaction.guild, entries, currentTimeframe, currentCategory, client || interaction.client);
       const attach = new AttachmentBuilder(buffer, { name: 'leaderboard.png' });
       const components = buildNavigationComponents(currentTimeframe, currentCategory);

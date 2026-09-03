@@ -237,7 +237,7 @@ module.exports = {
     }
 
     if (sub === 'top') {
-      const lb = getStreakLeaderboard(guild.id, 10);
+      const lb = getStreakLeaderboard(guild.id, 10, guild);
       const embed = buildLeaderboardEmbed(guild, lb);
       return interaction.reply({ embeds: [embed] });
     }
@@ -267,7 +267,7 @@ module.exports = {
     const guild = message.guild;
 
     if (sub === 'top' || sub === 'leaderboard') {
-      const lb = getStreakLeaderboard(guild.id, 10);
+      const lb = getStreakLeaderboard(guild.id, 10, guild);
       const embed = buildLeaderboardEmbed(guild, lb);
       return message.reply({ embeds: [embed] });
     }

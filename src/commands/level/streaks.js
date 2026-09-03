@@ -8,13 +8,13 @@ module.exports = {
     .setDescription('Muestra el top 10 de rachas de actividad del servidor (Alias de /streak top)'),
 
   async execute(interaction) {
-    const lb = getStreakLeaderboard(interaction.guildId, 10);
+    const lb = getStreakLeaderboard(interaction.guildId, 10, interaction.guild);
     const embed = streakCmd.buildLeaderboardEmbed(interaction.guild, lb);
     return interaction.reply({ embeds: [embed] });
   },
 
   async executePrefix(message, args, client) {
-    const lb = getStreakLeaderboard(message.guild.id, 10);
+    const lb = getStreakLeaderboard(message.guild.id, 10, message.guild);
     const embed = streakCmd.buildLeaderboardEmbed(message.guild, lb);
     return message.reply({ embeds: [embed] });
   }

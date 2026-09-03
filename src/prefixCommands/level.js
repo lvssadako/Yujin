@@ -106,7 +106,7 @@ module.exports = {
 
       const need = xpToNext(userData.level || 0);
       const percent = need > 0 ? Math.floor(((userData.xp || 0) / need) * 100) : 0;
-      const rankNum = getUserRank(guildId, targetUser.id, levels);
+      const rankNum = getUserRank(guildId, targetUser.id, levels, message.guild);
       const rank = rankNum > 0 ? rankNum : '—';
 
       // Canvas

@@ -192,7 +192,7 @@ module.exports = {
       const userData = ensureUserData(levels, interaction.guildId, targetUser.id);
       const need = xpToNext(userData.level || 0);
       const percent = need > 0 ? Math.floor((userData.xp || 0) / need * 100) : 0;
-      const rank = getUserRank(interaction.guildId, targetUser.id, levels) || '—';
+      const rank = getUserRank(interaction.guildId, targetUser.id, levels, interaction.guild) || '—';
 
       // Booster check
       const boosterRole = member.guild.roles.premiumSubscriberRole;

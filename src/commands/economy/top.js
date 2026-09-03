@@ -2,12 +2,17 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { getBalance } = require('../../services/economy/index').economyService;
 const { readProfiles } = require('../../utils/profileStore');
 
-async function handleTop(guildId, guildName) {
+async function handleTop(guildId, guildName, guild = null) {
   const profiles = readProfiles();
   const usersData = [];
   const guildUsers = (profiles.users && profiles.users[guildId]) ? profiles.users[guildId] : {};
   
   for (const uid of Object.keys(guildUsers)) {
+    if (guild) {
+      const member = guild.members?.cache?.get(uid);
+      const user = guild.client?.users?.cache?.get(uid) || member?.user;
+      if (user?.bot) continue;
+    }
     const bal = getBalance(guildId, uid);
     const total = (bal.coins || 0) + (bal.bank || 0);
     if (total > 0) {
@@ -44,12 +49,12 @@ module.exports = {
     .setName('ecotop')
     .setDescription('Muestra el Top 10 de usuarios con más monedas en el servidor.'),
   async execute(interaction) {
-    const result = await handleTop(interaction.guildId, interaction.guild.name);
+    const result = await handleTop(interaction.guildId, interaction.guild.name, interaction.guild);
     if (result.error) return interaction.reply({ content: result.error, ephemeral: true });
     await interaction.reply({ embeds: [result.embed] });
   },
   async executePrefix(message) {
-    const result = await handleTop(message.guild.id, message.guild.name);
+    const result = await handleTop(message.guild.id, message.guild.name, message.guild);
     if (result.error) return message.reply(result.error);
     await message.reply({ embeds: [result.embed] });
   }

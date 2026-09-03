@@ -66,7 +66,7 @@ module.exports = {
     // Levels
     const levels = readLevels();
     const lvlData = getUserData(levels, guild.id, user.id);
-    const rank = getUserRank(guild.id, user.id, levels) || '?';
+    const rank = getUserRank(guild.id, user.id, levels, guild) || '?';
     const nextXp = xpToNext(lvlData.level);
 
     const emb = new EmbedBuilder()

@@ -1,4 +1,4 @@
-﻿const logger = require('./logger');
+const logger = require('./logger');
 const fs = require('fs');
 const path = require('path');
 const { readJsonSafe, writeJsonAtomic } = require('./jsonStore');
@@ -91,9 +91,17 @@ function addVoiceTime(guildId, userId, ms) {
   return userData;
 }
 
-function getUserRank(guildId, userId, levels) {
+function getUserRank(guildId, userId, levels, guild = null) {
   const guildData = levels.guilds?.[guildId] || levels[guildId] || {};
   const sorted = Object.entries(guildData)
+    .filter(([id]) => {
+      if (guild) {
+        const member = guild.members?.cache?.get(id);
+        const user = guild.client?.users?.cache?.get(id) || member?.user;
+        if (user?.bot) return false;
+      }
+      return true;
+    })
     .map(([id, data]) => ({ id, level: data.level || 0, xp: data.xp || 0 }))
     .sort((a, b) => {
       if (b.level !== a.level) return b.level - a.level;

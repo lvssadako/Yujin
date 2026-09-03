@@ -136,10 +136,18 @@ function addMessageCount(guildId, userId) {
   return userData;
 }
 
-function getUserRank(guildId, userId, levels) {
+function getUserRank(guildId, userId, levels, guild = null) {
   const allLevels = levels || readLevels();
   const guildData = allLevels.guilds?.[guildId] || allLevels[guildId] || {};
   const sorted = Object.entries(guildData)
+    .filter(([id]) => {
+      if (guild) {
+        const member = guild.members?.cache?.get(id);
+        const user = guild.client?.users?.cache?.get(id) || member?.user;
+        if (user?.bot) return false;
+      }
+      return true;
+    })
     .map(([id, data]) => ({ id, level: data.level || 0, xp: data.xp || 0 }))
     .sort((a, b) => {
       if (b.level !== a.level) return b.level - a.level;
@@ -230,13 +238,22 @@ function removeXp(guildId, userId, amount) {
 
 const penalizeXp = removeXp;
 
-function getLeaderboard(guildId, timeframe = 'global', category = 'general', limit = 10) {
+function getLeaderboard(guildId, timeframe = 'global', category = 'general', limit = 10, guild = null) {
   const levels = readLevels();
   const guildData = levels.guilds?.[guildId] || levels[guildId] || {};
   const currentDay = getDayKey();
   const currentWeek = getWeekKey();
 
-  const entries = Object.entries(guildData).map(([id, raw]) => {
+  const entries = Object.entries(guildData)
+    .filter(([id]) => {
+      if (guild) {
+        const member = guild.members?.cache?.get(id);
+        const user = guild.client?.users?.cache?.get(id) || member?.user;
+        if (user?.bot) return false;
+      }
+      return true;
+    })
+    .map(([id, raw]) => {
     const d = { ...raw };
     const daily = (d.daily && d.daily.day === currentDay) ? d.daily : { xp: 0, textXp: 0, voiceXp: 0, messages: 0, voiceMs: 0 };
     const weekly = (d.weekly && d.weekly.week === currentWeek) ? d.weekly : { xp: 0, textXp: 0, voiceXp: 0, messages: 0, voiceMs: 0 };
