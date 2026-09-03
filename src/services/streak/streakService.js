@@ -47,16 +47,24 @@ function recordMessageActivity(guildId, userId) {
   const u = ensureUser(profiles, guildId, userId);
   const { today } = getLocalDayInfo();
 
-  if (u.lastActiveDay === today) {
-    return { updated: false, streakDays: u.streakDays || 0, isNewDay: false };
+  if (u.lastActiveDay === today && !u.streakDisabled) {
+    return { updated: false, streakDays: u.streakDays || 0, isNewDay: false, alertsDisabled: Boolean(u.streakAlertsDisabled) };
   }
 
+  const wasDisabled = Boolean(u.streakDisabled);
   const previousStreak = Number(u.streakDays) || 0;
-  const isConsecutive = u.lastActiveDay === (today - 1);
+  const isConsecutive = !wasDisabled && u.lastActiveDay === (today - 1);
   let savedByFreeze = false;
   let newStreak = 1;
 
-  if (isConsecutive) {
+  if (wasDisabled) {
+    // Racha previamente deshabilitada por inactividad (>=15 días): se reactiva desde día 1
+    newStreak = 1;
+    u.streakDisabled = false;
+    delete u.streakDisabledReason;
+    delete u.streakPausedAt;
+    logger.info(`[streak] Racha reactivada para ${userId} en ${guildId} tras enviar mensaje.`);
+  } else if (isConsecutive) {
     newStreak = previousStreak + 1;
   } else if (previousStreak > 0) {
     const inv = getInventory(guildId, userId);
@@ -91,10 +99,12 @@ function recordMessageActivity(guildId, userId) {
     previousStreak,
     isConsecutive,
     savedByFreeze,
-    wasReset: !isConsecutive && !savedByFreeze && previousStreak > 0,
+    wasReset: !isConsecutive && !savedByFreeze && previousStreak > 0 && !wasDisabled,
+    wasReactivated: wasDisabled,
     tierUpgraded,
     coinsRewarded,
-    tier: newTier
+    tier: newTier,
+    alertsDisabled: Boolean(u.streakAlertsDisabled)
   };
 }
 
@@ -104,11 +114,13 @@ function getUserStreakStatus(guildId, userId) {
   const g = ensureGlobalUser(profiles, userId);
   const { today, midnightTs, msRemaining } = getLocalDayInfo();
 
-  const streakDays = Number(u.streakDays) || 0;
+  const isStreakDisabled = Boolean(u.streakDisabled);
+  const streakDays = isStreakDisabled ? 0 : (Number(u.streakDays) || 0);
   const lastActive = Number(u.lastActiveDay) || 0;
   const isActiveToday = (lastActive === today);
   const currentTier = getFlameTier(streakDays);
   const nextTier = getNextTier(streakDays);
+  const daysSinceActive = lastActive > 0 ? (today - lastActive) : 999;
 
   const inv = getInventory(guildId, userId);
   const freezersCount = Number(inv?.['congelador'] || 0);
@@ -149,6 +161,8 @@ function getUserStreakStatus(guildId, userId) {
     msRemaining,
     freezersCount,
     alertsDisabled: Boolean(u.streakAlertsDisabled),
+    streakDisabled: isStreakDisabled,
+    daysSinceActive,
     // Personalización global
     streakBgUrl: effectiveBgUrl,
     streakBgOpacity: typeof g.streakBgOpacity === 'number' ? g.streakBgOpacity : 0.65,
@@ -203,18 +217,84 @@ function getStreakLeaderboard(guildId, limit = 10) {
   const activeUsers = Object.entries(guildUsers)
     .map(([userId, data]) => ({
       userId,
-      streakDays: Number(data.streakDays) || 0,
+      streakDays: data.streakDisabled ? 0 : (Number(data.streakDays) || 0),
       lastActiveDay: Number(data.lastActiveDay) || 0,
       isActiveToday: (data.lastActiveDay === today),
-      tier: getFlameTier(data.streakDays || 0)
+      tier: getFlameTier(data.streakDisabled ? 0 : (data.streakDays || 0)),
+      streakDisabled: Boolean(data.streakDisabled)
     }))
-    .filter(u => u.streakDays > 0)
+    .filter(u => u.streakDays > 0 && !u.streakDisabled)
     .sort((a, b) => b.streakDays - a.streakDays);
 
   return {
     top: activeUsers.slice(0, limit),
     totalActive: activeUsers.length,
     highestStreak: activeUsers[0]?.streakDays || 0
+  };
+}
+
+/**
+ * Verifica los usuarios que han enviado mensajes en los últimos N días (por defecto 15).
+ * Si detecta usuarios que no han escrito en ese periodo, les deshabilita la racha hasta que envíen un mensaje.
+ * @param {string} guildId - ID del servidor
+ * @param {number} daysThreshold - Límite de días de inactividad (default: 15)
+ * @param {boolean} dryRun - Si es true, solo calcula y reporta sin modificar los archivos
+ * @returns {object} Resultado del análisis con conteos y lista de usuarios afectados
+ */
+function checkAndDisableInactiveStreaks(guildId, daysThreshold = 15, dryRun = false) {
+  if (!guildId) return { totalChecked: 0, inactiveFound: 0, disabledCount: 0, users: [], thresholdDays: daysThreshold };
+
+  const profiles = readProfiles();
+  const guildUsers = profiles.users?.[guildId];
+  if (!guildUsers || typeof guildUsers !== 'object') {
+    return { totalChecked: 0, inactiveFound: 0, disabledCount: 0, users: [], thresholdDays: daysThreshold };
+  }
+
+  const { today } = getLocalDayInfo();
+  const threshold = Math.max(1, Number(daysThreshold) || 15);
+  const affectedUsers = [];
+  let modified = false;
+
+  for (const [userId, u] of Object.entries(guildUsers)) {
+    const lastActive = Number(u.lastActiveDay) || 0;
+    const currentStreak = Number(u.streakDays) || 0;
+    const isAlreadyDisabled = Boolean(u.streakDisabled);
+
+    // Calcular días desde su última actividad registrada
+    const daysSinceLastActive = lastActive > 0 ? (today - lastActive) : 999;
+    const isInactive = daysSinceLastActive >= threshold;
+
+    if (isInactive) {
+      affectedUsers.push({
+        userId,
+        previousStreak: currentStreak,
+        lastActiveDay: lastActive,
+        daysSinceLastActive,
+        alreadyDisabled: isAlreadyDisabled
+      });
+
+      if (!dryRun && (!isAlreadyDisabled || currentStreak > 0)) {
+        u.streakDisabled = true;
+        u.streakPausedAt = currentStreak;
+        u.streakDisabledReason = `inactivity_${threshold}_days`;
+        u.streakDays = 0;
+        modified = true;
+      }
+    }
+  }
+
+  if (modified && !dryRun) {
+    writeProfiles(profiles);
+    logger.info(`[streak] Verificación de inactividad ejecutada en ${guildId}: ${affectedUsers.length} usuarios inactivos (>= ${threshold} días).`);
+  }
+
+  return {
+    totalChecked: Object.keys(guildUsers).length,
+    inactiveFound: affectedUsers.length,
+    disabledCount: dryRun ? 0 : affectedUsers.filter(u => !u.alreadyDisabled || u.previousStreak > 0).length,
+    users: affectedUsers,
+    thresholdDays: threshold,
+    dryRun: Boolean(dryRun)
   };
 }
 
@@ -227,5 +307,6 @@ module.exports = {
   getUserStreakStatus,
   setGlobalStreakCustomization,
   setStreakAlertPreference,
-  getStreakLeaderboard
+  getStreakLeaderboard,
+  checkAndDisableInactiveStreaks
 };

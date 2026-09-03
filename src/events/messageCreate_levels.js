@@ -445,8 +445,14 @@ module.exports = (client) => {
 
       // Streak diaria por actividad de mensajes
       const streakResult = recordMessageActivity(guildId, userId);
-      if (streakResult.updated) {
-        if (streakResult.savedByFreeze) {
+      if (streakResult.updated && !streakResult.alertsDisabled) {
+        if (streakResult.wasReactivated) {
+          try {
+            await message.author.send(
+              `✨ ¡Bienvenido de vuelta a **${message.guild.name}**! Tu racha de actividad ha sido reactivada (**Día 1**). ¡Sigue escribiendo a diario para subir de nivel de fuego!`
+            );
+          } catch {}
+        } else if (streakResult.savedByFreeze) {
           try {
             await message.author.send(
               `🧊 ¡Tu **Congelador de Racha** fue utilizado automáticamente! Salvaste tu racha de **${streakResult.streakDays} días** en **${message.guild.name}**.`

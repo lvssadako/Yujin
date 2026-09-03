@@ -160,6 +160,8 @@ const COMMAND_MAP = {
   streak: 'level',
   racha: 'level',
   streaks: 'level',
+  streaknotif: 'level',
+  streakcheck: 'utility',
 
   // Boosters y Servidor
   boosters: 'boost',
@@ -240,6 +242,8 @@ function getCommandExample(cmdName) {
     streak: '/streak',
     racha: '/racha',
     streaks: '/streaks',
+    streaknotif: '/streaknotif estado: off',
+    streakcheck: '/streakcheck dias: 15 modo: execute',
 
     // Boost
     boosters: '/boosters',
@@ -278,7 +282,7 @@ function getPermissionBadge(catId, cmdName) {
   if (['reload', 'restart', 'testboost', 'testbutton', 'testsecurity', 'dev', 'host', 'logs', 'resetloan'].includes(cmdName)) {
     return '`👑 Bot Owner / Desarrollador`';
   }
-  if (catId === 'admin' || catId === 'config' || cmdName === 'addmoney' || cmdName === 'ecoadmin' || cmdName === 'leveladmin' || cmdName === 'boostercolors') {
+  if (catId === 'admin' || catId === 'config' || cmdName === 'addmoney' || cmdName === 'ecoadmin' || cmdName === 'leveladmin' || cmdName === 'boostercolors' || cmdName === 'streakcheck') {
     return '`🛡️ Administrador / Moderador`';
   }
   return '`👤 Todos los miembros`';
