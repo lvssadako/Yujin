@@ -3,23 +3,69 @@ const path = require('path');
 const { GlobalFonts } = require('@napi-rs/canvas');
 const logger = require('./logger');
 
-const FONT_FALLBACKS = '"Roboto", "Noto Sans JP", "Noto Sans CJK JP", "Noto Sans KR", "Noto Sans Arabic", "Noto Emoji", "Segoe UI Emoji", "Apple Color Emoji", "DejaVu Sans", "Liberation Sans", "Segoe UI", Arial, sans-serif';
+const FONT_FALLBACKS = [
+  '"Roboto"',
+  '"Noto Sans"',
+  '"Noto Sans JP"',
+  '"Noto Sans CJK JP"',
+  '"Noto Sans KR"',
+  '"Noto Sans CJK KR"',
+  '"Noto Sans SC"',
+  '"Noto Sans CJK SC"',
+  '"Noto Sans TC"',
+  '"Noto Sans CJK TC"',
+  '"Noto Sans Arabic"',
+  '"Noto Sans Devanagari"',
+  '"Noto Sans Thai"',
+  '"Noto Sans Hebrew"',
+  '"Noto Sans Bengali"',
+  '"Noto Sans Tamil"',
+  '"Noto Sans Telugu"',
+  '"Noto Sans Malayalam"',
+  '"Noto Sans Kannada"',
+  '"Noto Sans Gujarati"',
+  '"Noto Sans Gurmukhi"',
+  '"Noto Sans Sinhala"',
+  '"Noto Sans Myanmar"',
+  '"Noto Sans Khmer"',
+  '"Noto Sans Lao"',
+  '"Noto Sans Georgian"',
+  '"Noto Sans Armenian"',
+  '"Noto Color Emoji"',
+  '"Noto Emoji"',
+  '"Segoe UI Emoji"',
+  '"Segoe UI Symbol"',
+  '"Apple Color Emoji"',
+  '"Meiryo"',
+  '"Malgun Gothic"',
+  '"Microsoft YaHei"',
+  '"Microsoft JhengHei"',
+  '"Nirmala UI"',
+  '"Leelawadee UI"',
+  '"DejaVu Sans"',
+  '"Liberation Sans"',
+  '"Segoe UI"',
+  '"Arial"',
+  'sans-serif'
+].join(', ');
 
 let initialized = false;
 
-function walkDirForFonts(dir) {
-  if (!fs.existsSync(dir)) return [];
+function walkDirForFonts(dir, maxDepth = 4, currentDepth = 0) {
+  if (!fs.existsSync(dir) || currentDepth > maxDepth) return [];
   let results = [];
   try {
     const list = fs.readdirSync(dir);
     for (const file of list) {
       const fullPath = path.join(dir, file);
-      const stat = fs.statSync(fullPath);
-      if (stat && stat.isDirectory()) {
-        results = results.concat(walkDirForFonts(fullPath));
-      } else if (file.endsWith('.ttf') || file.endsWith('.otf') || file.endsWith('.ttc')) {
-        results.push(fullPath);
-      }
+      try {
+        const stat = fs.statSync(fullPath);
+        if (stat && stat.isDirectory()) {
+          results = results.concat(walkDirForFonts(fullPath, maxDepth, currentDepth + 1));
+        } else if (/\.(ttf|otf|ttc)$/i.test(file)) {
+          results.push(fullPath);
+        }
+      } catch {}
     }
   } catch {}
   return results;
@@ -35,7 +81,7 @@ function initFonts() {
     if (fs.existsSync(localFontsDir)) {
       const localFiles = fs.readdirSync(localFontsDir);
       for (const file of localFiles) {
-        if (file.endsWith('.ttf') || file.endsWith('.otf') || file.endsWith('.ttc')) {
+        if (/\.(ttf|otf|ttc)$/i.test(file)) {
           const fontPath = path.join(localFontsDir, file);
           try {
             GlobalFonts.registerFromPath(fontPath);
@@ -50,11 +96,15 @@ function initFonts() {
               GlobalFonts.registerFromPath(fontPath, 'Noto Sans JP');
               GlobalFonts.registerFromPath(fontPath, 'Noto Sans CJK JP');
               GlobalFonts.registerFromPath(fontPath, 'Noto Sans CJK');
+              GlobalFonts.registerFromPath(fontPath, 'Noto Sans SC');
+              GlobalFonts.registerFromPath(fontPath, 'Noto Sans TC');
             } else if (file.includes('NotoSansKR') || file.includes('KR')) {
               GlobalFonts.registerFromPath(fontPath, 'Noto Sans KR');
               GlobalFonts.registerFromPath(fontPath, 'Noto Sans CJK KR');
             } else if (file.includes('Arabic')) {
               GlobalFonts.registerFromPath(fontPath, 'Noto Sans Arabic');
+              GlobalFonts.registerFromPath(fontPath, 'Noto Sans Persian');
+              GlobalFonts.registerFromPath(fontPath, 'Noto Sans Urdu');
             } else if (file.includes('Emoji')) {
               GlobalFonts.registerFromPath(fontPath, 'Noto Emoji');
               GlobalFonts.registerFromPath(fontPath, 'Noto Color Emoji');
@@ -68,16 +118,24 @@ function initFonts() {
       }
     }
 
-    // 2. Escaneo recursivo de fuentes del sistema Linux / Unix
-    const linuxFontDirs = [
+    // 2. Escaneo de fuentes del sistema operativo (Windows, Linux, macOS)
+    const systemFontDirs = [
+      // Linux / Unix
       '/usr/share/fonts',
       '/usr/local/share/fonts',
       path.join(process.env.HOME || '', '.fonts'),
-      path.join(process.env.HOME || '', '.local/share/fonts')
-    ];
+      path.join(process.env.HOME || '', '.local/share/fonts'),
+      // Windows
+      process.env.WINDIR ? path.join(process.env.WINDIR, 'Fonts') : 'C:\\Windows\\Fonts',
+      path.join(process.env.LOCALAPPDATA || '', 'Microsoft', 'Windows', 'Fonts'),
+      // macOS
+      '/Library/Fonts',
+      '/System/Library/Fonts',
+      path.join(process.env.HOME || '', 'Library', 'Fonts')
+    ].filter(d => Boolean(d) && fs.existsSync(d));
 
-    for (const fontDir of linuxFontDirs) {
-      const foundFonts = walkDirForFonts(fontDir);
+    for (const fontDir of systemFontDirs) {
+      const foundFonts = walkDirForFonts(fontDir, 2);
       for (const fontPath of foundFonts) {
         try {
           GlobalFonts.registerFromPath(fontPath);
@@ -86,7 +144,7 @@ function initFonts() {
     }
 
     const families = GlobalFonts.families || [];
-    logger.info(`[FontLoader] Fuentes registradas en Canvas: ${families.length} familias disponibles.`);
+    logger.info(`[FontLoader] Soporte multi-idioma de fuentes activo en Canvas: ${families.length} familias registradas.`);
   } catch (err) {
     logger.warn('[FontLoader] Advertencia al inicializar fuentes de Canvas:', err.message);
   }

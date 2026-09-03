@@ -1,6 +1,10 @@
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const { AttachmentBuilder } = require('discord.js');
 const logger = require('../../utils/logger');
+const { initFonts, FONT_FALLBACKS } = require('../../utils/canvasFontLoader');
+
+// Inicializar fuentes para soporte de caracteres globales
+initFonts();
 
 // Strip emoji / symbol unicode codepoints that @napi-rs/canvas cannot render
 // (there are no color-emoji fonts available server-side).
@@ -194,21 +198,21 @@ async function generateStreakCard(user, status, botName = 'Bot') {
     roundRect(ctx, avX, avY, avSize, avSize, 18);
     ctx.fill();
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 36px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
+    ctx.font = `bold 36px ${FONT_FALLBACKS}`;
     ctx.fillText('AVATAR', avX + 15, avY + 75);
   }
 
   // 6. Nombre de usuario (Display Name / Nickname)
   const textX = avX + avSize + 28;
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 34px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
+  ctx.font = `bold 34px ${FONT_FALLBACKS}`;
   const rawName = user.displayName || user.globalName || user.username || 'Usuario';
   const usernameDisplay = rawName.length > 18 ? rawName.slice(0, 17) + '…' : rawName;
   ctx.fillText(usernameDisplay, textX, avY + 40);
 
   // Badge del Nivel de Fuego (Pastilla superior derecha)
   const tierLabel = stripEmoji(currentTier.name).toUpperCase();
-  ctx.font = 'bold 15px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
+  ctx.font = `bold 15px ${FONT_FALLBACKS}`;
   const tierTextWidth = ctx.measureText(tierLabel).width;
   const pillW = tierTextWidth + 36;
   const pillH = 32;
@@ -232,7 +236,7 @@ async function generateStreakCard(user, status, botName = 'Bot') {
   drawFlameIcon(ctx, textX, avY + 68, flameSize, tierColorHex);
 
   ctx.fillStyle = tierColorHex;
-  ctx.font = '900 44px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
+  ctx.font = `900 44px ${FONT_FALLBACKS}`;
   const streakCountText = `${streakDays} ${streakDays === 1 ? 'DÍA' : 'DÍAS'}`;
   ctx.fillText(streakCountText, textX + flameSize + 8, avY + 106);
 
@@ -240,7 +244,7 @@ async function generateStreakCard(user, status, botName = 'Bot') {
   const statusX = textX + flameSize + 8 + ctx.measureText(streakCountText).width + 18;
   const statusLabel = isActiveToday ? 'PROTEGIDA HOY' : 'PENDIENTE HOY';
   const statusColor = isActiveToday ? '#2ECC71' : '#F39C12';
-  ctx.font = 'bold 13px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
+  ctx.font = `bold 13px ${FONT_FALLBACKS}`;
   const statusW = ctx.measureText(statusLabel).width + 30;
   const statusY = avY + 76;
   const statusH = 28;
@@ -273,7 +277,7 @@ async function generateStreakCard(user, status, botName = 'Bot') {
 
   let curPillX = 45;
   for (const perk of perks) {
-    ctx.font = 'bold 14px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
+    ctx.font = `bold 14px ${FONT_FALLBACKS}`;
     const pw = ctx.measureText(perk.label).width + 32;
     const ph = 34;
     
@@ -324,12 +328,12 @@ async function generateStreakCard(user, status, botName = 'Bot') {
     : 'Has alcanzado el rango maximo de racha de la comunidad!';
 
   ctx.fillStyle = '#9FA3BC';
-  ctx.font = '14px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
+  ctx.font = `14px ${FONT_FALLBACKS}`;
   ctx.fillText(nextText, barX, barY + 42);
 
   const nameDisplay = botName || 'Bot';
   const footerRight = `${nameDisplay} · Chatea a diario para mantener tu fuego`;
-  ctx.font = '13px "Segoe UI", "DejaVu Sans", "Liberation Sans", "Noto Sans", Arial, sans-serif';
+  ctx.font = `13px ${FONT_FALLBACKS}`;
   const frW = ctx.measureText(footerRight).width;
   ctx.fillStyle = '#6E728B';
   ctx.fillText(footerRight, width - frW - 45, barY + 42);

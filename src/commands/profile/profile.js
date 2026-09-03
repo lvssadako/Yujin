@@ -327,7 +327,7 @@ module.exports = {
         ctx.fill();
         ctx.restore();
 
-        ctx.font = `bold ${Math.floor(16 * SCALE)}px "Segoe UI", "Helvetica Neue", Arial, sans-serif`;
+        ctx.font = `bold ${Math.floor(16 * SCALE)}px ${FONT_FALLBACKS}`;
         ctx.fillStyle = '#ffffff';
         ctx.textAlign = 'center';
         ctx.fillText(`${streakDays} ${streakDays === 1 ? 'DÍA RACHA' : 'DÍAS RACHA'}`, streakCenterX, streakY + Math.floor(6 * SCALE));
@@ -337,7 +337,7 @@ module.exports = {
         roundRect(ctx, streakCenterX - STREAK_WIDTH / 2, streakY - STREAK_HEIGHT / 2, STREAK_WIDTH, STREAK_HEIGHT, Math.floor(20 * SCALE));
         ctx.fill();
 
-        ctx.font = `600 ${Math.floor(14 * SCALE)}px "Segoe UI", "Helvetica Neue", Arial, sans-serif`;
+        ctx.font = `600 ${Math.floor(14 * SCALE)}px ${FONT_FALLBACKS}`;
         ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
         ctx.textAlign = 'center';
         ctx.fillText('SIN RACHA', streakCenterX, streakY + Math.floor(5 * SCALE));
