@@ -140,12 +140,20 @@ module.exports = {
     let days = 15;
     let isDryRun = false;
 
-    if (args[0] && !isNaN(parseInt(args[0], 10))) {
-      days = Math.max(1, Math.min(365, parseInt(args[0], 10)));
+    const safeArgs = Array.isArray(args) ? args : [];
+
+    if (safeArgs[0] && !isNaN(parseInt(safeArgs[0], 10))) {
+      days = Math.max(1, Math.min(365, parseInt(safeArgs[0], 10)));
     }
 
-    const modeArg = (args[1] || (isNaN(parseInt(args[0], 10)) ? args[0] : '')).toLowerCase();
-    if (['audit', 'dryrun', 'test', 'ver', 'check', 'solo_ver'].includes(modeArg)) {
+    let modeArg = '';
+    if (safeArgs[1]) {
+      modeArg = String(safeArgs[1]).toLowerCase();
+    } else if (safeArgs[0] && isNaN(parseInt(safeArgs[0], 10))) {
+      modeArg = String(safeArgs[0]).toLowerCase();
+    }
+
+    if (['audit', 'dryrun', 'test', 'ver', 'check', 'solo_ver', 'auditar'].includes(modeArg)) {
       isDryRun = true;
     }
 

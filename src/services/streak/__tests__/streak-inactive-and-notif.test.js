@@ -166,3 +166,45 @@ test('recordMessageActivity reactivates streak starting at Day 1 when inactive u
   assert.equal(updatedStatus.streakDays, 1);
   assert.equal(updatedStatus.isActiveToday, true);
 });
+
+test('streakcheck executePrefix handles no args, numeric args, and audit mode safely', async () => {
+  const mockGuild = {
+    id: 'guild_prefix_streakcheck_test',
+    name: 'Prefix Streak Test Guild',
+    iconURL: () => 'https://example.com/icon.png'
+  };
+
+  let repliedEmbed = null;
+  const createMockMsg = () => ({
+    guild: mockGuild,
+    member: {
+      permissions: {
+        has: () => true
+      }
+    },
+    reply: async (data) => {
+      repliedEmbed = data;
+      return data;
+    }
+  });
+
+  // 1. Sin argumentos (&streakcheck) - debe usar days=15, isDryRun=false sin lanzar error
+  await streakCheckCmd.executePrefix(createMockMsg(), []);
+  assert.ok(repliedEmbed && repliedEmbed.embeds);
+
+  // 2. Solo días (&streakcheck 20)
+  await streakCheckCmd.executePrefix(createMockMsg(), ['20']);
+  assert.ok(repliedEmbed && repliedEmbed.embeds);
+
+  // 3. Solo modo audit (&streakcheck audit)
+  await streakCheckCmd.executePrefix(createMockMsg(), ['audit']);
+  assert.ok(repliedEmbed && repliedEmbed.embeds);
+
+  // 4. Días y modo audit (&streakcheck 30 audit)
+  await streakCheckCmd.executePrefix(createMockMsg(), ['30', 'audit']);
+  assert.ok(repliedEmbed && repliedEmbed.embeds);
+
+  // 5. Argumentos nulos o undefined
+  await streakCheckCmd.executePrefix(createMockMsg(), undefined);
+  assert.ok(repliedEmbed && repliedEmbed.embeds);
+});
