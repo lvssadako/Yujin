@@ -1,6 +1,7 @@
 
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const { readWarns, writeWarns } = require('../../utils/warnStore');
+const { sendDmNotification } = require('../../services/notification/dmNotificationService');
 const crypto = require('crypto');
 const logger = require('../../utils/logger');
 
@@ -43,14 +44,19 @@ module.exports = {
         .setTimestamp();
       await interaction.reply({ embeds: [emb] });
       
-      try { await target.send(`Has recibido una advertencia en **${interaction.guild.name}**. Razón: ${reason}`); } catch (e) {}
+      await sendDmNotification(target, {
+        guildId: interaction.guild.id,
+        guildName: interaction.guild.name,
+        category: 'warns',
+        content: `⚠️ Has recibido una advertencia en **${interaction.guild.name}**.\n> **Razón:** ${reason}`
+      });
     } 
     else if (sub === 'list') {
       const userWarns = warns[guildId][target.id];
       if (userWarns.length === 0) return interaction.reply({ content: '✅ Este usuario no tiene advertencias.', ephemeral: true });
       
       const emb = new EmbedBuilder().setColor(0x5865F2).setTitle(`📋 Advertencias de ${target.tag}`)
-        .setDescription(userWarns.map((w, i) => `**\${i+1}.** [\`${w.id}\`] - \${w.reason} (Por: <@\${w.modId}>)`).join('\\n'));
+        .setDescription(userWarns.map((w, i) => `**${i + 1}.** [\`${w.id}\`] - ${w.reason} (Por: <@${w.modId}>)`).join('\n'));
       await interaction.reply({ embeds: [emb] });
     }
     else if (sub === 'remove') {
@@ -94,7 +100,12 @@ module.exports = {
         .setFooter({ text: `Warn ID: ${warnId}` })
         .setTimestamp();
       await message.reply({ embeds: [emb] });
-      try { await target.send(`Has recibido una advertencia en **${message.guild.name}**. Razón: ${reason}`); } catch (e) {}
+      await sendDmNotification(target, {
+        guildId: message.guild.id,
+        guildName: message.guild.name,
+        category: 'warns',
+        content: `⚠️ Has recibido una advertencia en **${message.guild.name}**.\n> **Razón:** ${reason}`
+      });
     } else if (sub === 'list') {
       const target = message.mentions.users.first() || (args[1] ? await client.users.fetch(args[1]).catch(() => null) : message.author);
       const userWarns = warns[guildId]?.[target.id] || [];

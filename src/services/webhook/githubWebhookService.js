@@ -22,10 +22,18 @@ function verifySignature(secret, headerSignature, rawBody) {
   return crypto.timingSafeEqual(sigBuffer, digestBuffer);
 }
 
+const MAX_PAYLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
+
 function executeGitPull(branch = 'refactor/structure') {
   return new Promise((resolve, reject) => {
+    const safeBranch = String(branch).trim();
+    if (!/^[a-zA-Z0-9._\-/]+$/.test(safeBranch)) {
+      const err = new Error(`Nombre de rama inválido para git pull: ${safeBranch}`);
+      logger.error('[GitHub Webhook]', err);
+      return reject(err);
+    }
     const projectRoot = path.join(__dirname, '..', '..', '..');
-    const cmd = `git pull origin ${branch}`;
+    const cmd = `git pull origin ${safeBranch}`;
 
     logger.info(`[GitHub Webhook] Ejecutando: ${cmd}`);
     exec(cmd, { cwd: projectRoot }, (error, stdout, stderr) => {
@@ -97,11 +105,21 @@ function init(client, options = {}) {
       const contentType = (req.headers['content-type'] || '').toLowerCase();
 
       let body = '';
+      let bodyExceeded = false;
       req.on('data', chunk => {
+        if (bodyExceeded) return;
         body += chunk;
+        if (body.length > MAX_PAYLOAD_BYTES) {
+          bodyExceeded = true;
+          logger.warn('[GitHub Webhook] Carga útil excede el límite permitido (10MB).');
+          res.writeHead(413, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Payload Too Large' }));
+          req.destroy();
+        }
       });
 
       req.on('end', async () => {
+        if (bodyExceeded) return;
         // Validar firma criptográfica
         if (!verifySignature(SECRET, signature, body)) {
           logger.warn('[GitHub Webhook] Firma HMAC inválida o ausente recibida desde:', req.socket?.remoteAddress);

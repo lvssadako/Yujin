@@ -1,17 +1,18 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { createSuccessEmbed } = require('../../utils/embedFactory');
+const { createSuccessEmbed, createErrorEmbed } = require('../../utils/embedFactory');
+const { isOwnerOrDev } = require('../../utils/staffAuth');
 const logger = require('../../utils/logger');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('restart')
-    .setDescription('Reinicia el proceso del bot de forma segura y controlada.')
+    .setDescription('Reinicia el proceso del bot de forma segura y controlada (Exclusivo Desarrollador/Dueño).')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
-    if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+    if (!isOwnerOrDev(interaction.user.id)) {
       return interaction.reply({
-        content: '❌ Solo los administradores pueden ejecutar este comando.',
+        content: '❌ Solo los desarrolladores o dueños del bot pueden reiniciar el proceso.',
         ephemeral: true
       });
     }
@@ -23,7 +24,7 @@ module.exports = {
 
     await interaction.reply({ embeds: [embed], ephemeral: true });
 
-    logger.warn('Bot restart manual iniciado por administrador', {
+    logger.warn('Bot restart manual iniciado por desarrollador/dueño', {
       user: interaction.user.tag,
       userId: interaction.user.id
     });
@@ -34,8 +35,8 @@ module.exports = {
   },
 
   async executePrefix(message, args, client) {
-    if (!message.member?.permissions?.has(PermissionFlagsBits.Administrator)) {
-      return message.reply('❌ Solo los administradores pueden ejecutar este comando.');
+    if (!isOwnerOrDev(message.author.id)) {
+      return message.reply('❌ Solo los desarrolladores o dueños del bot pueden reiniciar el proceso.');
     }
 
     const embed = createSuccessEmbed(

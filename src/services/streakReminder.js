@@ -1,6 +1,7 @@
 const { EmbedBuilder } = require('discord.js');
 const { readProfiles, writeProfiles } = require('../utils/profileStore');
 const { getFlameTier, getLocalDayInfo } = require('./streak/streakService');
+const { canSendDmNotification, sendDmNotification } = require('./notification/dmNotificationService');
 const logger = require('../utils/logger');
 
 let clientRef = null;
@@ -31,7 +32,7 @@ async function checkStreaks() {
 
       const lastReminded = Number(profile.lastStreakReminderDay) || 0;
       if (lastReminded === today) continue; // Ya fue notificado hoy
-      if (profile.streakAlertsDisabled) continue; // Usuario desactivó alertas voluntariamente
+      if (profile.streakAlertsDisabled || !canSendDmNotification(guild.id, userId, 'streaks')) continue;
 
       try {
         const member = await guild.members.fetch(userId).catch(() => null);
@@ -54,8 +55,11 @@ async function checkStreaks() {
           .setFooter({ text: `${guild.name} · Sistema de Rachas de Actividad` })
           .setTimestamp();
 
-        await member.user.send({ embeds: [embed] }).catch(() => {
-          logger.warn('[streakReminder] No se pudo enviar DM de racha', { userId, guildId: guild.id });
+        await sendDmNotification(member.user, {
+          guildId: guild.id,
+          guildName: guild.name,
+          category: 'streaks',
+          embeds: [embed]
         });
 
         profile.lastStreakReminderDay = today;

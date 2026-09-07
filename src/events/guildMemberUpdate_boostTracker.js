@@ -7,6 +7,7 @@ const { validateChannelForSending } = require('../utils/channelValidation');
 const { createBoostEmbed, createInfoEmbed } = require('../utils/embedFactory');
 const { readJsonSafe, writeJsonAtomic } = require('../utils/jsonStore');
 const { readConfig } = require('../utils/configCache');
+const { sendDmNotification } = require('../services/notification/dmNotificationService');
 
 const dataDir = path.join(__dirname, '..', '..', 'data');
 const boostsPath = path.join(dataDir, 'boosts.json');
@@ -120,13 +121,15 @@ module.exports = (client) => {
           entry.firstBoost = now;
           addCoins(gid, uid, 10000);
 
-          try {
-            await newMember.send(
+          await sendDmNotification(newMember.user, {
+            guildId: gid,
+            guildName: guild.name,
+            category: 'boosts',
+            content:
               `🎉 ¡Gracias por boostear **${guild.name}**!\n` +
               `🪙 Has recibido **10,000 monedas** como recompensa inicial.\n` +
               `🪙 Recibirás **5,000 monedas** semanales mientras mantengas el boost activo.`
-            );
-          } catch {}
+          });
 
           logger.info(`💰 ${newMember.user.tag} recibió 10,000 monedas (primer boost);`);
         }
@@ -142,9 +145,12 @@ module.exports = (client) => {
           if (newBadges.length > 0) {
             const badgeList = newBadges.map(b => `${b.icon || '🏅'} ${b.name}`).join(', ');
             logger.info(`[badges] otorgados a ${newMember.user.tag}: ${badgeList}`);
-            try {
-              await newMember.send(`💎 ¡Gracias por boostear **${guild.name}**!\n🎖️ Desbloqueaste: ${badgeList}`);
-            } catch {}
+            await sendDmNotification(newMember.user, {
+              guildId: gid,
+              guildName: guild.name,
+              category: 'badges',
+              content: `💎 ¡Gracias por boostear **${guild.name}**!\n🎖️ Desbloqueaste: ${badgeList}`
+            });
           }
         } catch {}
 

@@ -174,6 +174,7 @@ test('handlePresenceUpdate schedules delayed removal when link is missing', asyn
 });
 
 test('stopPresenceStatusRoles clears pending timers and maps', () => {
+  stopPresenceStatusRoles();
   pendingRemove.set('u:r', setTimeout(() => {}, 10000));
   userCooldown.set('u', Date.now());
 

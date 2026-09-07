@@ -27,8 +27,13 @@ module.exports = {
       return interaction.reply({ content: '❌ No puedes aislar a un usuario con un rol igual o superior al tuyo.', ephemeral: true });
     }
 
-    if (!targetMember.manageable || !targetMember.isCommunicationDisabled() === false && !interaction.guild.members.me.permissions.has(PermissionFlagsBits.ModerateMembers)) {
-      return interaction.reply({ content: '❌ No tengo permisos para aislar a este usuario (verifica la jerarquía de mis roles).', ephemeral: true });
+    const me = await interaction.guild.members.fetchMe();
+    if (!me.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+      return interaction.reply({ content: '❌ No tengo permisos para aislar miembros.', ephemeral: true });
+    }
+
+    if (!targetMember.moderatable) {
+      return interaction.reply({ content: '❌ No puedo aislar a este usuario (verifica la jerarquía de mis roles).', ephemeral: true });
     }
 
     try {
@@ -69,6 +74,14 @@ module.exports = {
 
     if (targetMember.roles.highest.position >= message.member.roles.highest.position && message.author.id !== message.guild.ownerId) {
       return message.reply('❌ No puedes aislar a un usuario con un rol igual o superior al tuyo.');
+    }
+
+    const me = await message.guild.members.fetchMe();
+    if (!me.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+      return message.reply('❌ No tengo permisos para aislar miembros.');
+    }
+    if (!targetMember.moderatable) {
+      return message.reply('❌ No puedo aislar a este usuario (verifica la jerarquía de mis roles).');
     }
 
     try {

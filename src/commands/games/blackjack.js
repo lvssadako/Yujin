@@ -1,4 +1,4 @@
-﻿const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { getBalance, addCoins, removeCoins } = require('../../services/economy/index').economyService;
 const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
 const { secureChoice } = require('../../utils/cryptoRandom');
@@ -7,6 +7,39 @@ const logger = require('../../utils/logger');
 const MIN_BET = 100;
 const MAX_BET = 50000;
 const COOLDOWN_MS = 5000;
+const GAME_TTL_MS = 120000; // 2 minutos
+
+const activeGames = new Map();
+
+function cleanupExpiredGames() {
+  const now = Date.now();
+  for (const [uid, game] of activeGames.entries()) {
+    if (game.terminado || (now - (game.tiempo || 0)) > GAME_TTL_MS) {
+      if (game.timeout) clearTimeout(game.timeout);
+      activeGames.delete(uid);
+    }
+  }
+}
+
+// Interfaz retrocompatible y controlada
+global.blackjackGames = new Proxy(activeGames, {
+  get(target, prop) {
+    if (typeof prop === 'string') return target.get(prop);
+    return target[prop];
+  },
+  set(target, prop, val) {
+    if (typeof prop === 'string') target.set(prop, val);
+    return true;
+  },
+  deleteProperty(target, prop) {
+    if (typeof prop === 'string') {
+      const g = target.get(prop);
+      if (g && g.timeout) clearTimeout(g.timeout);
+      return target.delete(prop);
+    }
+    return true;
+  }
+});
 
 function todayUtcDay() {
   return Math.floor(Date.now() / 86400000);
@@ -341,6 +374,7 @@ module.exports = {
     ),
 
   async execute(interaction) {
+    cleanupExpiredGames();
     const bet = interaction.options.getInteger('apuesta');
     const guildId = interaction.guildId;
     const userId = interaction.user.id;

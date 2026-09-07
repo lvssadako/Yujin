@@ -61,6 +61,11 @@ function loadCommandRegistry({
         commandData.push(cmd.data.toJSON());
         if (typeof cmd.executePrefix === 'function') {
           prefixCommands.set(cmd.data.name, cmd);
+          if (Array.isArray(cmd.aliases)) {
+            for (const alias of cmd.aliases) {
+              prefixCommands.set(alias, cmd);
+            }
+          }
         }
       }
     } catch (error) {
@@ -102,8 +107,13 @@ function loadCommandRegistry({
       try {
         if (purgeCache) purgeFileCache(filePath);
         const cmd = require(filePath);
-        if (cmd && cmd.name && cmd.execute) {
+        if (cmd && cmd.name && (cmd.execute || cmd.executePrefix)) {
           prefixCommands.set(cmd.name, cmd);
+          if (Array.isArray(cmd.aliases)) {
+            for (const alias of cmd.aliases) {
+              prefixCommands.set(alias, cmd);
+            }
+          }
         }
       } catch (error) {
         logger.warn('Could not load prefix command file', {

@@ -93,8 +93,26 @@ async function fetchAndValidateImage(rawUrl, maxSizeBytes = 10 * 1024 * 1024) {
       return { ok: false, error: `La imagen excede el tamaño máximo permitido (${Math.round(maxSizeBytes / (1024 * 1024))} MB).` };
     }
 
-    const arrayBuf = await res.arrayBuffer();
-    const buffer = Buffer.from(arrayBuf);
+    let buffer;
+    if (res.body && typeof res.body.getReader === 'function') {
+      const reader = res.body.getReader();
+      const chunks = [];
+      let totalBytes = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        totalBytes += value.length;
+        if (totalBytes > maxSizeBytes) {
+          try { reader.cancel(); } catch {}
+          return { ok: false, error: `La imagen excede el tamaño máximo permitido (${Math.round(maxSizeBytes / (1024 * 1024))} MB).` };
+        }
+        chunks.push(value);
+      }
+      buffer = Buffer.concat(chunks);
+    } else {
+      const arrayBuf = await res.arrayBuffer();
+      buffer = Buffer.from(arrayBuf);
+    }
 
     if (buffer.length === 0) {
       return { ok: false, error: 'La respuesta de la imagen está vacía.' };
@@ -119,6 +137,16 @@ async function fetchAndValidateImage(rawUrl, maxSizeBytes = 10 * 1024 * 1024) {
   }
 }
 
+function getSafeImagePath(prefix, guildId, userId) {
+  const safeGuild = String(guildId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  const safeUser = String(userId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!safeGuild || !safeUser) return null;
+  const filePath = path.join(BACKGROUNDS_DIR, `${prefix}_${safeGuild}_${safeUser}.bin`);
+  const resolved = path.resolve(filePath);
+  if (!resolved.startsWith(path.resolve(BACKGROUNDS_DIR))) return null;
+  return resolved;
+}
+
 /**
  * Guarda y almacena en caché local permanente el fondo de perfil de un usuario
  * @param {string} guildId
@@ -130,12 +158,14 @@ async function saveUserProfileBackground(guildId, userId, url) {
   if (!guildId || !userId) return { ok: false, error: 'Parámetros inválidos.' };
   ensureBackgroundsDir();
 
+  const filePath = getSafeImagePath('profile', guildId, userId);
+  if (!filePath) return { ok: false, error: 'Identificador de usuario o servidor no válido.' };
+
   const result = await fetchAndValidateImage(url);
   if (!result.ok) {
     return result;
   }
 
-  const filePath = path.join(BACKGROUNDS_DIR, `profile_${guildId}_${userId}.bin`);
   try {
     await fs.promises.writeFile(filePath, result.buffer);
     logger.info(`[imageService] Cached user profile background for ${userId} (${result.size} bytes)`);
@@ -157,7 +187,8 @@ async function getUserProfileBackgroundBuffer(guildId, userId, fallbackUrl = nul
   if (!guildId || !userId) return null;
   ensureBackgroundsDir();
 
-  const filePath = path.join(BACKGROUNDS_DIR, `profile_${guildId}_${userId}.bin`);
+  const filePath = getSafeImagePath('profile', guildId, userId);
+  if (!filePath) return null;
 
   // 1. Lectura inmediata desde disco local (0ms lag, inmune a URLs caídas/expiradas)
   try {
@@ -192,7 +223,8 @@ async function getUserProfileBackgroundBuffer(guildId, userId, fallbackUrl = nul
  */
 async function deleteUserProfileBackground(guildId, userId) {
   if (!guildId || !userId) return;
-  const filePath = path.join(BACKGROUNDS_DIR, `profile_${guildId}_${userId}.bin`);
+  const filePath = getSafeImagePath('profile', guildId, userId);
+  if (!filePath) return;
   try {
     if (fs.existsSync(filePath)) {
       await fs.promises.unlink(filePath);
@@ -210,12 +242,14 @@ async function saveUserStreakBackground(guildId, userId, url) {
   if (!guildId || !userId) return { ok: false, error: 'Parámetros inválidos.' };
   ensureBackgroundsDir();
 
+  const filePath = getSafeImagePath('streak', guildId, userId);
+  if (!filePath) return { ok: false, error: 'Identificador de usuario o servidor no válido.' };
+
   const result = await fetchAndValidateImage(url);
   if (!result.ok) {
     return result;
   }
 
-  const filePath = path.join(BACKGROUNDS_DIR, `streak_${guildId}_${userId}.bin`);
   try {
     await fs.promises.writeFile(filePath, result.buffer);
     logger.info(`[imageService] Cached user streak background for ${userId} (${result.size} bytes)`);
@@ -233,7 +267,8 @@ async function getUserStreakBackgroundBuffer(guildId, userId, fallbackUrl = null
   if (!guildId || !userId) return null;
   ensureBackgroundsDir();
 
-  const filePath = path.join(BACKGROUNDS_DIR, `streak_${guildId}_${userId}.bin`);
+  const filePath = getSafeImagePath('streak', guildId, userId);
+  if (!filePath) return null;
 
   try {
     if (fs.existsSync(filePath)) {
@@ -264,7 +299,8 @@ async function getUserStreakBackgroundBuffer(guildId, userId, fallbackUrl = null
  */
 async function deleteUserStreakBackground(guildId, userId) {
   if (!guildId || !userId) return;
-  const filePath = path.join(BACKGROUNDS_DIR, `streak_${guildId}_${userId}.bin`);
+  const filePath = getSafeImagePath('streak', guildId, userId);
+  if (!filePath) return;
   try {
     if (fs.existsSync(filePath)) {
       await fs.promises.unlink(filePath);

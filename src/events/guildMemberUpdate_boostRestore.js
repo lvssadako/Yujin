@@ -1,6 +1,7 @@
 const logger = require('../utils/logger');
 const { Events } = require('discord.js');
 const { readProfiles, writeProfiles, ensureUser } = require('../utils/profileStore');
+const { sendDmNotification } = require('../services/notification/dmNotificationService');
 
 module.exports = (client) => {
   client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
@@ -36,10 +37,13 @@ module.exports = (client) => {
 
         writeProfiles(profiles);
         
-        // Notificar al usuario (opcional)
-        try {
-          await newMember.send('💔 Has dejado de boostear el servidor. Tu perfil personalizado ha sido guardado y se restaurará si vuelves a boostear.');
-        } catch {}
+        // Notificar al usuario con sendDmNotification
+        await sendDmNotification(newMember.user, {
+          guildId: newMember.guild.id,
+          guildName: newMember.guild.name,
+          category: 'boosts',
+          content: `💔 Has dejado de boostear **${newMember.guild.name}**. Tu perfil personalizado ha sido guardado y se restaurará si vuelves a boostear.`
+        });
       }
 
       // Ganó/recuperó el boost
@@ -59,14 +63,20 @@ module.exports = (client) => {
           writeProfiles(profiles);
 
           // Notificar al usuario
-          try {
-            await newMember.send('🚀 ¡Bienvenido de vuelta, Booster! Tu perfil personalizado ha sido restaurado.');
-          } catch {}
+          await sendDmNotification(newMember.user, {
+            guildId: newMember.guild.id,
+            guildName: newMember.guild.name,
+            category: 'boosts',
+            content: `🚀 ¡Bienvenido de vuelta, Booster! Tu perfil personalizado en **${newMember.guild.name}** ha sido restaurado.`
+          });
         } else {
           // Primer boost, no hay backup
-          try {
-            await newMember.send('🎉 ¡Gracias por boostear! Ahora puedes personalizar tu perfil con `/profileset`.');
-          } catch {}
+          await sendDmNotification(newMember.user, {
+            guildId: newMember.guild.id,
+            guildName: newMember.guild.name,
+            category: 'boosts',
+            content: `🎉 ¡Gracias por boostear **${newMember.guild.name}**! Ahora puedes personalizar tu perfil con \`/profileset\`.`
+          });
         }
       }
     } catch (err) {

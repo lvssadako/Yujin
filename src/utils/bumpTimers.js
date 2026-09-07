@@ -1,18 +1,14 @@
-// Utilidad para manejar timers de bump persistentes
-const fs = require('fs');
 const path = require('path');
+const { readJsonSafe, writeJsonAtomic } = require('./jsonStore');
 const timersPath = path.join(__dirname, '..', '..', 'data', 'bump_timers.json');
 
 function readTimers() {
-  try {
-    return JSON.parse(fs.readFileSync(timersPath, 'utf8'));
-  } catch {
-    return [];
-  }
+  const data = readJsonSafe(timersPath, []);
+  return Array.isArray(data) ? data : [];
 }
 
 function writeTimers(timers) {
-  fs.writeFileSync(timersPath, JSON.stringify(timers, null, 2));
+  writeJsonAtomic(timersPath, Array.isArray(timers) ? timers : []);
 }
 
 function addTimer(timer) {

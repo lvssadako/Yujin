@@ -66,5 +66,9 @@ module.exports = {
             logger.error('Ban command error:', err);
             return interaction.editReply('❌ Error al banear al usuario');
         }
+    },
+
+    async executePrefix(message, args, client) {
+        return require('../../prefixCommands/ban').execute(message, args, client);
     }
 };

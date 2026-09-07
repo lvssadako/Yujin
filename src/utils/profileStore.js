@@ -59,6 +59,16 @@ function ensureUser(profiles, guildId, userId) {
   if (typeof u.dailyStreak !== 'number') u.dailyStreak = 0;
   if (typeof u.lastDailyDay !== 'number') u.lastDailyDay = 0;
   if (typeof u.lastStreakReminderDay !== 'number') u.lastStreakReminderDay = 0;
+  if (!u.dmNotifications || typeof u.dmNotifications !== 'object') {
+    u.dmNotifications = {
+      all: true,
+      streaks: u.streakAlertsDisabled ? false : true,
+      warns: true,
+      levels: true,
+      boosts: true,
+      badges: true
+    };
+  }
   if (!u.xpBoostsActive) u.xpBoostsActive = [];
   if (!u.xpBoostsQueue) u.xpBoostsQueue = [];
   const now = Date.now();

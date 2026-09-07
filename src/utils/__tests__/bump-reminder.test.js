@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-const timersPath = path.join(__dirname, '..', 'data', 'bump_timers.json');
+const timersPath = path.join(__dirname, '..', '..', '..', 'data', 'bump_timers.json');
 const backup = fs.existsSync(timersPath) ? fs.readFileSync(timersPath, 'utf8') : null;
 
 function restore() {

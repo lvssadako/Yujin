@@ -69,5 +69,9 @@ module.exports = {
       logger.error('kick command error:', err);
       return interaction.reply({ content: '❌ Error al expulsar al miembro', ephemeral: true });
     }
+  },
+
+  async executePrefix(message, args, client) {
+    return require('../../prefixCommands/kick').execute(message, args, client);
   }
 };

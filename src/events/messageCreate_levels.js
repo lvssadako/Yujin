@@ -10,6 +10,7 @@ const { addCoins } = require('../services/economy').economyService;
 const { updateMissionProgress } = require('../utils/dailyMissions');
 const { shouldSendAutoMessage } = require('../utils/autoMessageGuard');
 const { recordMessageActivity } = require('../services/streak/streakService');
+const { sendDmNotification } = require('../services/notification/dmNotificationService');
 const { secureRandom, secureRandomInt, secureChoice } = require('../utils/cryptoRandom');
 
 function xpToNext(level) {
@@ -185,7 +186,12 @@ module.exports = (client) => {
               const newBadges = await checkAndGrantBadges(message.guild, userId);
               if (newBadges.length) {
                 const badgeList = newBadges.map(b => `${b.icon || '🏅'} **${b.name}**`).join(', ');
-                try { await message.author.send(`🎖️ Nuevo logro desbloqueado: ${badgeList}`); } catch {}
+                await sendDmNotification(message.author, {
+                  guildId,
+                  guildName: message.guild.name,
+                  category: 'badges',
+                  content: `🎖️ Nuevo logro desbloqueado en **${message.guild.name}**: ${badgeList}`
+                });
               }
             } catch (e) {
               logger.warn('[badges] Error verificando logros por mensajes:', e?.message);
@@ -294,16 +300,18 @@ module.exports = (client) => {
               logger.error('[levels] ❌ Error enviando anuncio de level up:', e?.message || e);
               
               // Fallback: enviar por DM si falla el canal
-              try {
-                logger.info('[levels] Intentando enviar por DM como fallback');
-                await message.author.send({
-                  content: `📩 **${message.guild.name}** - Level Up\n${text}`,
-                  allowedMentions: { users: [] }
-                });
+              logger.info('[levels] Intentando enviar por DM como fallback');
+              const dmRes = await sendDmNotification(message.author, {
+                guildId,
+                guildName: message.guild.name,
+                category: 'levels',
+                content: `📩 **${message.guild.name}** - Level Up\n${text}`
+              });
+              if (dmRes.sent) {
                 messageWasSent = true;
                 logger.info('[levels] ✅ Mensaje enviado por DM');
-              } catch (dmErr) {
-                logger.error('[levels] ❌ No se pudo enviar ni por canal ni por DM:', dmErr?.message);
+              } else {
+                logger.info('[levels] DM fallback no entregado:', dmRes.reason);
               }
             }
 
@@ -321,15 +329,13 @@ module.exports = (client) => {
                   }).catch(() => {});
                 } catch {}
                 
-                // También enviar por DM
-                try {
-                  const dm = await message.author.createDM();
-                  await dm.send({
-                    content: `🎉 ¡Felicidades! Desbloqueaste nuevos logros:\n${newBadges.map(b => `${b.icon || '🏅'} **${b.name}** - ${b.desc || 'Logro especial'}`).join('\n')}`
-                  });
-                } catch (dmErr) {
-                  logger.info('[badges] No se pudo enviar DM:', dmErr.message);
-                }
+                // También enviar por DM usando dmNotificationService
+                await sendDmNotification(message.author, {
+                  guildId,
+                  guildName: message.guild.name,
+                  category: 'badges',
+                  content: `🎉 ¡Felicidades! Desbloqueaste nuevos logros en **${message.guild.name}**:\n${newBadges.map(b => `${b.icon || '🏅'} **${b.name}** - ${b.desc || 'Logro especial'}`).join('\n')}`
+                });
               }
             } catch (e) {
               logger.warn('[badges] Error verificando logros:', e?.message);
@@ -447,29 +453,33 @@ module.exports = (client) => {
       const streakResult = recordMessageActivity(guildId, userId);
       if (streakResult.updated && !streakResult.alertsDisabled) {
         if (streakResult.wasReactivated) {
-          try {
-            await message.author.send(
-              `✨ ¡Bienvenido de vuelta a **${message.guild.name}**! Tu racha de actividad ha sido reactivada (**Día 1**). ¡Sigue escribiendo a diario para subir de nivel de fuego!`
-            );
-          } catch {}
+          await sendDmNotification(message.author, {
+            guildId,
+            guildName: message.guild.name,
+            category: 'streaks',
+            content: `✨ ¡Bienvenido de vuelta a **${message.guild.name}**! Tu racha de actividad ha sido reactivada (**Día 1**). ¡Sigue escribiendo a diario para subir de nivel de fuego!`
+          });
         } else if (streakResult.savedByFreeze) {
-          try {
-            await message.author.send(
-              `🧊 ¡Tu **Congelador de Racha** fue utilizado automáticamente! Salvaste tu racha de **${streakResult.streakDays} días** en **${message.guild.name}**.`
-            );
-          } catch {}
+          await sendDmNotification(message.author, {
+            guildId,
+            guildName: message.guild.name,
+            category: 'streaks',
+            content: `🧊 ¡Tu **Congelador de Racha** fue utilizado automáticamente! Salvaste tu racha de **${streakResult.streakDays} días** en **${message.guild.name}**.`
+          });
         } else if (streakResult.tierUpgraded && streakResult.coinsRewarded > 0) {
-          try {
-            await message.author.send(
-              `🔥 ¡Felicidades! Has alcanzado el nivel **${streakResult.tier.emoji} ${streakResult.tier.name}** con **${streakResult.streakDays} días** de racha en **${message.guild.name}**.\n🎁 **Recompensa por hito:** ¡Has recibido **+${streakResult.coinsRewarded.toLocaleString()} 🪙** en tu billetera!`
-            );
-          } catch {}
+          await sendDmNotification(message.author, {
+            guildId,
+            guildName: message.guild.name,
+            category: 'streaks',
+            content: `🔥 ¡Felicidades! Has alcanzado el nivel **${streakResult.tier.emoji} ${streakResult.tier.name}** con **${streakResult.streakDays} días** de racha en **${message.guild.name}**.\n🎁 **Recompensa por hito:** ¡Has recibido **+${streakResult.coinsRewarded.toLocaleString()} 🪙** en tu billetera!`
+          });
         } else if (streakResult.wasReset && streakResult.previousStreak >= 7 && cfg.notifyStreakLost) {
-          try {
-            await message.author.send(
-              `💔 Tu racha de actividad de **${streakResult.previousStreak} días** en **${message.guild.name}** se ha perdido. ¡Comienza una nueva hoy enviando mensajes!`
-            );
-          } catch {}
+          await sendDmNotification(message.author, {
+            guildId,
+            guildName: message.guild.name,
+            category: 'streaks',
+            content: `💔 Tu racha de actividad de **${streakResult.previousStreak} días** en **${message.guild.name}** se ha perdido. ¡Comienza una nueva hoy enviando mensajes!`
+          });
         }
       }
 
