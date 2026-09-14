@@ -12,10 +12,10 @@
     "test": "node --test --test-concurrency=1 \"src/**/__tests__/*.test.js\""
   },
   "dependencies": {
-    "@napi-rs/canvas": "^1.0.8",
+    "@napi-rs/canvas": "^1.0.9",
     "discord.js": "^14.11.0",
     "dotenv": "^17.4.2",
     "winston": "^3.19.0",
-    "zod": "^4.4.3"
+    "zod": "^4.6.2"
   }
 }
