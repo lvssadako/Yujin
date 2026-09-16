@@ -6,30 +6,11 @@ const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const { readProfiles, ensureUser } = require('../../utils/profileStore');
 const { readConfig } = require('../../utils/configCache');
 const { normalizeExternalImageUrl } = require('../../utils/urlSafety');
+const { fetchImageBuffer: fetchBuffer } = require('../../services/image/imageService');
 const { readLevels, ensureUserData, xpToNext, getUserRank } = require('../../services/level').levelService;
 const { initFonts, FONT_FALLBACKS } = require('../../utils/canvasFontLoader');
 
 initFonts();
-
-// Descargar buffer de imagen de forma limpia y directa
-async function fetchBuffer(url) {
-  if (!url || typeof url !== 'string') return null;
-  const targetUrl = url.trim();
-  if (!/^https?:\/\//i.test(targetUrl)) return null;
-
-  try {
-    const res = await fetch(targetUrl, { signal: AbortSignal.timeout(10000) });
-    if (!res.ok) {
-      logger.warn(`[fetchBuffer] HTTP ${res.status} para ${targetUrl}`);
-      return null;
-    }
-    const ab = await res.arrayBuffer();
-    return Buffer.from(ab);
-  } catch (e) {
-    logger.warn('[fetchBuffer] Error:', e?.message || e);
-    return null;
-  }
-}
 
 // Resolver icono de insignia (Discord custom emoji, snowflake ID, URL directa o archivo)
 async function resolveBadgeIcon(icon, size = 128) {
@@ -41,31 +22,19 @@ async function resolveBadgeIcon(icon, size = 128) {
   if (match) {
     const emojiId = match[1];
     const url = `https://cdn.discordapp.com/emojis/${emojiId}.png?size=${size}`;
-    const buf = await fetchBuffer(url);
-    if (buf) return buf;
-    try {
-      return await loadImage(url);
-    } catch {}
+    return fetchBuffer(url);
   }
 
   // 2. Solo Snowflake ID numérico de Discord
   const idMatch = str.match(/^(\d{17,21})$/);
   if (idMatch) {
     const url = `https://cdn.discordapp.com/emojis/${idMatch[1]}.png?size=${size}`;
-    const buf = await fetchBuffer(url);
-    if (buf) return buf;
-    try {
-      return await loadImage(url);
-    } catch {}
+    return fetchBuffer(url);
   }
 
   // 3. URL directa
   if (/^https?:\/\//i.test(str)) {
-    const buf = await fetchBuffer(str);
-    if (buf) return buf;
-    try {
-      return await loadImage(str);
-    } catch {}
+    return fetchBuffer(str);
   }
 
   // 4. Archivo local
@@ -261,8 +230,6 @@ module.exports = {
         const avBuf = await fetchBuffer(avUrl);
         if (avBuf) {
           img = await loadImage(avBuf);
-        } else {
-          img = await loadImage(avUrl);
         }
       } catch (err) {
         logger.warn('[profile] Error cargando avatar:', err?.message);

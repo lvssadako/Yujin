@@ -6,6 +6,7 @@ const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const { readLevels, xpToNext, getUserRank } = require('../../services/level').levelService;
 const { readProfiles, ensureUser } = require('../../utils/profileStore');
 const { initFonts, FONT_FALLBACKS } = require('../../utils/canvasFontLoader');
+const { fetchImageBuffer } = require('../../services/image/imageService');
 
 initFonts();
 
@@ -26,14 +27,7 @@ const dataDir = path.join(__dirname, '..', 'data');
 const levelsPath = path.join(dataDir, 'levels.json');
 
 async function fetchAvatarBuffer(url) {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('avatar fetch failed');
-    const ab = await res.arrayBuffer();
-    return Buffer.from(ab);
-  } catch {
-    return null;
-  }
+  return fetchImageBuffer(url);
 }
 
 function roundRect(ctx, x, y, w, h, r) {

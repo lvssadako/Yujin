@@ -24,25 +24,10 @@ function lightenHex(hex, amount = 0.35) {
   } catch { return '#F8B5A0'; }
 }
 
-const { normalizeExternalImageUrl } = require('../utils/urlSafety');
+const { fetchImageBuffer } = require('../services/image/imageService');
 
 async function fetchAvatarBuffer(url) {
-  const safeUrl = normalizeExternalImageUrl(url);
-  if (!safeUrl) return null;
-
-  try {
-    const res = await fetch(safeUrl, {
-      signal: AbortSignal.timeout(8000),
-      headers: {
-        'User-Agent': 'Mozilla/5.0'
-      }
-    });
-    if (!res.ok) throw new Error('avatar fetch failed');
-    const ab = await res.arrayBuffer();
-    return Buffer.from(ab);
-  } catch {
-    return null;
-  }
+  return fetchImageBuffer(url, { timeoutMs: 8000 });
 }
 
 function roundRect(ctx, x, y, w, h, r) {

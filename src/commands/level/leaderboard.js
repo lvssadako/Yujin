@@ -3,7 +3,7 @@ const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const logger = require('../../utils/logger');
 const { levelService } = require('../../services/level');
 const { readProfiles, ensureUser } = require('../../utils/profileStore');
-const { normalizeExternalImageUrl } = require('../../utils/urlSafety');
+const { fetchImageBuffer } = require('../../services/image/imageService');
 const { initFonts, FONT_FALLBACKS } = require('../../utils/canvasFontLoader');
 
 initFonts();
@@ -32,16 +32,7 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 async function fetchAvatarBuffer(url) {
-  const safeUrl = normalizeExternalImageUrl(url);
-  if (!safeUrl) return null;
-  try {
-    const res = await fetch(safeUrl, { signal: AbortSignal.timeout(6000) });
-    if (!res.ok) return null;
-    const ab = await res.arrayBuffer();
-    return Buffer.from(ab);
-  } catch {
-    return null;
-  }
+  return fetchImageBuffer(url, { timeoutMs: 6000 });
 }
 
 async function drawCircularAvatar(ctx, buffer, x, y, size, borderColor) {

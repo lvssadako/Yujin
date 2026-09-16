@@ -19,26 +19,10 @@ function stripEmoji(text) {
     .trim();
 }
 
-const { normalizeExternalImageUrl } = require('../../utils/urlSafety');
+const { fetchImageBuffer } = require('../image/imageService');
 
 async function fetchAvatarBuffer(url) {
-  const safeUrl = normalizeExternalImageUrl(url);
-  if (!safeUrl) return null;
-
-  try {
-    const res = await fetch(safeUrl, {
-      signal: AbortSignal.timeout(8000),
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
-      }
-    });
-    if (!res.ok) throw new Error('Fetch buffer error');
-    const ab = await res.arrayBuffer();
-    return Buffer.from(ab);
-  } catch {
-    return null;
-  }
+  return fetchImageBuffer(url, { timeoutMs: 8000 });
 }
 
 function roundRect(ctx, x, y, w, h, r) {

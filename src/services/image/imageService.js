@@ -1,7 +1,156 @@
 const fs = require('fs');
 const path = require('path');
 const logger = require('../../utils/logger');
-const { normalizeExternalImageUrl } = require('../../utils/urlSafety');
+const dns = require('node:dns').promises;
+const http = require('node:http');
+const https = require('node:https');
+const { isIP } = require('node:net');
+const { normalizeExternalImageUrl, parsePublicHttpUrl, isPublicIp } = require('../../utils/urlSafety');
+
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_DOWNLOAD_MS = 10000;
+const MAX_REDIRECTS = 5;
+
+function downloadError(code, message) {
+  return Object.assign(new Error(message), { code });
+}
+
+async function resolvePublicAddress(url) {
+  const hostname = url.hostname.replace(/^\[|\]$/g, '');
+  const family = isIP(hostname);
+  const addresses = family ? [{ address: hostname, family }]
+    : await dns.lookup(hostname, { all: true, verbatim: true });
+  // Fail closed even for mixed public/private answers; never resolve again
+  // while connecting. A new redirect gets its own checked DNS answer.
+  if (!addresses.length || addresses.some(item =>
+    !isPublicIp(item.address) || isIP(item.address) !== item.family)) {
+    throw downloadError('UNSAFE_URL', 'Destino de imagen bloqueado por seguridad.');
+  }
+  return addresses[0];
+}
+
+function requestImage(url, address, maxSizeBytes, signal) {
+  return new Promise((resolve, reject) => {
+    signal.throwIfAborted();
+    const transport = url.protocol === 'https:' ? https : http;
+    let response;
+    let settled = false;
+    function finish(error, result) {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener('abort', abort);
+      if (error) reject(error);
+      else resolve(result);
+      response?.destroy();
+      req.destroy();
+    }
+    const abort = () => finish(signal.reason);
+    const req = transport.request(url, {
+      method: 'GET',
+      signal,
+      agent: false, // Never reuse a socket from a different DNS validation.
+      family: address.family,
+      autoSelectFamily: false,
+      // Retain original URL hostname for Host, TLS SNI and certificate checks.
+      lookup: (_hostname, options, callback) => {
+        if (options.all) callback(null, [{ ...address }]);
+        else callback(null, address.address, address.family);
+      },
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        'Accept-Encoding': 'identity',
+      },
+    }, res => {
+      response = res;
+      res.on('error', error => finish(error));
+      if (settled) { res.destroy(); return; }
+      if ([301, 302, 303, 307, 308].includes(res.statusCode)) {
+        if (!res.headers.location) {
+          finish(downloadError('REDIRECT', 'Redirección de imagen sin destino.'));
+        } else {
+          finish(null, { location: res.headers.location });
+        }
+        return;
+      }
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        finish(downloadError('HTTP', `El servidor de la imagen respondió con error HTTP ${res.statusCode}.`));
+        return;
+      }
+      // No transparent decompression: limits apply to bytes actually buffered.
+      if (res.headers['content-encoding'] && res.headers['content-encoding'] !== 'identity') {
+        finish(downloadError('ENCODING', 'El servidor envió una imagen con codificación no admitida.'));
+        return;
+      }
+      const tooLarge = () => downloadError('SIZE', `La imagen excede el tamaño máximo permitido (${Math.round(maxSizeBytes / (1024 * 1024))} MB).`);
+      if (Number(res.headers['content-length']) > maxSizeBytes) {
+        finish(tooLarge());
+        return;
+      }
+      const chunks = [];
+      let size = 0;
+      res.on('data', chunk => {
+        if (settled) return;
+        size += chunk.length;
+        if (size > maxSizeBytes) { finish(tooLarge()); return; }
+        chunks.push(chunk);
+      });
+      res.on('end', () => finish(null, { buffer: Buffer.concat(chunks, size) }));
+      res.on('aborted', () => finish(downloadError('NETWORK', 'Descarga de imagen interrumpida.')));
+      res.on('close', () => {
+        if (!settled) finish(downloadError('NETWORK', 'Descarga de imagen interrumpida.'));
+      });
+    });
+    req.on('error', error => finish(error));
+    signal.addEventListener('abort', abort, { once: true });
+    req.end();
+  });
+}
+
+// One deadline covers DNS, connection, redirects and streaming (not just idle
+// socket time). OS DNS lookup cannot be cancelled, but a late answer can never
+// start a request after this deadline. No proxy environment variables are used.
+async function downloadImage(rawUrl, maxSizeBytes = MAX_IMAGE_BYTES, timeoutMs = MAX_DOWNLOAD_MS) {
+  if (!Number.isSafeInteger(maxSizeBytes) || maxSizeBytes <= 0 || maxSizeBytes > MAX_IMAGE_BYTES ||
+      !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > MAX_DOWNLOAD_MS) {
+    throw downloadError('LIMIT', 'Límites de descarga de imagen inválidos.');
+  }
+  const controller = new AbortController();
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const error = downloadError('TIMEOUT', 'Tiempo de espera agotado al descargar la imagen externa.');
+      controller.abort(error);
+      reject(error);
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([timeout, (async () => {
+      let target = rawUrl;
+      for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
+        const url = parsePublicHttpUrl(target);
+        if (!url) throw downloadError('UNSAFE_URL', 'URL no válida o bloqueada por seguridad.');
+        const address = await resolvePublicAddress(url);
+        controller.signal.throwIfAborted();
+        const result = await requestImage(url, address, maxSizeBytes, controller.signal);
+        if (result.buffer) return result.buffer;
+        if (redirects === MAX_REDIRECTS) break;
+        // Keep signed query parameters and allow extensionless CDN redirects.
+        target = new URL(result.location, url).toString();
+      }
+      throw downloadError('REDIRECT', 'Demasiadas redirecciones al descargar la imagen.');
+    })()]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Renderers historically accept extensionless URLs and SVG. Preserve that
+// contract while sharing ALL network protections with background uploads.
+async function fetchImageBuffer(url, { timeoutMs = MAX_DOWNLOAD_MS } = {}) {
+  try { return await downloadImage(url, MAX_IMAGE_BYTES, timeoutMs); }
+  catch { return null; }
+}
 
 const BACKGROUNDS_DIR = path.join(__dirname, '..', '..', '..', 'data', 'backgrounds');
 
@@ -69,50 +218,14 @@ function detectImageMime(buffer) {
  * @param {number} maxSizeBytes
  * @returns {Promise<{ ok: boolean, buffer?: Buffer, mime?: string, size?: number, error?: string }>}
  */
-async function fetchAndValidateImage(rawUrl, maxSizeBytes = 10 * 1024 * 1024) {
+async function fetchAndValidateImage(rawUrl, maxSizeBytes = MAX_IMAGE_BYTES) {
   const safeUrl = normalizeExternalImageUrl(rawUrl);
   if (!safeUrl) {
     return { ok: false, error: 'URL no válida o bloqueada por seguridad.' };
   }
 
   try {
-    const res = await fetch(safeUrl, {
-      signal: AbortSignal.timeout(10000),
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
-      }
-    });
-
-    if (!res.ok) {
-      return { ok: false, error: `El servidor de la imagen respondió con error HTTP ${res.status}.` };
-    }
-
-    const contentLength = Number(res.headers.get('content-length'));
-    if (Number.isFinite(contentLength) && contentLength > maxSizeBytes) {
-      return { ok: false, error: `La imagen excede el tamaño máximo permitido (${Math.round(maxSizeBytes / (1024 * 1024))} MB).` };
-    }
-
-    let buffer;
-    if (res.body && typeof res.body.getReader === 'function') {
-      const reader = res.body.getReader();
-      const chunks = [];
-      let totalBytes = 0;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        totalBytes += value.length;
-        if (totalBytes > maxSizeBytes) {
-          try { reader.cancel(); } catch {}
-          return { ok: false, error: `La imagen excede el tamaño máximo permitido (${Math.round(maxSizeBytes / (1024 * 1024))} MB).` };
-        }
-        chunks.push(value);
-      }
-      buffer = Buffer.concat(chunks);
-    } else {
-      const arrayBuf = await res.arrayBuffer();
-      buffer = Buffer.from(arrayBuf);
-    }
+    const buffer = await downloadImage(safeUrl, maxSizeBytes);
 
     if (buffer.length === 0) {
       return { ok: false, error: 'La respuesta de la imagen está vacía.' };
@@ -129,9 +242,9 @@ async function fetchAndValidateImage(rawUrl, maxSizeBytes = 10 * 1024 * 1024) {
 
     return { ok: true, buffer, mime, size: buffer.length };
   } catch (err) {
-    logger.warn('[imageService] Error fetching image:', err?.message || err);
-    if (err?.name === 'TimeoutError' || err?.message?.includes('timeout')) {
-      return { ok: false, error: 'Tiempo de espera agotado al descargar la imagen externa (timeout 10s).' };
+    // Do not log remote URLs, DNS answers or signed CDN tokens.
+    if (['UNSAFE_URL', 'SIZE', 'HTTP', 'TIMEOUT', 'REDIRECT', 'ENCODING', 'LIMIT'].includes(err?.code)) {
+      return { ok: false, error: err.message };
     }
     return { ok: false, error: 'No se pudo conectar con el servidor de la imagen.' };
   }
@@ -313,6 +426,7 @@ async function deleteUserStreakBackground(guildId, userId) {
 module.exports = {
   detectImageMime,
   fetchAndValidateImage,
+  fetchImageBuffer,
   saveUserProfileBackground,
   getUserProfileBackgroundBuffer,
   deleteUserProfileBackground,
