@@ -55,6 +55,7 @@ function writeLevels(data) {
     } catch {}
   } catch (err) {
     logger.error('[levelService] Error escribiendo levels.json:', err.message);
+    throw err;
   }
 }
 
