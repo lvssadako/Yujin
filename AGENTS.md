@@ -99,6 +99,13 @@ Todo comando nuevo o refactorizado debe contar obligatoriamente con compatibilid
 - Todo cálculo de intereses debe respetar el intervalo de 24 horas por préstamo (`TICK_INTERVAL_MS`) e imponer el techo de deuda máximo (`MAX_DEBT_MULTIPLIER = 2.5`).
 - El scheduler de préstamos se ejecuta cada 1 hora de forma idempotente, verificando el tiempo transcurrido por usuario sin duplicar cobros tras reinicios del bot.
 
+### 11. Gestor de paquetes único
+
+- El gestor oficial de este proyecto es `pnpm@11.24.0`, declarado en `package.json`.
+- Instalar, ejecutar scripts, auditar y actualizar dependencias siempre con `pnpm`.
+- No crear ni regenerar `package-lock.json`; el lockfile canónico es `pnpm-lock.yaml`.
+- Las referencias `npm` que permanezcan en metadatos de dependencias de terceros o en el identificador interno de Dependabot no representan comandos soportados del proyecto.
+
 ## Problemas ya detectados y que NO deben repetirse
 
 - escritura directa a JSON en varios lugares sin validación

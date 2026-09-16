@@ -111,10 +111,10 @@ This document summarizes the comprehensive stabilization, security hardening, mo
 
 ```bash
 # Run all tests
-npm test
+pnpm test
 
-# Run directly via Node test runner
-node --test "src/**/__tests__/*.test.js"
+# Run directly via Node test runner through pnpm
+pnpm exec node --test "src/**/__tests__/*.test.js"
 ```
 
 ---

@@ -185,7 +185,7 @@ Risk: 🟢 Bajo
   ├─ src/middleware/__tests__/rate-limit.test.js (4 tests)
   └─ src/database/__tests__/database-adapter.test.js (2 tests)
 
-☑ Configuración de package.json ("npm test" ejecuta todas las suites).
+☑ Configuración de package.json ("pnpm test" ejecuta todas las suites).
 
 Status: ✅ Completado al 100% (55/55 pruebas pasando)
 Risk: 🟢 Bajo

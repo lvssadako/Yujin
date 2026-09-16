@@ -61,4 +61,4 @@ El código base se rige por las siguientes directrices obligatorias de seguridad
 ## 🤖 Dependencias y Automatización
 
 - **Dependabot**: Monitoreo y actualización semanal automatizada de dependencias en `package.json` mediante [`.github/dependabot.yml`](./.github/dependabot.yml).
-- **Auditorías npm**: Ejecución periódica de `npm audit` o `pnpm audit` para mitigar CVEs en dependencias directas y transitivas.
+- **Auditorías pnpm**: Ejecución periódica de `pnpm audit` para mitigar CVEs en dependencias directas y transitivas.

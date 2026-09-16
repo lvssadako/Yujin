@@ -5,7 +5,9 @@
   "private": true,
   "license": "UNLICENSED",
   "main": "src/index.js",
+  "packageManager": "pnpm@11.24.0",
   "scripts": {
+    "preinstall": "node scripts/ensurePnpm.js",
     "start": "node src/index.js",
     "dev": "node --watch-path=src/index.js --watch-path=src/events --watch-path=config/default.json --watch-path=package.json --watch-path=.env --watch-preserve-output src/index.js",
     "watch": "node src/index.js",

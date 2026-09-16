@@ -55,7 +55,7 @@ Bot integral de Discord para gestión comunitaria avanzada, diseñado con arquit
   - Watcher en tiempo real que escucha cambios en `src/commands/`, `src/commands_shared/`, `src/prefixCommands/`, `src/services/`, `src/constants/` y `src/utils/`.
   - Purga la caché interna de `require` y recarga los módulos al instante **sin desconectar el bot de Discord ni reiniciar el proceso**.
   - Sincronización inteligente con la API de Discord (`syncSlashCommands`): Compara el hash SHA-256 de las definiciones de comandos y solo realiza llamadas REST si la estructura de comandos cambió, protegiendo contra rate limits.
-- **Reinicio Controlado de Proceso (`npm run dev`)**:
+- **Reinicio Controlado de Proceso (`pnpm dev`)**:
   - Acotado estrictamente a los archivos troncales (`src/index.js`, `.env`, `package.json`, `config/default.json`, `src/events/`).
   - Los archivos de datos JSON (`data/`, `src/data/`), logs y documentación están excluidos de reinicios para evitar bucles.
 - **Comandos de Mantenimiento para Administradores**:
@@ -175,7 +175,7 @@ LCOBOT/
 ```bash
 git clone <URL_DEL_REPOSITORIO>
 cd LCOBOT
-npm install
+pnpm install
 ```
 
 ### 2. Configurar variables de entorno
@@ -191,15 +191,15 @@ DISABLE_HOT_RELOAD=false
 
 - **Modo Desarrollo (con Hot Reload y reinicio estricto de troncales)**:
   ```bash
-  npm run dev
+  pnpm dev
   ```
 - **Modo Producción**:
   ```bash
-  npm start
+  pnpm start
   ```
 - **Ejecución de Pruebas Automatizadas**:
   ```bash
-  npm test
+  pnpm test
   ```
 
 ---
@@ -226,9 +226,9 @@ El proyecto utiliza el test runner nativo de Node.js (`node --test`), garantizan
 
 Ejecución de la suite completa:
 ```bash
-npm test
+pnpm test
 # o directamente:
-node --test "src/**/__tests__/*.test.js"
+pnpm exec node --test "src/**/__tests__/*.test.js"
 ```
 *Resultado: 58 pruebas pasando al 100%.*
 
@@ -249,7 +249,7 @@ node --test "src/**/__tests__/*.test.js"
 
 Para realizar cambios en el proyecto:
 1. Asegúrate de que los archivos de negocio residan en `src/services/` o `src/utils/`.
-2. Verifica que las pruebas sigan pasando con `npm test`.
+2. Verifica que las pruebas sigan pasando con `pnpm test`.
 3. Comprueba la sintaxis de JavaScript antes de desplegar con `node --check src/index.js`.
 
 ---

@@ -1,6 +1,7 @@
 version: 2
 updates:
-  # Configuración de Dependabot para dependencias de Node.js / npm
+  # Dependencias Node.js gestionadas por pnpm (pnpm-lock.yaml).
+  # Dependabot identifica este ecosistema como "npm" en su API.
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
@@ -18,7 +19,7 @@ updates:
       prefix: "chore(deps)"
       include: "scope"
     groups:
-      npm_and_yarn:
+      pnpm_dependencies:
         patterns:
           - "*"
       security-updates:

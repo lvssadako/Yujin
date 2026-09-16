@@ -13,7 +13,7 @@
 | **Estructura Limpia `src/`** | ✅ Completado | Código desacoplado en `commands/`, `services/`, `events/`, `utils/`, `loaders/` |
 | **Logger Centralizado (Winston)** | ✅ Completado | Logs estructurados con rotación automática en `logs/` y consola formateada |
 | **Hot Reload en Memoria** | ✅ Completado | Recarga instantánea de comandos/servicios sin reiniciar proceso ni Gateway |
-| **Reinicio Controlado** | ✅ Completado | `npm run dev` acotado exclusivamente a archivos troncales, excluyendo JSONs |
+| **Reinicio Controlado** | ✅ Completado | `pnpm dev` acotado exclusivamente a archivos troncales, excluyendo JSONs |
 | **Sistema de Rachas de Actividad (Streaks)** | ✅ Completado | 6 niveles de fuego, congeladores, alertas DM, tarjetas Canvas HD y estudio global |
 | **Personalización de Perfil y Rachas** | ✅ Completado | Wallpapers temáticos, colores de acento, fondos URL seguros y guardado global |
 | **Persistencia Atómica y Segura** | ✅ Completado | `writeJsonAtomic` previene corrupción en JSONs de estado (`profile.json`, `levels.json`) |

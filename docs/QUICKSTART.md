@@ -10,7 +10,7 @@ Guía práctica para levantar el bot, trabajar en desarrollo con Hot Reload, eje
 ```bash
 git clone <URL_DEL_REPOSITORIO>
 cd LCOBOT
-npm install
+pnpm install
 ```
 
 ### 1.2 Configurar `.env`
@@ -28,14 +28,14 @@ DISABLE_HOT_RELOAD=false
 
 ### Modo Desarrollo (con Hot Reload y watch en troncales)
 ```bash
-npm run dev
+pnpm dev
 ```
 > **¿Cómo funciona el Hot Reload?**
 > Al editar comandos en `src/commands/`, `src/services/`, `src/utils/`, etc., el bot recarga los módulos en memoria automáticamente **sin reiniciar el proceso ni perder la conexión al Gateway de Discord**.
 
 ### Modo Producción
 ```bash
-npm start
+pnpm start
 ```
 
 ---
@@ -44,11 +44,11 @@ npm start
 
 ```bash
 # Correr toda la suite de pruebas (39 tests)
-npm test
+pnpm test
 
 # Correr una suite específica
-node --test src/utils/__tests__/streak.test.js
-node --test src/utils/__tests__/command-loader.test.js
+pnpm exec node --test src/utils/__tests__/streak.test.js
+pnpm exec node --test src/utils/__tests__/command-loader.test.js
 ```
 
 ---

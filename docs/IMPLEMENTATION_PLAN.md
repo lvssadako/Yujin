@@ -50,7 +50,7 @@
    - Riesgo de inconsistencias o asignaciones no esperadas
 
 3. Nota de dependencias y validación insuficiente
-   - Aunque no hay vulnerabilidades conocidas de npm, la arquitectura no valida inputs ni nombres de archivos ni tipos de datos
+   - Aunque no hay vulnerabilidades conocidas en las dependencias Node.js, la arquitectura no valida inputs ni nombres de archivos ni tipos de datos
 
 #### Bajos
 
