@@ -2,10 +2,10 @@ const logger = require('../../utils/logger');
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
+const { readConfig, writeConfig } = require('../../utils/configCache');
 
 const dataDir = path.join(__dirname, '..', '..', '..', 'data');
 const levelsPath = path.join(dataDir, 'levels.json');
-const cfgPath = path.join(__dirname, '..', '..', '..', 'config.json');
 
 function readLevels() {
   try {
@@ -14,14 +14,6 @@ function readLevels() {
   } catch {
     return {};
   }
-}
-
-function readConfig() {
-  try { return JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch { return {}; }
-}
-
-function saveConfig(cfg) {
-  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2), 'utf8');
 }
 
 /**
@@ -146,6 +138,14 @@ module.exports = {
       .setDescription('Fuerza actualización manual de roles de top')),
 
   async execute(interaction) {
+    if (!interaction.guild) {
+      return interaction.reply({ content: '❌ Este comando solo puede usarse en un servidor.', ephemeral: true });
+    }
+    const permissions = interaction.member?.permissions;
+    if (!permissions?.has(PermissionFlagsBits.ManageRoles) && !permissions?.has(PermissionFlagsBits.Administrator)) {
+      return interaction.reply({ content: '❌ Necesitas permisos para gestionar roles de top.', ephemeral: true });
+    }
+
     const subcommand = interaction.options.getSubcommand();
 
     if (subcommand === 'update') {
@@ -186,8 +186,10 @@ module.exports = {
         });
       }
 
-      config.topRoles[position] = role.id;
-      saveConfig(config);
+      writeConfig(current => ({
+        ...current,
+        topRoles: { ...(current.topRoles || {}), [position]: role.id }
+      }));
 
       await interaction.reply(`✅ Rol ${role} configurado para Top ${position}`);
 
@@ -201,8 +203,11 @@ module.exports = {
         return interaction.reply({ content: `❌ No hay rol configurado para Top ${position}`, ephemeral: true });
       }
 
-      delete config.topRoles[position];
-      saveConfig(config);
+      writeConfig(current => {
+        const next = { ...current, topRoles: { ...(current.topRoles || {}) } };
+        delete next.topRoles[position];
+        return next;
+      });
 
       await interaction.reply(`✅ Rol de Top ${position} eliminado`);
 
@@ -214,6 +219,9 @@ module.exports = {
   },
 
   async executePrefix(message, args, client) {
+    if (!message.guild?.id) {
+      return message.reply('❌ Este comando solo puede usarse en un servidor.');
+    }
     if (!message.member?.permissions.has(PermissionFlagsBits.ManageRoles) && !message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
       return message.reply('❌ No tienes permisos para gestionar roles de top.');
     }
@@ -239,15 +247,23 @@ module.exports = {
       if (isNaN(pos) || pos < 1 || pos > 10 || !role) {
         return message.reply('❌ Uso: `&toproles set <posicion 1-10> @rol`');
       }
-      config.topRoles[pos] = role.id;
-      saveConfig(config);
+      if (!role.editable) {
+        return message.reply('❌ No puedo gestionar ese rol (está por encima de mi rol más alto).');
+      }
+      writeConfig(current => ({
+        ...current,
+        topRoles: { ...(current.topRoles || {}), [pos]: role.id }
+      }));
       await message.reply(`✅ Rol ${role.name} configurado para Top ${pos}.`);
       await updateTopRoles(message.guild).catch(() => {});
     } else if (sub === 'remove') {
       const pos = parseInt(args[1], 10);
       if (isNaN(pos) || !config.topRoles[pos]) return message.reply('❌ Posición no válida o sin rol configurado.');
-      delete config.topRoles[pos];
-      saveConfig(config);
+      writeConfig(current => {
+        const next = { ...current, topRoles: { ...(current.topRoles || {}) } };
+        delete next.topRoles[pos];
+        return next;
+      });
       await message.reply(`✅ Rol de Top ${pos} eliminado.`);
       await updateTopRoles(message.guild).catch(() => {});
     } else {
