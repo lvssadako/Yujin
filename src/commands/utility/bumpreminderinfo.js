@@ -1,21 +1,16 @@
 const { SlashCommandBuilder } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
-
-const configPath = path.join(__dirname, '..', '..', '..', 'data', 'bump_reminder.json');
-function readConfig() {
-  try { return JSON.parse(fs.readFileSync(configPath, 'utf8')); }
-  catch { return {}; }
-}
+const { getBumpReminder } = require('../../utils/bumpReminderStore');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('bumpreminderinfo')
     .setDescription('Muestra la configuración actual del recordatorio de bump'),
   async execute(interaction) {
-    const config = readConfig();
     const guildId = interaction.guildId;
-    const reminder = config[guildId];
+    if (!guildId) {
+      return interaction.reply({ content: '❌ Este comando solo puede usarse en un servidor.', ephemeral: true });
+    }
+    const reminder = getBumpReminder(guildId);
     if (reminder && reminder.channelId && reminder.roleId) {
       await interaction.reply({
         content: `🔔 El recordatorio de bump está configurado para el canal <#${reminder.channelId}> y el rol <@&${reminder.roleId}>.`,
@@ -30,9 +25,11 @@ module.exports = {
   },
 
   async executePrefix(message, args, client) {
-    const config = readConfig();
+    if (!message.guild?.id) {
+      return message.reply('❌ Este comando solo puede usarse en un servidor.');
+    }
     const guildId = message.guild.id;
-    const reminder = config[guildId];
+    const reminder = getBumpReminder(guildId);
     if (reminder && reminder.channelId && reminder.roleId) {
       await message.reply({
         content: `🔔 El recordatorio de bump está configurado para el canal <#${reminder.channelId}> y el rol <@&${reminder.roleId}>.`

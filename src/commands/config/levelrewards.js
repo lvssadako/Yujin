@@ -1,10 +1,5 @@
-const fs = require('fs');
-const path = require('path');
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
-
-const cfgPath = path.join(__dirname, '..', 'config.json');
-function readCfg() { try { return JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch { return {}; } }
-function writeCfg(obj) { fs.writeFileSync(cfgPath, JSON.stringify(obj, null, 2), 'utf8'); }
+const { readConfig: readCfg, writeConfig: writeCfg } = require('../../utils/configCache');
 
 module.exports = {
   data: new SlashCommandBuilder()

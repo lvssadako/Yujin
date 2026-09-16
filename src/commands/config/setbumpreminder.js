@@ -1,15 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
-
-const configPath = path.join(__dirname, '..', '..', '..', 'data', 'bump_reminder.json');
-function readConfig() {
-  try { return JSON.parse(fs.readFileSync(configPath, 'utf8')); }
-  catch { return {}; }
-}
-function writeConfig(obj) {
-  fs.writeFileSync(configPath, JSON.stringify(obj, null, 2), 'utf8');
-}
+const { setBumpReminder } = require('../../utils/bumpReminderStore');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -29,12 +19,10 @@ module.exports = {
     const channel = interaction.options.getChannel('canal');
     const role = interaction.options.getRole('rol');
     const guildId = interaction.guildId;
-    const config = readConfig();
-    config[guildId] = {
-      channelId: channel.id,
-      roleId: role.id
-    };
-    writeConfig(config);
+    if (!guildId) {
+      return interaction.reply({ content: '❌ Este comando solo puede usarse en un servidor.', ephemeral: true });
+    }
+    setBumpReminder(guildId, channel.id, role.id);
     await interaction.reply({
       content: `✅ Recordatorio de bump configurado para el canal <#${channel.id}> y el rol <@&${role.id}>.\n\nPuedes ver la configuración actual en cualquier momento usando /bumpreminderinfo.`,
       ephemeral: true
@@ -50,12 +38,10 @@ module.exports = {
     if (!channel || !role) {
       return message.reply('❌ Uso: `&setbumpreminder #canal @rol`');
     }
-    const config = readConfig();
-    config[message.guild.id] = {
-      channelId: channel.id,
-      roleId: role.id
-    };
-    writeConfig(config);
+    if (!message.guild?.id) {
+      return message.reply('❌ Este comando solo puede usarse en un servidor.');
+    }
+    setBumpReminder(message.guild.id, channel.id, role.id);
     await message.reply(`✅ Recordatorio de bump configurado para el canal <#${channel.id}> y el rol <@&${role.id}>.`);
   }
 };

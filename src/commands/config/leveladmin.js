@@ -4,17 +4,17 @@ const path = require('path');
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { validateRoleForAssignment } = require('../../utils/roleValidation');
 const { validateChannelForSending } = require('../../utils/channelValidation');
+const { readConfig: readCentralConfig, writeConfig: writeCentralConfig } = require('../../utils/configCache');
 
 const dataDir = path.join(__dirname, '..', '..', '..', 'data');
 const levelsPath = path.join(dataDir, 'levels.json');
-const cfgPath = path.join(__dirname, '..', '..', '..', 'config.json');
 
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
 function readLevels() { try { return JSON.parse(fs.readFileSync(levelsPath, 'utf8')); } catch { return { guilds: {} }; } }
 function writeLevels(obj) { fs.writeFileSync(levelsPath, JSON.stringify(obj, null, 2), 'utf8'); }
-function readCfg() { try { return JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch { return {}; } }
-function writeCfg(obj) { fs.writeFileSync(cfgPath, JSON.stringify(obj, null, 2), 'utf8'); }
+function readCfg() { return readCentralConfig(); }
+function writeCfg(obj) { return writeCentralConfig(obj); }
 
 function xpToNext(level) { return Math.round(200 * Math.pow(level + 1, 1.4)); }
 function totalXpFromLevel(level, xpProgress) {

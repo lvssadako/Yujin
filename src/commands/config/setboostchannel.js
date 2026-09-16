@@ -1,9 +1,6 @@
 const logger = require('../../utils/logger');
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
-
-const cfgPath = path.join(__dirname, '..', '..', '..', 'config.json');
+const { writeConfig } = require('../../utils/configCache');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -23,18 +20,19 @@ module.exports = {
 
   async execute(interaction) {
     try {
-      const config = fs.existsSync(cfgPath) ? JSON.parse(fs.readFileSync(cfgPath, 'utf8')) : {};
       const subcommand = interaction.options.getSubcommand();
 
       if (subcommand === 'set') {
         const channel = interaction.options.getChannel('canal');
-        config.boostChannelId = channel.id;
-        fs.writeFileSync(cfgPath, JSON.stringify(config, null, 2));
+        writeConfig(current => ({ ...current, boostChannelId: channel.id }));
         await interaction.reply(`✅ Canal de notificaciones de boost configurado a ${channel}`);
       } 
       else if (subcommand === 'remove') {
-        delete config.boostChannelId;
-        fs.writeFileSync(cfgPath, JSON.stringify(config, null, 2));
+        writeConfig(current => {
+          const next = { ...current };
+          delete next.boostChannelId;
+          return next;
+        });
         await interaction.reply('✅ Canal de notificaciones de boost removido');
       }
     } catch (err) {
@@ -52,16 +50,17 @@ module.exports = {
     }
     const sub = (args[0] || '').toLowerCase();
     try {
-      const config = fs.existsSync(cfgPath) ? JSON.parse(fs.readFileSync(cfgPath, 'utf8')) : {};
       if (sub === 'remove' || sub === 'quitar') {
-        delete config.boostChannelId;
-        fs.writeFileSync(cfgPath, JSON.stringify(config, null, 2));
+        writeConfig(current => {
+          const next = { ...current };
+          delete next.boostChannelId;
+          return next;
+        });
         return message.reply('✅ Canal de notificaciones de boost removido.');
       }
       const channel = message.mentions.channels.first() || (args[1] ? await message.guild.channels.fetch(args[1]).catch(() => null) : null);
       if (!channel) return message.reply('❌ Uso: `&setboostchannel set #canal` o `&setboostchannel remove`');
-      config.boostChannelId = channel.id;
-      fs.writeFileSync(cfgPath, JSON.stringify(config, null, 2));
+      writeConfig(current => ({ ...current, boostChannelId: channel.id }));
       return message.reply(`✅ Canal de notificaciones de boost configurado a <#${channel.id}>.`);
     } catch (err) {
       logger.error('Error en setboostchannel prefix:', err);

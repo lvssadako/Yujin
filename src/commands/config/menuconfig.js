@@ -1,6 +1,4 @@
 const logger = require('../../utils/logger');
-const fs = require('fs');
-const path = require('path');
 const {
   SlashCommandBuilder,
   PermissionFlagsBits,
@@ -11,21 +9,7 @@ const {
   StringSelectMenuBuilder,
   ComponentType
 } = require('discord.js');
-
-const configPath = path.join(__dirname, '..', 'config.json');
-
-// helper read/write (seguro si no existe)
-function readConfig() {
-  try {
-    if (!fs.existsSync(configPath)) return {};
-    return JSON.parse(fs.readFileSync(configPath, 'utf8'));
-  } catch (e) {
-    return {};
-  }
-}
-function writeConfig(cfg) {
-  fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2), 'utf8');
-}
+const { readConfig, writeConfig } = require('../../utils/configCache');
 
 // generate a safe key from name
 function genKey(name) {

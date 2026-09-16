@@ -3,20 +3,12 @@ const { addXp } = require('../services/level').levelService;
 const { shouldSendAutoMessage } = require('../utils/autoMessageGuard');
 const { grantOnceAsync } = require('../utils/eventGuard');
 
-const fs = require('fs');
-const path = require('path');
 const { addTimer, removeTimer, hasActiveTimerForGuild } = require('../utils/bumpTimers');
+const { getBumpReminder } = require('../utils/bumpReminderStore');
 
 const DISBOARD_ID = '302050872383242240';
 const BUMP_SUCCESS_TEXT = 'Bump done!';
 const processedBumps = new Map();
-
-// Configuración de recordatorio (canal y rol)
-const configPath = path.join(__dirname, '..', '..', 'data', 'bump_reminder.json');
-function readConfig() {
-  try { return JSON.parse(fs.readFileSync(configPath, 'utf8')); }
-  catch { return {}; }
-}
 
 module.exports = (client) => {
   client.on('messageCreate', async (message) => {
@@ -92,8 +84,7 @@ if (!hasBumpEmbed) return;
     } catch {}
 
     // Recordatorio (si está configurado)
-    const config = readConfig();
-    const reminder = config[guildId];
+    const reminder = getBumpReminder(guildId);
     if (reminder && reminder.channelId && reminder.roleId) {
       if (hasActiveTimerForGuild(guildId)) {
         return;

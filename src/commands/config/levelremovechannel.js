@@ -1,15 +1,5 @@
-const fs = require('fs');
-const path = require('path');
 const { SlashCommandBuilder, ChannelType, PermissionFlagsBits } = require('discord.js');
-
-const configPath = path.join(__dirname, '..', '..', '..', 'data', 'config.json');
-
-function readConfig() {
-    try { return JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch { return {}; }
-}
-function writeConfig(config) {
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-}
+const { readConfig, writeConfig } = require('../../utils/configCache');
 
 module.exports = {
     name: 'levelremovechannel',
@@ -22,9 +12,12 @@ module.exports = {
     async execute(interaction) {
         const channel = interaction.options.getChannel('channel');
         const config = readConfig();
-        if (config.channels && config.channels[channel.id]) {
-            delete config.channels[channel.id];
-            writeConfig(config);
+        if (config.channels && Object.prototype.hasOwnProperty.call(config.channels, channel.id)) {
+            writeConfig(current => {
+                const next = { ...current, channels: { ...(current.channels || {}) } };
+                delete next.channels[channel.id];
+                return next;
+            });
             return interaction.reply(`✅ Canal ${channel} removido de la lista.`);
         } else {
             return interaction.reply(`⚠️ El canal ${channel} no está en la lista.`);
@@ -38,9 +31,12 @@ module.exports = {
         const channel = message.mentions.channels.first() || (args[0] ? await message.guild.channels.fetch(args[0]).catch(() => null) : null);
         if (!channel) return message.reply('❌ Uso: `&levelremovechannel #canal`');
         const config = readConfig();
-        if (config.channels && config.channels[channel.id]) {
-            delete config.channels[channel.id];
-            writeConfig(config);
+        if (config.channels && Object.prototype.hasOwnProperty.call(config.channels, channel.id)) {
+            writeConfig(current => {
+                const next = { ...current, channels: { ...(current.channels || {}) } };
+                delete next.channels[channel.id];
+                return next;
+            });
             return message.reply(`✅ Canal <#${channel.id}> removido de la lista.`);
         } else {
             return message.reply(`⚠️ El canal <#${channel.id}> no está en la lista.`);
