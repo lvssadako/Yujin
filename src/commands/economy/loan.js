@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { getBalance, addCoins, removeCoins } = require('../../services/economy/index').economyService;
-const { takeLoan, repayLoan, getUserLoanSummary } = require('../../services/economy/loanService');
+const { getUserLoanSummary } = require('../../services/economy/loanService');
+const { loanPaymentService } = require('../../services/economy/loanPaymentService');
+const { loanGrantService } = require('../../services/economy/loanGrantService');
 
 // ─── Constantes de penalización ───────────────────────────────────────────────
 
@@ -13,22 +14,18 @@ const PENALTY_INFO = [
 
 // ─── Subcomando: take ─────────────────────────────────────────────────────────
 
-async function handleTake(guildId, userId, amountStr) {
-  const amount = parseInt(amountStr, 10);
-  if (isNaN(amount) || amount <= 0) {
-    return { error: '❌ Especifica una cantidad válida (entre 500 y 100,000 🪙).' };
+async function handleTake(guildId, userId, amountStr, source, deliveryId) {
+  let result;
+  try {
+    result = loanGrantService.grant({ guildId, userId, amount: amountStr, source, deliveryId });
+  } catch {
+    return { error: '❌ No se pudo confirmar el préstamo. Consulta `/loan status` antes de enviar otra solicitud; si el problema continúa, contacta al staff.' };
   }
-
-  const result = takeLoan(guildId, userId, amount);
-  if (!result.success) {
-    return { error: `❌ ${result.reason}` };
-  }
-
-  // Acreditar el dinero en la billetera del usuario
-  addCoins(guildId, userId, amount);
-  const newBal = getBalance(guildId, userId);
-
-  const initialInterest = result.initialInterest || Math.ceil(amount * 0.05);
+  if (result.duplicate) return { duplicate: true };
+  if (!result.success) return { error: result.error };
+  const amount = result.credited;
+  const newBal = { coins: result.coins };
+  const initialInterest = result.initialInterest;
 
   const embed = new EmbedBuilder()
     .setColor(0x5865F2)
@@ -57,46 +54,17 @@ async function handleTake(guildId, userId, amountStr) {
 
 // ─── Subcomando: repay ────────────────────────────────────────────────────────
 
-async function handleRepay(guildId, userId, amountStr) {
-  const summary = getUserLoanSummary(guildId, userId);
-  if (!summary.active) {
-    return { error: '✅ No tienes préstamos activos. ¡Estás libre de deudas!' };
+async function handleRepay(guildId, userId, amountStr, source, deliveryId) {
+  let result;
+  try {
+    result = loanPaymentService.pay({ guildId, userId, amount: amountStr, source, deliveryId });
+  } catch {
+    return { error: '❌ No se pudo confirmar el pago. Consulta `/loan status` antes de enviar otro pago; si el problema continúa, contacta al staff.' };
   }
-
-  const bal = getBalance(guildId, userId);
-
-  let amount;
-  if (amountStr === 'all' || amountStr === 'todo') {
-    amount = Math.min(bal.coins, summary.balance);
-  } else {
-    amount = parseInt(amountStr, 10);
-    if (isNaN(amount) || amount <= 0) {
-      return { error: '❌ Especifica una cantidad válida o usa `all` para pagar todo.' };
-    }
-  }
-
-  if (amount > bal.coins) {
-    return { error: `❌ No tienes suficientes monedas. Tienes **${bal.coins.toLocaleString()} 🪙** y la deuda es **${summary.balance.toLocaleString()} 🪙**.` };
-  }
-
-  if (amount <= 0) {
-    return { error: '❌ No tienes monedas para pagar.' };
-  }
-
-  // Descontar monedas
-  const removed = removeCoins(guildId, userId, amount);
-  if (!removed) {
-    return { error: '❌ No se pudo procesar el pago. Fondos insuficientes.' };
-  }
-
-  const result = repayLoan(guildId, userId, amount);
-  if (!result.success) {
-    // Revertir el pago si algo falló en repayLoan (no debería ocurrir)
-    addCoins(guildId, userId, amount);
-    return { error: `❌ ${result.reason}` };
-  }
-
-  const newBal = getBalance(guildId, userId);
+  // El recibo evita volver a cobrar y responder a una entrega ya registrada.
+  if (result.duplicate) return { duplicate: true };
+  if (!result.success) return { error: result.error };
+  const newBal = { coins: result.coins };
 
   if (result.cleared) {
     const embed = new EmbedBuilder()
@@ -246,36 +214,38 @@ module.exports = {
     let result;
     if (sub === 'take') {
       const cantidad = interaction.options.getInteger('cantidad');
-      result = await handleTake(guildId, userId, cantidad.toString());
+      result = await handleTake(guildId, userId, cantidad?.toString(), 'slash', interaction.id);
     } else if (sub === 'repay') {
       const cantidad = interaction.options.getString('cantidad').toLowerCase().trim();
-      result = await handleRepay(guildId, userId, cantidad);
+      result = await handleRepay(guildId, userId, cantidad, 'slash', interaction.id);
     } else if (sub === 'status') {
       result = await handleStatus(guildId, userId);
     } else {
       return interaction.reply({ content: '❌ Subcomando no reconocido.', ephemeral: true });
     }
 
+    if (result.duplicate) return;
     if (result.error) return interaction.reply({ content: result.error, ephemeral: true });
     return interaction.reply({ embeds: [result.embed] });
   },
 
   async executePrefix(message, args) {
     const sub = (args[0] || '').toLowerCase();
-    const guildId = message.guild.id;
+    const guildId = message.guild?.id;
     const userId = message.author.id;
 
     let result;
     if (sub === 'take' || sub === 'pedir') {
-      result = await handleTake(guildId, userId, args[1]);
+      result = await handleTake(guildId, userId, args[1], 'prefix', message.id);
     } else if (sub === 'repay' || sub === 'pagar') {
-      result = await handleRepay(guildId, userId, (args[1] || '').toLowerCase());
+      result = await handleRepay(guildId, userId, (args[1] || '').toLowerCase(), 'prefix', message.id);
     } else if (sub === 'status' || sub === 'estado') {
       result = await handleStatus(guildId, userId);
     } else {
       return message.reply('❌ Uso: `&loan take <cantidad>`, `&loan repay <cantidad|all>`, `&loan status`');
     }
 
+    if (result.duplicate) return;
     if (result.error) return message.reply(result.error);
     return message.reply({ embeds: [result.embed] });
   }

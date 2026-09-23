@@ -1,228 +1,150 @@
-const http = require('http');
-const crypto = require('crypto');
-const path = require('path');
-const querystring = require('querystring');
-const { exec } = require('child_process');
-const logger = require('../../utils/logger');
-const { reloadCommandRegistry } = require('../../loaders/commandLoader');
+const http = require('node:http');
+const crypto = require('node:crypto');
+const path = require('node:path');
+const querystring = require('node:querystring');
+const { execFile } = require('node:child_process');
+const { createDeliveryStore } = require('./deliveryStore');
 
+const MAX_PAYLOAD_BYTES = 10 * 1024 * 1024;
+const WEBHOOK_PATHS = new Set(['/webhook', '/api/webhook', '/api/github-webhook', '/github-webhook']);
+const HEALTH_PATHS = new Set(['/', '/health', '/status', '/api/health', '/healthcheck']);
 let server = null;
 
-function verifySignature(secret, headerSignature, rawBody) {
-  if (!secret) return true; // Si no hay secret configurado, omitir validación
-  if (!headerSignature) return false;
-
-  const hmac = crypto.createHmac('sha256', secret);
-  const digest = `sha256=${hmac.update(rawBody).digest('hex')}`;
-
-  const sigBuffer = Buffer.from(headerSignature);
-  const digestBuffer = Buffer.from(digest);
-
-  if (sigBuffer.length !== digestBuffer.length) return false;
-  return crypto.timingSafeEqual(sigBuffer, digestBuffer);
+function verifySignature(secret, signature, rawBody) {
+  if (typeof secret !== 'string' || !secret.trim() || typeof signature !== 'string' ||
+      !/^sha256=[a-f0-9]{64}$/.test(signature)) return false;
+  const expected = crypto.createHmac('sha256', secret).update(rawBody).digest();
+  return crypto.timingSafeEqual(Buffer.from(signature.slice(7), 'hex'), expected);
 }
 
-const MAX_PAYLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
-
 function executeGitPull(branch = 'refactor/structure') {
+  if (typeof branch !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/.test(branch)) {
+    return Promise.reject(new Error('Invalid deployment branch'));
+  }
   return new Promise((resolve, reject) => {
-    const safeBranch = String(branch).trim();
-    if (!/^[a-zA-Z0-9._\-/]+$/.test(safeBranch)) {
-      const err = new Error(`Nombre de rama inválido para git pull: ${safeBranch}`);
-      logger.error('[GitHub Webhook]', err);
-      return reject(err);
-    }
-    const projectRoot = path.join(__dirname, '..', '..', '..');
-    const cmd = `git pull origin ${safeBranch}`;
+    execFile('git', ['pull', 'origin', branch], {
+      cwd: path.join(__dirname, '..', '..', '..'), timeout: 120000, maxBuffer: 1024 * 1024
+    }, (error, stdout) => error ? reject(error) : resolve(stdout));
+  });
+}
 
-    logger.info(`[GitHub Webhook] Ejecutando: ${cmd}`);
-    exec(cmd, { cwd: projectRoot }, (error, stdout, stderr) => {
-      if (error) {
-        logger.error('[GitHub Webhook] Error en git pull:', { error: error.message, stderr });
-        return reject(error);
+async function deployAndReload(client, branch) {
+  await executeGitPull(branch);
+  if (client) require('../../loaders/commandLoader').reloadCommandRegistry(client);
+}
+
+// Independent server factory: tests inject both state and the entire deployment.
+function createWebhookServer(options) {
+  const { secret, branch = 'refactor/structure', repository, store, deploy, logger = { error() {} },
+    maxPayloadBytes = MAX_PAYLOAD_BYTES } = options;
+  if (!store || typeof deploy !== 'function') throw new Error('Missing webhook dependencies');
+  let activeJob = Promise.resolve();
+  const respond = (res, status, payload) => {
+    if (res.destroyed || res.writableEnded) return;
+    res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify(payload));
+  };
+  const instance = http.createServer((req, res) => {
+    const route = (req.url.split('?')[0] || '/').toLowerCase().replace(/\/+$/, '') || '/';
+    req.on('error', () => {});
+    if ((req.method === 'GET' || req.method === 'HEAD') && (HEALTH_PATHS.has(route) || WEBHOOK_PATHS.has(route))) {
+      return respond(res, 200, { status: 'online' });
+    }
+    if (req.method === 'OPTIONS' && WEBHOOK_PATHS.has(route)) return respond(res, 204, {});
+    if (req.method !== 'POST' || !WEBHOOK_PATHS.has(route)) return respond(res, 404, { error: 'Not found' });
+    if (typeof secret !== 'string' || !secret.trim()) {
+      req.resume();
+      return respond(res, 503, { error: 'Deployment unavailable' });
+    }
+    const chunks = [];
+    let bytes = 0;
+    let exceeded = false;
+    req.on('data', chunk => {
+      if (exceeded) return;
+      bytes += chunk.length;
+      if (bytes > maxPayloadBytes) {
+        exceeded = true;
+        chunks.length = 0;
+        return respond(res, 413, { error: 'Payload too large' });
       }
-      logger.info(`[GitHub Webhook] Git pull completado:\n${stdout.trim()}`);
-      resolve(stdout);
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      if (exceeded) return;
+      const body = Buffer.concat(chunks);
+      if (!verifySignature(secret, req.headers['x-hub-signature-256'], body)) {
+        return respond(res, 401, { error: 'Unauthorized signature' });
+      }
+      const event = req.headers['x-github-event'];
+      if (event === 'ping') return respond(res, 200, { status: 'ready' });
+      if (event !== 'push') return respond(res, 200, { status: 'ignored' });
+      const delivery = req.headers['x-github-delivery'];
+      if (typeof delivery !== 'string' || !/^[a-zA-Z0-9-]{1,128}$/.test(delivery)) {
+        return respond(res, 400, { error: 'Invalid delivery ID' });
+      }
+      let payload;
+      try {
+        const contentType = (req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+        if (contentType === 'application/x-www-form-urlencoded') {
+          const form = querystring.parse(body.toString('utf8'));
+          if (typeof form.payload !== 'string') throw new Error('Missing payload');
+          payload = JSON.parse(form.payload);
+        } else if (contentType === 'application/json') {
+          payload = JSON.parse(body.toString('utf8'));
+        } else return respond(res, 415, { error: 'Unsupported content type' });
+        if (!payload || Array.isArray(payload) || typeof payload.ref !== 'string') throw new Error('Invalid payload');
+      } catch { return respond(res, 400, { error: 'Invalid payload' }); }
+      if (repository && payload.repository?.full_name !== repository) return respond(res, 403, { error: 'Repository not allowed' });
+      if (payload.ref !== `refs/heads/${branch}` || payload.deleted === true) return respond(res, 200, { status: 'ignored' });
+      let reservation;
+      try {
+        reservation = store.reserve(delivery, crypto.createHash('sha256').update(body).digest('hex'));
+      } catch {
+        logger.error('[GitHub Webhook] Deployment state unavailable; operator review required.');
+        return respond(res, 503, { error: 'Deployment unavailable' });
+      }
+      if (reservation.status === 'duplicate') return respond(res, 200, { status: 'duplicate' });
+      if (reservation.status !== 'accepted') {
+        res.setHeader('Retry-After', '60');
+        return respond(res, 503, { error: 'Deployment busy or requires review' });
+      }
+      // Persisted reservation already exists. 202 means accepted, never success.
+      activeJob = Promise.resolve().then(async () => {
+        let outcome = 'completed';
+        try { await deploy(branch); }
+        catch {
+          outcome = 'failed';
+          logger.error('[GitHub Webhook] Deployment failed; operator review required before further deployments.');
+        }
+        try { reservation.finish(outcome); }
+        catch { logger.error('[GitHub Webhook] Completion could not be persisted; operator review required.'); }
+      });
+      respond(res, 202, { status: 'accepted' });
     });
   });
+  instance.requestTimeout = 15000;
+  instance.headersTimeout = 10000;
+  instance.waitForIdle = () => activeJob;
+  return instance;
 }
 
 function init(client, options = {}) {
   if (server) return server;
-
-  // Azure App Service asigna automáticamente process.env.PORT (usualmente 80 o 8080)
-  const PORT = process.env.PORT || process.env.WEBHOOK_PORT || options.port || 3000;
-  const SECRET = process.env.GITHUB_WEBHOOK_SECRET || options.secret || '';
-  const TARGET_BRANCH = process.env.GITHUB_BRANCH || options.branch || 'refactor/structure';
-
-  const WEBHOOK_PATHS = new Set(['/webhook', '/api/webhook', '/api/github-webhook', '/github-webhook']);
-  const HEALTH_PATHS = new Set(['/', '/health', '/status', '/api/health', '/healthcheck']);
-
-  server = http.createServer(async (req, res) => {
-    // Manejo de errores de conexión en el socket
-    req.on('error', (err) => {
-      logger.error('[GitHub Webhook] Error en el socket de la solicitud:', err);
-    });
-
-    const parsedPath = (req.url.split('?')[0] || '/').toLowerCase().replace(/\/+$/, '') || '/';
-
-    // CORS pre-flight
-    if (req.method === 'OPTIONS') {
-      res.writeHead(204, {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, HEAD',
-        'Access-Control-Allow-Headers': 'Content-Type, X-GitHub-Event, X-Hub-Signature-256',
-        'Access-Control-Max-Age': '86400'
-      });
-      return res.end();
-    }
-
-    // 1. Healthcheck y verificación de estado en navegador (GET/HEAD)
-    if ((req.method === 'GET' || req.method === 'HEAD') && (HEALTH_PATHS.has(parsedPath) || WEBHOOK_PATHS.has(parsedPath))) {
-      res.writeHead(200, {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      });
-      if (req.method === 'HEAD') return res.end();
-      return res.end(JSON.stringify({
-        status: 'online',
-        service: 'Yujin Bot - GitHub Webhook Receiver',
-        path: parsedPath,
-        branch: TARGET_BRANCH,
-        secretConfigured: Boolean(SECRET),
-        uptime: process.uptime(),
-        message: WEBHOOK_PATHS.has(parsedPath)
-          ? 'Endpoint de Webhook activo. Esperando eventos POST desde GitHub.'
-          : 'Healthcheck OK',
-        timestamp: new Date().toISOString()
-      }));
-    }
-
-    // 2. Receptor de Webhooks de GitHub
-    if (req.method === 'POST' && WEBHOOK_PATHS.has(parsedPath)) {
-      const githubEvent = req.headers['x-github-event'];
-      const signature = req.headers['x-hub-signature-256'];
-      const contentType = (req.headers['content-type'] || '').toLowerCase();
-
-      let body = '';
-      let bodyExceeded = false;
-      req.on('data', chunk => {
-        if (bodyExceeded) return;
-        body += chunk;
-        if (body.length > MAX_PAYLOAD_BYTES) {
-          bodyExceeded = true;
-          logger.warn('[GitHub Webhook] Carga útil excede el límite permitido (10MB).');
-          res.writeHead(413, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Payload Too Large' }));
-          req.destroy();
-        }
-      });
-
-      req.on('end', async () => {
-        if (bodyExceeded) return;
-        // Validar firma criptográfica
-        if (!verifySignature(SECRET, signature, body)) {
-          logger.warn('[GitHub Webhook] Firma HMAC inválida o ausente recibida desde:', req.socket?.remoteAddress);
-          res.writeHead(401, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ error: 'Firma no autorizada o secreto incorrecto' }));
-        }
-
-        // Si es un ping de prueba de GitHub
-        if (githubEvent === 'ping') {
-          logger.info('[GitHub Webhook] Evento ping recibido correctamente desde GitHub.');
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ message: 'Ping recibido con éxito', status: 'ready' }));
-        }
-
-        // Si es un push de código
-        if (githubEvent === 'push') {
-          try {
-            let payload;
-            if (contentType.includes('application/x-www-form-urlencoded')) {
-              const parsedForm = querystring.parse(body);
-              payload = typeof parsedForm.payload === 'string' ? JSON.parse(parsedForm.payload) : parsedForm;
-            } else {
-              payload = JSON.parse(body);
-            }
-
-            const ref = payload.ref || '';
-            const expectedRef = `refs/heads/${TARGET_BRANCH}`;
-
-            if (ref !== expectedRef) {
-              logger.info(`[GitHub Webhook] Push ignorado en rama no monitoreada: ${ref} (Esperada: ${expectedRef})`);
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              return res.end(JSON.stringify({
-                message: `Ignorado. Rama recibida: ${ref}. Monitoreando: ${expectedRef}`
-              }));
-            }
-
-            const commit = payload.head_commit || (payload.commits && payload.commits[0]) || {};
-            const commitMsg = commit.message || 'Sin mensaje';
-            const commitAuthor = commit.author?.name || 'GitHub User';
-
-            logger.info(`[GitHub Webhook] 🚀 Push detectado en ${TARGET_BRANCH} por ${commitAuthor}: "${commitMsg}"`);
-
-            // Responder a GitHub inmediatamente para evitar timeout (GitHub requiere respuesta en <10s)
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({
-              status: 'success',
-              message: 'Despliegue iniciado',
-              branch: TARGET_BRANCH,
-              commit: commit.id?.slice(0, 7) || 'latest'
-            }));
-
-            // Ejecutar git pull
-            await executeGitPull(TARGET_BRANCH);
-
-            // Recargar comandos y módulos en caliente
-            if (client) {
-              const paths = {
-                commandsDir: path.join(__dirname, '..', '..', 'commands'),
-                sharedDir: path.join(__dirname, '..', '..', 'commands_shared'),
-                prefixDir: path.join(__dirname, '..', '..', 'prefixCommands'),
-                servicesDir: path.join(__dirname, '..', '..', 'services'),
-                constantsDir: path.join(__dirname, '..', '..', 'constants'),
-                utilsDir: path.join(__dirname, '..', '..', 'utils')
-              };
-
-              const registry = reloadCommandRegistry(client, paths);
-              logger.info(`[GitHub Webhook] ✅ Módulos recargados en memoria: ${registry.commands.size} slash, ${registry.prefixCommands.size} prefix.`);
-            }
-
-          } catch (err) {
-            logger.error('[GitHub Webhook] Error procesando payload de push:', err);
-          }
-          return;
-        }
-
-        // Otros eventos de GitHub (release, workflow_run, etc.)
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ message: `Evento ${githubEvent || 'desconocido'} recibido sin acción requerida.` }));
-      });
-
-      return;
-    }
-
-    // Ruta no encontrada o método no soportado
-    logger.warn(`[GitHub Webhook] Solicitud no atendida: ${req.method} ${req.url} (normalizado: ${parsedPath})`);
-    res.writeHead(404, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      error: 'Endpoint no encontrado',
-      receivedPath: parsedPath,
-      validWebhookPaths: Array.from(WEBHOOK_PATHS),
-      validHealthPaths: Array.from(HEALTH_PATHS)
-    }));
+  const logger = options.logger || require('../../utils/logger');
+  const port = Number(options.port ?? process.env.PORT ?? process.env.WEBHOOK_PORT ?? 3000);
+  const branch = options.branch ?? process.env.GITHUB_BRANCH ?? 'refactor/structure';
+  server = createWebhookServer({
+    secret: options.secret ?? process.env.GITHUB_WEBHOOK_SECRET ?? '',
+    branch,
+    repository: options.repository ?? process.env.GITHUB_REPOSITORY,
+    store: options.store || createDeliveryStore(options.stateDir || path.join(__dirname, '..', '..', '..', 'data', 'webhook')),
+    deploy: options.deploy || (target => deployAndReload(client, target)),
+    logger
   });
-
-  server.listen(PORT, '0.0.0.0', () => {
-    logger.info(`🌐 [GitHub Webhook & Health] Servidor escuchando en http://0.0.0.0:${PORT} (Rama: ${TARGET_BRANCH})`);
-  });
-
-  return server;
+  const current = server;
+  current.once('close', () => { if (server === current) server = null; });
+  current.listen(port, options.host || '0.0.0.0');
+  return current;
 }
 
-module.exports = {
-  init,
-  verifySignature,
-  executeGitPull
-};
+module.exports = { init, createWebhookServer, verifySignature, executeGitPull };

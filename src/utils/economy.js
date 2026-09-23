@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const { readJsonSafe, writeJsonAtomic } = require('./jsonStore');
+const { withLock } = require('../services/economy/economyLock');
 
 const dataDir = path.join(__dirname, '..', '..', 'data');
 const econPath = path.join(dataDir, 'economy.json');
@@ -99,7 +100,7 @@ function subtractCoins(guildId, userId, amount) {
   return true;
 }
 
-module.exports = {
+const api = {
   readEconomy,
   writeEconomy,
   ensureUserEcon,
@@ -110,3 +111,5 @@ module.exports = {
   removeGems,
   subtractCoins
 };
+module.exports = Object.fromEntries(Object.entries(api).map(([name, fn]) =>
+  [name, (...args) => withLock(dataDir, () => fn(...args))]));

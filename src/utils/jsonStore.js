@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const loanPayments = require('../services/economy/loanPaymentStore');
 
 const crypto = require('crypto');
 const { TextDecoder } = require('node:util');
@@ -36,6 +37,8 @@ function parseJson(bytes) {
  * supported; business/schema validation belongs to the owning service.
  */
 function readJsonSafe(filePath, fallback = {}) {
+  // Fuera del try: un fallo de recuperación debe bloquear el acceso económico.
+  if (loanPayments.managed(filePath)) return loanPayments.readManaged(filePath);
   const bytes = snapshot(filePath);
   return bytes === null ? fallback : parseJson(bytes);
 }
@@ -127,6 +130,7 @@ function publish(filePath, payload, before) {
  * lock is provided. Callers must coordinate competing read-modify-write cycles.
  */
 function writeJsonAtomic(filePath, data) {
+  if (loanPayments.managed(filePath)) return loanPayments.writeManaged(filePath, data);
   const before = snapshot(filePath);
   if (before !== null) parseJson(before); // Blocks blind writes after a lenient read.
   return publish(filePath, serialize(data), before);

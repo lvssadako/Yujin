@@ -4,16 +4,23 @@ const crypto = require('node:crypto');
 const { REST, Routes } = require('discord.js');
 const logger = require('../utils/logger');
 
-function getAllJsFiles(dir) {
-  if (!fs.existsSync(dir)) return [];
+function isTestPath(filePath) {
+  const parts = String(filePath).split(/[\\/]/);
+  return parts.some(part => part === '__tests__' || part === 'tests') ||
+    /\.(test|spec)\.js$/.test(parts[parts.length - 1]);
+}
+
+function getAllJsFiles(dir, recursive = true) {
+  if (isTestPath(dir) || !fs.existsSync(dir)) return [];
 
   const files = [];
   const entries = fs.readdirSync(dir, { withFileTypes: true });
 
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
+    if (isTestPath(entry.name)) continue;
     if (entry.isDirectory()) {
-      files.push(...getAllJsFiles(fullPath));
+      if (recursive) files.push(...getAllJsFiles(fullPath));
     } else if (entry.isFile() && entry.name.endsWith('.js')) {
       files.push(fullPath);
     }
@@ -77,9 +84,8 @@ function loadCommandRegistry({
   }
 
   if (sharedDir && fs.existsSync(sharedDir)) {
-    const sharedFiles = fs.readdirSync(sharedDir).filter(file => file.endsWith('.js'));
-    for (const file of sharedFiles) {
-      const filePath = path.join(sharedDir, file);
+    const sharedFiles = getAllJsFiles(sharedDir, false);
+    for (const filePath of sharedFiles) {
       try {
         if (purgeCache) purgeFileCache(filePath);
         const cmd = require(filePath);
@@ -101,9 +107,8 @@ function loadCommandRegistry({
   }
 
   if (prefixDir && fs.existsSync(prefixDir)) {
-    const prefixFiles = fs.readdirSync(prefixDir).filter(file => file.endsWith('.js'));
-    for (const file of prefixFiles) {
-      const filePath = path.join(prefixDir, file);
+    const prefixFiles = getAllJsFiles(prefixDir, false);
+    for (const filePath of prefixFiles) {
       try {
         if (purgeCache) purgeFileCache(filePath);
         const cmd = require(filePath);
@@ -214,7 +219,7 @@ function shouldTriggerHotReload(filename) {
   if (!filename.endsWith('.js')) return false;
 
   // Ignore test files and test suites
-  if (filename.endsWith('.test.js') || filename.endsWith('.spec.js') || filename.includes('__tests__')) {
+  if (isTestPath(filename)) {
     return false;
   }
 

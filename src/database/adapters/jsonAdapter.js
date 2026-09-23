@@ -1,6 +1,7 @@
 const path = require('path');
 const BaseDatabaseAdapter = require('./baseAdapter');
 const { readJsonSafe, writeJsonAtomic } = require('../../utils/jsonStore');
+const { managed, withLock } = require('../../services/economy/loanPaymentStore');
 
 class JsonDatabaseAdapter extends BaseDatabaseAdapter {
   /**
@@ -38,21 +39,27 @@ class JsonDatabaseAdapter extends BaseDatabaseAdapter {
 
   async set(collection, key, value) {
     const filePath = this.getFilePath(collection);
-    const data = readJsonSafe(filePath, {});
-    data[key] = value;
-    writeJsonAtomic(filePath, data);
-    return value;
+    const mutate = () => {
+      const data = readJsonSafe(filePath, {});
+      data[key] = value;
+      writeJsonAtomic(filePath, data);
+      return value;
+    };
+    return managed(filePath) ? withLock(path.dirname(filePath), mutate) : mutate();
   }
 
   async delete(collection, key) {
     const filePath = this.getFilePath(collection);
-    const data = readJsonSafe(filePath, {});
-    if (data[key] !== undefined) {
-      delete data[key];
-      writeJsonAtomic(filePath, data);
-      return true;
-    }
-    return false;
+    const mutate = () => {
+      const data = readJsonSafe(filePath, {});
+      if (data[key] !== undefined) {
+        delete data[key];
+        writeJsonAtomic(filePath, data);
+        return true;
+      }
+      return false;
+    };
+    return managed(filePath) ? withLock(path.dirname(filePath), mutate) : mutate();
   }
 
   async updateAll(collection, data) {

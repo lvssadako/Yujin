@@ -1,6 +1,7 @@
 const { readJsonSafe, writeJsonAtomic } = require('../../utils/jsonStore');
 const path = require('node:path');
 const fs = require('node:fs');
+const { withLock } = require('./economyLock');
 
 function createEconomyService(options = {}) {
   const dataDir = options.dataDir || path.join(__dirname, '..', '..', '..', 'data');
@@ -137,13 +138,15 @@ function createEconomyService(options = {}) {
     return true;
   }
 
-  return {
+  const api = {
     readEconomy, writeEconomy, ensureUserEconomy,
     getBalance, addCoins, removeCoins, subtractCoins,
     addBank, removeBank,
     addGems, removeGems,
     getInventory, addItem, removeItem
   };
+  return Object.fromEntries(Object.entries(api).map(([name, fn]) =>
+    [name, (...args) => withLock(path.dirname(economyPath), () => fn(...args))]));
 }
 
 const economyService = createEconomyService();

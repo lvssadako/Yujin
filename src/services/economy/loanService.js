@@ -1,5 +1,10 @@
 const path = require('node:path');
 const fs = require('node:fs');
+const { withLock } = require('./economyLock');
+const {
+  MAX_DEBT_MULTIPLIER, INITIAL_INTEREST_RATE, MIN_LOAN, MAX_LOAN,
+  PENALTY_THRESHOLDS, calcPenaltyLevel, applyLoanGrant, applyRepayment
+} = require('./loanRules');
 const { readJsonSafe, writeJsonAtomic } = require('../../utils/jsonStore');
 
 const DATA_DIR = path.join(__dirname, '..', '..', '..', 'data');
@@ -8,8 +13,6 @@ const LOANS_PATH = path.join(DATA_DIR, 'loans.json');
 // ─── Constantes de Configuración del Préstamo ────────────────────────────────
 const TICK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 horas por ciclo de interés
 const MAX_CATCHUP_DAYS = 7;                   // Límite de días si el bot estuvo desconectado
-const MAX_DEBT_MULTIPLIER = 2.5;              // Techo máximo de deuda (2.5x del monto prestado)
-const INITIAL_INTEREST_RATE = 0.05;           // Tasa de interés inicial (5% de apertura)
 
 // ─── Tasas de interés según días transcurridos (ticks) ────────────────────────
 // Ticks 1-3  → 5%   (inicio suave)
@@ -22,20 +25,6 @@ const INTEREST_SCHEDULE = [
   { minTick: 4,  rate: 0.08 },
   { minTick: 0,  rate: 0.05 }
 ];
-
-// ─── Umbrales de penalización (deuda / principal) ─────────────────────────────
-// Level 0 → sin penalización        (deuda < 1.5x principal)
-// Level 1 → advertencia             (deuda >= 1.5x principal)
-// Level 2 → ingresos -50%           (deuda >= 2.0x principal)
-// Level 3 → ingresos -75% y congelado en tope (deuda >= 2.5x principal)
-const PENALTY_THRESHOLDS = [
-  { level: 3, multiplier: 2.5 },
-  { level: 2, multiplier: 2.0 },
-  { level: 1, multiplier: 1.5 }
-];
-
-const MIN_LOAN = 500;
-const MAX_LOAN = 100_000;
 
 // ─── Helpers de IO ─────────────────────────────────────────────────────────────
 
@@ -148,29 +137,11 @@ function takeLoan(guildId, userId, amount, options = {}) {
   const data = readLoans();
   const loan = ensureUserLoan(data, guildId, userId);
 
-  if (loan.active) {
-    return { success: false, reason: 'Ya tienes un préstamo activo. Págalo primero antes de solicitar uno nuevo.' };
-  }
-
-  const now = options.now !== undefined ? Number(options.now) : Date.now();
-  const initialRate = options.initialInterestRate !== undefined ? Number(options.initialInterestRate) : INITIAL_INTEREST_RATE;
-  const initialInterest = Math.ceil(safeAmount * initialRate);
-
-  loan.active = true;
-  loan.principal = safeAmount;
-  loan.initialInterest = initialInterest;
-  loan.balance = safeAmount + initialInterest;
-  loan.interestRate = 0.05;
-  loan.createdAt = now;
-  loan.lastInterestTick = now;
-  loan.tickCount = 0;
-  loan.transferredWithActiveLoan = 0;
-  loan.xpPenaltyApplied = 0;
-  loan.penaltyLevel = calcPenaltyLevel(loan.balance, loan.principal);
-
-  writeLoans(data);
-  return { success: true, loan: { ...loan }, initialInterest };
+  const result = applyLoanGrant(loan, safeAmount, options);
+  if (result.success) writeLoans(data);
+  return result;
 }
+
 
 /**
  * Realiza un pago parcial o total del préstamo.
@@ -180,40 +151,11 @@ function repayLoan(guildId, userId, amount) {
   const data = readLoans();
   const loan = ensureUserLoan(data, guildId, userId);
 
-  if (!loan.active) {
-    return { success: false, reason: 'No tienes un préstamo activo.' };
-  }
-
-  const safeAmount = Math.floor(Math.max(0, Number(amount)));
-  if (!Number.isFinite(safeAmount) || safeAmount <= 0) {
-    return { success: false, reason: 'Monto de pago inválido.' };
-  }
-
-  const paid = Math.min(safeAmount, loan.balance);
-  loan.balance -= paid;
-
-  let cleared = false;
-  if (loan.balance <= 0) {
-    loan.balance = 0;
-    loan.active = false;
-    loan.penaltyLevel = 0;
-    loan.principal = 0;
-    loan.initialInterest = 0;
-    loan.interestRate = 0.05;
-    loan.tickCount = 0;
-    loan.createdAt = 0;
-    loan.lastInterestTick = 0;
-    loan.transferredWithActiveLoan = 0;
-    loan.xpPenaltyApplied = 0;
-    cleared = true;
-  } else {
-    // Al amortizar deuda, recalcular y reducir inmediatamente la penalización
-    loan.penaltyLevel = calcPenaltyLevel(loan.balance, loan.principal);
-  }
-
-  writeLoans(data);
-  return { success: true, paid, remaining: loan.balance, cleared, penaltyLevel: loan.penaltyLevel };
+  const result = applyRepayment(loan, amount);
+  if (result.success) writeLoans(data);
+  return result;
 }
+
 
 /**
  * Registra un intento o transferencia realizada mientras el usuario mantiene un préstamo activo.
@@ -279,18 +221,6 @@ function getRateForTick(tickCount) {
     if (tickCount >= entry.minTick) return entry.rate;
   }
   return 0.05;
-}
-
-/**
- * Calcula el nivel de penalización según la proporción deuda/principal.
- */
-function calcPenaltyLevel(balance, principal) {
-  if (!principal || principal <= 0) return 0;
-  const ratio = balance / principal;
-  for (const { level, multiplier } of PENALTY_THRESHOLDS) {
-    if (ratio >= multiplier) return level;
-  }
-  return 0;
 }
 
 /**
@@ -453,7 +383,9 @@ function getUserLoanSummary(guildId, userId, now = Date.now()) {
 module.exports = {
   getLoan,
   takeLoan,
+  applyLoanGrant,
   repayLoan,
+  applyRepayment,
   resetLoan,
   recordLoanTransfer,
   applyInterestTick,
@@ -469,3 +401,9 @@ module.exports = {
   MIN_LOAN,
   MAX_LOAN
 };
+
+for (const name of ['getLoan', 'takeLoan', 'repayLoan', 'resetLoan', 'recordLoanTransfer',
+  'applyInterestTick', 'processAllGuildLoans', 'getUserLoanSummary']) {
+  const operation = module.exports[name];
+  module.exports[name] = (...args) => withLock(DATA_DIR, () => operation(...args));
+}
