@@ -1,7 +1,6 @@
 const fs = require('fs');
 const path = require('path');
 const {
-  EmbedBuilder,
   ActionRowBuilder,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
@@ -15,7 +14,47 @@ const {
   PermissionFlagsBits
 } = require('discord.js');
 const logger = require('../../utils/logger');
-const { COLORS } = require('../../utils/embedFactory');
+const { COLORS, LIMITS, buildPaginatedEmbeds } = require('../../utils/embedFactory');
+
+function isSafeImageUrl(value) {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 2048) return false;
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+  if (parsed.username || parsed.password) return false;
+  return true;
+}
+
+// Agrupa líneas en bloques que caben en un field (1024), cortando solo entre líneas.
+function groupLinesForFields(lines, max = LIMITS.fieldValue) {
+  const groups = [];
+  let current = '';
+  for (const line of lines) {
+    const candidate = current ? `${current}\n${line}` : line;
+    if (candidate.length > max && current) {
+      groups.push(current);
+      current = line;
+    } else if (candidate.length > max) {
+      groups.push(candidate.slice(0, max));
+      current = '';
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) groups.push(current);
+  return groups;
+}
+
+function applyBannerToFirst(embeds, bannerUrl) {
+  if (embeds.length > 0 && isSafeImageUrl(bannerUrl)) {
+    embeds[0].setImage(bannerUrl);
+  }
+  return embeds;
+}
 
 const dataDir = path.join(__dirname, '..', '..', '..', 'data');
 const storePath = path.join(dataDir, 'boosterColors.json');
@@ -72,51 +111,70 @@ function isMemberBooster(member) {
   return false;
 }
 
-// Genera el embed público para los miembros
-function buildPublicEmbed(guildId, guild) {
+// Genera los embeds públicos paginados para los miembros (reparto equitativo).
+function buildPublicEmbeds(guildId, guild) {
   const cfg = getConfig(guildId);
-  const embed = new EmbedBuilder()
-    .setColor(0xF47FFF) // Tono Booster Magenta
-    .setAuthor({
-      name: `${guild?.name || 'Servidor'} • Sistema de Autoroles`,
-      iconURL: guild?.iconURL?.({ size: 128 }) || undefined
-    })
-    .setTitle(cfg.title)
-    .setDescription(cfg.description)
-    .setFooter({ text: cfg.footer, iconURL: guild?.client?.user?.displayAvatarURL?.() })
-    .setTimestamp();
+  const fields = [];
 
-  if (cfg.bannerUrl && /^https?:\/\//i.test(cfg.bannerUrl)) {
-    embed.setImage(cfg.bannerUrl);
-  }
-
-  // Lista de colores configurados en campos organizados
+  // Lista de colores configurados en grupos que caben en un field, sin corte abrupto
   if (cfg.colors.length > 0) {
-    const listFormatted = cfg.colors.map((c, i) => {
+    const lines = cfg.colors.map((c, i) => {
       const emoji = c.emoji ? `${c.emoji} ` : '🔹 ';
       return `${i + 1}. ${emoji}**${c.name}** — <@&${c.roleId}>`;
-    }).join('\n');
-
-    embed.addFields({
-      name: '🌈 Colores Disponibles',
-      value: listFormatted.length > 1024 ? listFormatted.slice(0, 1020) + '...' : listFormatted,
-      inline: false
+    });
+    const groups = groupLinesForFields(lines);
+    groups.forEach((group, idx) => {
+      fields.push({
+        name: groups.length > 1 ? `🌈 Colores Disponibles (${idx + 1}/${groups.length})` : '🌈 Colores Disponibles',
+        value: group,
+        inline: false,
+      });
     });
   } else {
-    embed.addFields({
+    fields.push({
       name: '🌈 Colores Disponibles',
       value: '*Aún no hay colores configurados por la administración.*',
       inline: false
     });
   }
 
-  embed.addFields({
+  fields.push({
     name: '🔒 Requisito',
     value: '`🚀 Server Booster Activo` (Se valida automáticamente al seleccionar)',
     inline: false
   });
 
-  return embed;
+  const authorName = `${guild?.name || 'Servidor'} • Sistema de Autoroles`;
+  const embeds = buildPaginatedEmbeds({
+    title: cfg.title,
+    description: cfg.description,
+    fields,
+    color: 0xF47FFF, // Tono Booster Magenta
+    footer: cfg.footer,
+    author: {
+      name: authorName,
+      iconURL: guild?.iconURL?.({ size: 128 }) || undefined,
+    },
+  });
+  if (guild?.client?.user && embeds.length > 0) {
+    try {
+      const botIcon = guild.client.user.displayAvatarURL?.();
+      if (typeof botIcon === 'string' && botIcon.length > 0) {
+        const last = embeds[embeds.length - 1];
+        const currentFooter = last.data.footer?.text || cfg.footer || '';
+        last.setFooter({ text: currentFooter.slice(0, LIMITS.footer), iconURL: botIcon });
+      }
+    } catch {
+      // Sin icono del bot: se conserva el footer de texto
+    }
+  }
+
+  return applyBannerToFirst(embeds, cfg.bannerUrl);
+}
+
+// Compatibilidad: un solo embed (primera página) donde el flujo envía un único mensaje simple.
+function buildPublicEmbed(guildId, guild) {
+  return buildPublicEmbeds(guildId, guild)[0];
 }
 
 // Genera los componentes del embed público (Select Menu con opciones de color)
@@ -169,51 +227,57 @@ function buildPublicComponents(guildId) {
   return rows;
 }
 
-// Genera el embed para el Panel Administrativo
-function buildAdminEmbed(guildId, guild) {
+// Genera los embeds paginados del Panel Administrativo (reparto equitativo).
+function buildAdminEmbeds(guildId, guild) {
   const cfg = getConfig(guildId);
   const colorCount = cfg.colors.length;
-
-  const embed = new EmbedBuilder()
-    .setColor(COLORS.primary || 0x5865F2)
-    .setAuthor({
-      name: 'Panel de Configuración de Autoroles Booster',
-      iconURL: guild?.iconURL?.({ size: 128 }) || undefined
-    })
-    .setTitle('⚙️ Gestión de Colores Exclusivos')
-    .setDescription(
-      'Configura los colores que estarán disponibles para los **Boosters** antes de enviar el embed al canal público.\n\n' +
-      `**Estado Actual:** \`${colorCount}/24 Colores Configurados\`\n` +
-      `**Canales Vinculados:** \`${cfg.sentMessages.length} embeds publicados\``
-    )
-    .setTimestamp();
+  const fields = [];
 
   if (cfg.colors.length > 0) {
-    const list = cfg.colors.map((c, i) => {
+    const lines = cfg.colors.map((c, i) => {
       const emoji = c.emoji ? `${c.emoji} ` : '';
       const exists = guild?.roles?.cache?.has(c.roleId) ? '✅' : '⚠️ *Rol no existe*';
       return `\`${i + 1}.\` ${emoji}**${c.name}** (<@&${c.roleId}>) • ${exists}`;
-    }).join('\n');
-
-    embed.addFields({
-      name: '📋 Lista de Colores Configurados',
-      value: list.length > 1024 ? list.slice(0, 1020) + '...' : list,
-      inline: false
+    });
+    const groups = groupLinesForFields(lines);
+    groups.forEach((group, idx) => {
+      fields.push({
+        name: groups.length > 1 ? `📋 Lista de Colores Configurados (${idx + 1}/${groups.length})` : '📋 Lista de Colores Configurados',
+        value: group,
+        inline: false,
+      });
     });
   } else {
-    embed.addFields({
+    fields.push({
       name: '📋 Lista de Colores Configurados',
       value: '*No hay colores agregados. Usa el botón "➕ Añadir Color" para comenzar.*',
       inline: false
     });
   }
 
-  embed.addFields(
+  fields.push(
     { name: '📝 Título del Embed', value: `\`${cfg.title}\``, inline: true },
     { name: '🖼️ Banner', value: cfg.bannerUrl ? `[Ver Banner](${cfg.bannerUrl})` : '`Ninguno`', inline: true }
   );
 
-  return embed;
+  return buildPaginatedEmbeds({
+    title: '⚙️ Gestión de Colores Exclusivos',
+    description:
+      'Configura los colores que estarán disponibles para los **Boosters** antes de enviar el embed al canal público.\n\n' +
+      `**Estado Actual:** \`${colorCount}/24 Colores Configurados\`\n` +
+      `**Canales Vinculados:** \`${cfg.sentMessages.length} embeds publicados\``,
+    fields,
+    color: COLORS.primary || 0x5865F2,
+    author: {
+      name: 'Panel de Configuración de Autoroles Booster',
+      iconURL: guild?.iconURL?.({ size: 128 }) || undefined,
+    },
+  });
+}
+
+// Compatibilidad: un solo embed (primera página).
+function buildAdminEmbed(guildId, guild) {
+  return buildAdminEmbeds(guildId, guild)[0];
 }
 
 // Genera los componentes del Panel Administrativo
@@ -277,8 +341,10 @@ module.exports = {
   saveConfig,
   isMemberBooster,
   buildPublicEmbed,
+  buildPublicEmbeds,
   buildPublicComponents,
   buildAdminEmbed,
+  buildAdminEmbeds,
   buildAdminComponents,
 
   // Manejador central de todas las interacciones de colores booster
@@ -482,11 +548,11 @@ module.exports = {
 
         // D) Vista Previa
         if (customId === 'booster_color_panel_preview') {
-          const previewEmbed = buildPublicEmbed(guild.id, guild);
+          const previewEmbeds = buildPublicEmbeds(guild.id, guild);
           const previewComponents = buildPublicComponents(guild.id);
           return interaction.reply({
             content: '👁️ **Vista Previa de cómo verán los miembros el embed:**',
-            embeds: [previewEmbed],
+            embeds: previewEmbeds,
             components: previewComponents,
             ephemeral: true
           });
@@ -513,7 +579,7 @@ module.exports = {
           let updatedCount = 0;
           const validSent = [];
 
-          const pubEmbed = buildPublicEmbed(guild.id, guild);
+          const pubEmbeds = buildPublicEmbeds(guild.id, guild);
           const pubComp = buildPublicComponents(guild.id);
 
           for (const item of cfg.sentMessages) {
@@ -522,7 +588,7 @@ module.exports = {
               if (ch) {
                 const msg = await ch.messages.fetch(item.messageId).catch(() => null);
                 if (msg) {
-                  await msg.edit({ embeds: [pubEmbed], components: pubComp });
+                  await msg.edit({ embeds: pubEmbeds, components: pubComp });
                   validSent.push(item);
                   updatedCount++;
                 }
@@ -541,9 +607,9 @@ module.exports = {
         // G) Limpiar Todos los Colores
         if (customId === 'booster_color_panel_clear_all') {
           saveConfig(guild.id, c => ({ ...c, colors: [] }));
-          const newEmbed = buildAdminEmbed(guild.id, guild);
+          const newEmbeds = buildAdminEmbeds(guild.id, guild);
           const newComp = buildAdminComponents(guild.id);
-          return interaction.update({ embeds: [newEmbed], components: newComp });
+          return interaction.update({ embeds: newEmbeds, components: newComp });
         }
       }
 
@@ -555,12 +621,12 @@ module.exports = {
           colors: c.colors.filter(col => col.id !== colorId)
         }));
 
-        const adminEmbed = buildAdminEmbed(guild.id, guild);
+        const adminEmbeds = buildAdminEmbeds(guild.id, guild);
         const adminComp = buildAdminComponents(guild.id);
 
         return interaction.update({
           content: '✅ Color eliminado correctamente del panel.',
-          embeds: [adminEmbed],
+          embeds: adminEmbeds,
           components: adminComp
         });
       }
@@ -574,11 +640,11 @@ module.exports = {
           return interaction.editReply({ content: '❌ No se pudo encontrar el canal seleccionado.' });
         }
 
-        const pubEmbed = buildPublicEmbed(guild.id, guild);
+        const pubEmbeds = buildPublicEmbeds(guild.id, guild);
         const pubComp = buildPublicComponents(guild.id);
 
         try {
-          const sentMsg = await targetChannel.send({ embeds: [pubEmbed], components: pubComp });
+          const sentMsg = await targetChannel.send({ embeds: pubEmbeds, components: pubComp });
           saveConfig(guild.id, c => ({
             ...c,
             sentMessages: [...c.sentMessages, { channelId: targetChannel.id, messageId: sentMsg.id }]
@@ -616,12 +682,12 @@ module.exports = {
             colors: [...c.colors.filter(col => col.roleId !== roleId), { id: newId, name, roleId, emoji }]
           }));
 
-          const adminEmbed = buildAdminEmbed(guild.id, guild);
+          const adminEmbeds = buildAdminEmbeds(guild.id, guild);
           const adminComp = buildAdminComponents(guild.id);
 
           return interaction.reply({
             content: `✅ ¡Color **${name}** (<@&${roleId}>) añadido correctamente!`,
-            embeds: [adminEmbed],
+            embeds: adminEmbeds,
             components: adminComp,
             ephemeral: true
           });
@@ -639,12 +705,12 @@ module.exports = {
             bannerUrl
           }));
 
-          const adminEmbed = buildAdminEmbed(guild.id, guild);
+          const adminEmbeds = buildAdminEmbeds(guild.id, guild);
           const adminComp = buildAdminComponents(guild.id);
 
           return interaction.reply({
             content: '✅ ¡Diseño y textos del embed actualizados correctamente!',
-            embeds: [adminEmbed],
+            embeds: adminEmbeds,
             components: adminComp,
             ephemeral: true
           });

@@ -80,11 +80,11 @@ module.exports = {
 
     // 1. ABRIR PANEL DE CONTROL INTERACTIVO
     if (sub === 'panel') {
-      const adminEmbed = boosterColorService.buildAdminEmbed(guild.id, guild);
+      const adminEmbeds = boosterColorService.buildAdminEmbeds(guild.id, guild);
       const adminComp = boosterColorService.buildAdminComponents(guild.id);
 
       return interaction.reply({
-        embeds: [adminEmbed],
+        embeds: adminEmbeds,
         components: adminComp,
         ephemeral: true
       });
@@ -102,11 +102,11 @@ module.exports = {
         });
       }
 
-      const pubEmbed = boosterColorService.buildPublicEmbed(guild.id, guild);
+      const pubEmbeds = boosterColorService.buildPublicEmbeds(guild.id, guild);
       const pubComp = boosterColorService.buildPublicComponents(guild.id);
 
       try {
-        const sentMsg = await targetChannel.send({ embeds: [pubEmbed], components: pubComp });
+        const sentMsg = await targetChannel.send({ embeds: pubEmbeds, components: pubComp });
         boosterColorService.saveConfig(guild.id, c => ({
           ...c,
           sentMessages: [...c.sentMessages, { channelId: targetChannel.id, messageId: sentMsg.id }]
@@ -144,9 +144,9 @@ module.exports = {
 
     // 4. LISTAR COLORES
     if (sub === 'list') {
-      const adminEmbed = boosterColorService.buildAdminEmbed(guild.id, guild);
+      const adminEmbeds = boosterColorService.buildAdminEmbeds(guild.id, guild);
       return interaction.reply({
-        embeds: [adminEmbed],
+        embeds: adminEmbeds,
         ephemeral: true
       });
     }

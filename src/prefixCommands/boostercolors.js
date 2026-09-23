@@ -50,11 +50,11 @@ module.exports = {
 
     // 1. ABRIR PANEL INTERACTIVO DE CONFIGURACIÓN
     if (sub === 'panel' || (!args[0] && sub === 'panel')) {
-      const adminEmbed = boosterColorService.buildAdminEmbed(guild.id, guild);
+      const adminEmbeds = boosterColorService.buildAdminEmbeds(guild.id, guild);
       const adminComp = boosterColorService.buildAdminComponents(guild.id);
 
       return message.reply({
-        embeds: [adminEmbed],
+        embeds: adminEmbeds,
         components: adminComp
       });
     }
@@ -68,11 +68,11 @@ module.exports = {
         return message.reply('⚠️ **Aviso:** No has configurado ningún color todavía.\nUsa `&boostercolors panel` o `&boostercolors add` para añadir colores antes de publicar el embed.');
       }
 
-      const pubEmbed = boosterColorService.buildPublicEmbed(guild.id, guild);
+      const pubEmbeds = boosterColorService.buildPublicEmbeds(guild.id, guild);
       const pubComp = boosterColorService.buildPublicComponents(guild.id);
 
       try {
-        const sentMsg = await targetChannel.send({ embeds: [pubEmbed], components: pubComp });
+        const sentMsg = await targetChannel.send({ embeds: pubEmbeds, components: pubComp });
         boosterColorService.saveConfig(guild.id, c => ({
           ...c,
           sentMessages: [...c.sentMessages, { channelId: targetChannel.id, messageId: sentMsg.id }]
@@ -122,8 +122,8 @@ module.exports = {
 
     // 4. LISTAR COLORES (list / ver)
     if (sub === 'list' || sub === 'ver') {
-      const adminEmbed = boosterColorService.buildAdminEmbed(guild.id, guild);
-      return message.reply({ embeds: [adminEmbed] });
+      const adminEmbeds = boosterColorService.buildAdminEmbeds(guild.id, guild);
+      return message.reply({ embeds: adminEmbeds });
     }
 
     // AYUDA DE USO
