@@ -83,3 +83,31 @@ test('las vistas previas limitan textos largos al tamaño configurado', () => {
   assert.equal(footerPreview?.value.length, 900);
   assert.ok(fields.every(field => field.value.length <= 1024));
 });
+
+test('los bloques de la lista administrativa conservan un encabezado simple', () => {
+  const colors = Array.from({ length: 24 }, (_, index) => ({
+    id: 'color_' + index,
+    name: 'ColorExtremadamenteLargoParaForzarVariosBloques_' + (index + 1),
+    roleId: '1234567890123456' + String(index).padStart(2, '0'),
+    emoji: '🎨',
+  }));
+  const service = loadServiceWithConfig({
+    title: 'Colores para Boosters',
+    description: 'Descripción pública',
+    footer: 'Pie público',
+    bannerUrl: '',
+    colors,
+    sentMessages: [],
+  });
+
+  const embeds = service.buildAdminEmbeds('guild_fixture', null);
+  const colorFields = embeds.flatMap(embed => embed.data.fields ?? [])
+    .filter(field => field.name === '📋 Lista de Colores Configurados');
+
+  assert.ok(colorFields.length > 1, 'el fixture debe distribuir la lista en varios bloques');
+  assert.ok(colorFields.every(field => !/\(\d+\/\d+\)/.test(field.name)));
+  const rendered = colorFields.map(field => field.value).join('\n');
+  for (let index = 1; index <= 24; index += 1) {
+    assert.ok(rendered.includes('ColorExtremadamenteLargoParaForzarVariosBloques_' + index));
+  }
+});

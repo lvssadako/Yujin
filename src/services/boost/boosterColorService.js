@@ -242,7 +242,7 @@ function buildAdminEmbeds(guildId, guild) {
     const groups = groupLinesForFields(lines);
     groups.forEach((group, idx) => {
       fields.push({
-        name: groups.length > 1 ? `📋 Lista de Colores Configurados (${idx + 1}/${groups.length})` : '📋 Lista de Colores Configurados',
+        name: '📋 Lista de Colores Configurados',
         value: group,
         inline: false,
       });
