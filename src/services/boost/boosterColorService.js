@@ -4,8 +4,6 @@ const {
   ActionRowBuilder,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
-  ButtonBuilder,
-  ButtonStyle,
   ChannelSelectMenuBuilder,
   ChannelType,
   ModalBuilder,
@@ -120,7 +118,7 @@ function buildPublicEmbeds(guildId, guild) {
   if (cfg.colors.length > 0) {
     const lines = cfg.colors.map((c, i) => {
       const emoji = c.emoji ? `${c.emoji} ` : '🔹 ';
-      return `${i + 1}. ${emoji}**${c.name}** — <@&${c.roleId}>`;
+      return (i + 1) + '. ' + emoji + '**' + c.name + '**';
     });
     const groups = groupLinesForFields(lines);
     groups.forEach((group, idx) => {
@@ -240,7 +238,6 @@ function buildAdminEmbeds(guildId, guild) {
       return [
         "`" + (i + 1) + ".`",
         emoji + '**' + c.name + '**',
-        '(<@&' + c.roleId + '>)',
         '•',
         exists,
       ].join(' ');
@@ -288,59 +285,86 @@ function buildAdminEmbed(guildId, guild) {
 // Genera los componentes del Panel Administrativo
 function buildAdminComponents(guildId) {
   const cfg = getConfig(guildId);
-  const rows = [];
 
-  // Fila 1: Botones de Gestión
-  const row1 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('booster_color_panel_add')
-      .setLabel('Añadir Color')
+  const managementOptions = [
+    new StringSelectMenuOptionBuilder()
+      .setLabel('Añadir color')
+      .setDescription('Vincula un nombre, emoji y rol.')
       .setEmoji('➕')
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId('booster_color_panel_remove')
-      .setLabel('Eliminar Color')
-      .setEmoji('➖')
-      .setStyle(ButtonStyle.Danger)
-      .setDisabled(cfg.colors.length === 0),
-    new ButtonBuilder()
-      .setCustomId('booster_color_panel_edit_text')
-      .setLabel('Editar Texto / Banner')
+      .setValue('booster_color_panel_add'),
+  ];
+
+  if (cfg.colors.length > 0) {
+    managementOptions.push(
+      new StringSelectMenuOptionBuilder()
+        .setLabel('Eliminar un color')
+        .setDescription('Quita un color de la lista.')
+        .setEmoji('➖')
+        .setValue('booster_color_panel_remove'),
+      new StringSelectMenuOptionBuilder()
+        .setLabel('Eliminar todos los colores')
+        .setDescription('Vacía la lista de este servidor.')
+        .setEmoji('🗑️')
+        .setValue('booster_color_panel_clear_all'),
+    );
+  }
+
+  const publicationOptions = [
+    new StringSelectMenuOptionBuilder()
+      .setLabel('Editar diseño público')
+      .setDescription('Cambia título, descripción, pie y banner.')
       .setEmoji('✏️')
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId('booster_color_panel_preview')
-      .setLabel('Vista Previa')
+      .setValue('booster_color_panel_edit_text'),
+    new StringSelectMenuOptionBuilder()
+      .setLabel('Vista previa')
+      .setDescription('Revisa el mensaje como lo verá un miembro.')
       .setEmoji('👁️')
-      .setStyle(ButtonStyle.Primary)
-  );
+      .setValue('booster_color_panel_preview'),
+  ];
 
-  // Fila 2: Enviar a canal & Sincronizar
-  const row2 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('booster_color_panel_send_btn')
-      .setLabel('Enviar Embed a un Canal')
-      .setEmoji('🚀')
-      .setStyle(ButtonStyle.Primary)
-      .setDisabled(cfg.colors.length === 0),
-    new ButtonBuilder()
-      .setCustomId('booster_color_panel_sync')
-      .setLabel('Actualizar Mensajes Publicados')
-      .setEmoji('🔄')
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(cfg.sentMessages.length === 0),
-    new ButtonBuilder()
-      .setCustomId('booster_color_panel_clear_all')
-      .setLabel('Limpiar Todos')
-      .setEmoji('🗑️')
-      .setStyle(ButtonStyle.Danger)
-      .setDisabled(cfg.colors.length === 0)
-  );
+  if (cfg.colors.length > 0) {
+    publicationOptions.push(
+      new StringSelectMenuOptionBuilder()
+        .setLabel('Publicar en un canal')
+        .setDescription('Envía el panel público a un canal.')
+        .setEmoji('🚀')
+        .setValue('booster_color_panel_send_btn'),
+    );
+  }
+  if (cfg.sentMessages.length > 0) {
+    publicationOptions.push(
+      new StringSelectMenuOptionBuilder()
+        .setLabel('Actualizar publicaciones')
+        .setDescription('Sincroniza los mensajes ya publicados.')
+        .setEmoji('🔄')
+        .setValue('booster_color_panel_sync'),
+    );
+  }
 
-  rows.push(row1, row2);
-  return rows;
+  const managementMenu = new StringSelectMenuBuilder()
+    .setCustomId('booster_color_panel_manage_select')
+    .setPlaceholder('🎨 Gestionar colores')
+    .addOptions(managementOptions);
+  const publicationMenu = new StringSelectMenuBuilder()
+    .setCustomId('booster_color_panel_publish_select')
+    .setPlaceholder('🪄 Diseño y publicaciones')
+    .addOptions(publicationOptions);
+
+  return [
+    new ActionRowBuilder().addComponents(managementMenu),
+    new ActionRowBuilder().addComponents(publicationMenu),
+  ];
 }
 
+function respondWithAdminPanel(interaction, guild, content) {
+  const payload = {
+    content,
+    embeds: buildAdminEmbeds(guild.id, guild),
+    components: buildAdminComponents(guild.id),
+  };
+  if (interaction.message && typeof interaction.update === 'function') return interaction.update(payload);
+  return interaction.reply({ ...payload, ephemeral: true });
+}
 module.exports = {
   getConfig,
   saveConfig,
@@ -354,7 +378,10 @@ module.exports = {
 
   // Manejador central de todas las interacciones de colores booster
   async handleInteraction(interaction) {
-    const { customId, guild, member } = interaction;
+    const { guild, member } = interaction;
+    const componentId = interaction.customId;
+    const isAdminNavigation = componentId === 'booster_color_panel_manage_select' || componentId === 'booster_color_panel_publish_select';
+    const customId = isAdminNavigation ? interaction.values?.[0] : componentId;
     if (!guild) return;
 
     try {
@@ -437,8 +464,8 @@ module.exports = {
         });
       }
 
-      // 2. BOTONES DEL PANEL ADMINISTRATIVO
-      if (interaction.isButton()) {
+      // 2. ACCIONES DEL PANEL ADMINISTRATIVO
+      if (interaction.isButton() || isAdminNavigation) {
         // A) Añadir Color (Muestra modal)
         if (customId === 'booster_color_panel_add') {
           const modal = new ModalBuilder()
@@ -493,7 +520,6 @@ module.exports = {
               cfg.colors.map(c => {
                 const opt = new StringSelectMenuOptionBuilder()
                   .setLabel(c.name.slice(0, 50))
-                  .setDescription(`ID: ${c.roleId}`.slice(0, 100))
                   .setValue(c.id);
                 if (c.emoji) {
                   const customMatch = c.emoji.match(/<a?:[a-zA-Z0-9_~-]+:(\d+)>/);
@@ -534,17 +560,26 @@ module.exports = {
             .setMaxLength(1500)
             .setRequired(true);
 
+          const footerInput = new TextInputBuilder()
+            .setCustomId('embed_footer')
+            .setLabel('Pie del Embed')
+            .setValue(cfg.footer || '')
+            .setStyle(TextInputStyle.Short)
+            .setMaxLength(2048)
+            .setRequired(true);
           const bannerInput = new TextInputBuilder()
             .setCustomId('embed_banner')
             .setLabel('URL de Imagen / Banner (Opcional)')
             .setValue(cfg.bannerUrl || '')
             .setStyle(TextInputStyle.Short)
             .setPlaceholder('https://...')
+            .setMaxLength(2048)
             .setRequired(false);
 
           modal.addComponents(
             new ActionRowBuilder().addComponents(titleInput),
             new ActionRowBuilder().addComponents(descInput),
+            new ActionRowBuilder().addComponents(footerInput),
             new ActionRowBuilder().addComponents(bannerInput)
           );
 
@@ -687,38 +722,24 @@ module.exports = {
             colors: [...c.colors.filter(col => col.roleId !== roleId), { id: newId, name, roleId, emoji }]
           }));
 
-          const adminEmbeds = buildAdminEmbeds(guild.id, guild);
-          const adminComp = buildAdminComponents(guild.id);
-
-          return interaction.reply({
-            content: `✅ ¡Color **${name}** (<@&${roleId}>) añadido correctamente!`,
-            embeds: adminEmbeds,
-            components: adminComp,
-            ephemeral: true
-          });
+          return respondWithAdminPanel(interaction, guild, '✅ Color añadido correctamente.');
         }
 
         if (customId === 'booster_color_modal_edit_text') {
           const title = interaction.fields.getTextInputValue('embed_title').trim();
           const description = interaction.fields.getTextInputValue('embed_desc').trim();
           const bannerUrl = interaction.fields.getTextInputValue('embed_banner')?.trim() || '';
+          const footer = interaction.fields.getTextInputValue('embed_footer').trim();
 
           saveConfig(guild.id, c => ({
             ...c,
             title,
             description,
+            footer,
             bannerUrl
           }));
 
-          const adminEmbeds = buildAdminEmbeds(guild.id, guild);
-          const adminComp = buildAdminComponents(guild.id);
-
-          return interaction.reply({
-            content: '✅ ¡Diseño y textos del embed actualizados correctamente!',
-            embeds: adminEmbeds,
-            components: adminComp,
-            ephemeral: true
-          });
+          return respondWithAdminPanel(interaction, guild, '✅ Diseño público actualizado.');
         }
       }
     } catch (error) {
