@@ -53,14 +53,17 @@ test('el panel administrativo muestra una vista previa del texto público', () =
     sentMessages: [],
   });
 
-  const embeds = service.buildAdminEmbeds('guild_fixture', null);
+  const embeds = service.buildAdminEmbeds('guild_fixture', { name: 'Comunidad' });
   const fields = embeds.flatMap(embed => embed.data.fields ?? []);
-  const descriptionPreview = fields.find(field => field.name === '📖 Descripción pública · Vista previa');
-  const footerPreview = fields.find(field => field.name === '🪶 Pie público · Vista previa');
+  assert.equal(embeds[0].data.title, '🎨 Colores Booster');
+  assert.equal(embeds[0].data.author.name, 'Comunidad');
+  assert.equal(embeds[0].data.description, '**0/24 colores** · **0 embeds publicados**');
+  const descriptionPreview = fields.find(field => field.name === '📖 Descripción pública');
+  const footerPreview = fields.find(field => field.name === '🪶 Pie público');
 
   assert.equal(descriptionPreview?.value, description);
   assert.equal(footerPreview?.value, footer);
-  assert.ok(fields.some(field => field.name === '📝 Título del Embed'));
+  assert.ok(fields.some(field => field.name === '📝 Título público'));
   assert.ok(fields.some(field => field.name === '🖼️ Banner'));
   assert.ok(embeds.every(embed => (embed.data.fields ?? []).every(field => field.value.length <= 1024)));
 });
@@ -76,8 +79,8 @@ test('las vistas previas limitan textos largos al tamaño configurado', () => {
   });
 
   const fields = service.buildAdminEmbeds('guild_fixture', null).flatMap(embed => embed.data.fields ?? []);
-  const descriptionPreview = fields.find(field => field.name === '📖 Descripción pública · Vista previa');
-  const footerPreview = fields.find(field => field.name === '🪶 Pie público · Vista previa');
+  const descriptionPreview = fields.find(field => field.name === '📖 Descripción pública');
+  const footerPreview = fields.find(field => field.name === '🪶 Pie público');
 
   assert.equal(descriptionPreview?.value.length, 900);
   assert.equal(footerPreview?.value.length, 900);
@@ -102,12 +105,16 @@ test('los bloques de la lista administrativa conservan un encabezado simple', ()
 
   const embeds = service.buildAdminEmbeds('guild_fixture', null);
   const colorFields = embeds.flatMap(embed => embed.data.fields ?? [])
-    .filter(field => field.name === '📋 Lista de Colores Configurados');
+    .filter(field => field.name === '🎨 Colores' || field.name === '↳ Continuación');
 
   assert.ok(colorFields.length > 1, 'el fixture debe distribuir la lista en varios bloques');
+  assert.ok(colorFields.some(field => field.name === '🎨 Colores'));
+  assert.ok(colorFields.some(field => field.name === '↳ Continuación'));
   assert.ok(colorFields.every(field => !/\(\d+\/\d+\)/.test(field.name)));
   const rendered = colorFields.map(field => field.value).join('\n');
   for (let index = 1; index <= 24; index += 1) {
     assert.ok(rendered.includes('ColorExtremadamenteLargoParaForzarVariosBloques_' + index));
+    const roleId = '1234567890123456' + String(index - 1).padStart(2, '0');
+    assert.ok(rendered.includes('<@&' + roleId + '>'));
   }
 });

@@ -227,7 +227,7 @@ function buildPublicComponents(guildId) {
   return rows;
 }
 
-// Genera los embeds paginados del Panel Administrativo (reparto equitativo).
+// Genera los embeds administrativos del panel Booster.
 function buildAdminEmbeds(guildId, guild) {
   const cfg = getConfig(guildId);
   const colorCount = cfg.colors.length;
@@ -235,54 +235,46 @@ function buildAdminEmbeds(guildId, guild) {
 
   if (cfg.colors.length > 0) {
     const lines = cfg.colors.map((c, i) => {
-      const emoji = c.emoji ? `${c.emoji} ` : '';
+      const emoji = c.emoji ? c.emoji + ' ' : '';
       const exists = guild?.roles?.cache?.has(c.roleId) ? '✅' : '⚠️ *Rol no existe*';
-      return `\`${i + 1}.\` ${emoji}**${c.name}** (<@&${c.roleId}>) • ${exists}`;
+      return [
+        "`" + (i + 1) + ".`",
+        emoji + '**' + c.name + '**',
+        '(<@&' + c.roleId + '>)',
+        '•',
+        exists,
+      ].join(' ');
     });
     const groups = groupLinesForFields(lines);
-    groups.forEach((group, idx) => {
+    groups.forEach((group, index) => {
       fields.push({
-        name: '📋 Lista de Colores Configurados',
+        name: index === 0 ? '🎨 Colores' : '↳ Continuación',
         value: group,
         inline: false,
       });
     });
   } else {
     fields.push({
-      name: '📋 Lista de Colores Configurados',
-      value: '*No hay colores agregados. Usa el botón "➕ Añadir Color" para comenzar.*',
-      inline: false
+      name: '🎨 Colores',
+      value: '*Aún no hay colores.*',
+      inline: false,
     });
   }
 
   fields.push(
-    { name: '📝 Título del Embed', value: `\`${cfg.title}\``, inline: true },
-    { name: '🖼️ Banner', value: cfg.bannerUrl ? `[Ver Banner](${cfg.bannerUrl})` : '`Ninguno`', inline: true }
-  );
-
-  fields.push(
-    {
-      name: '📖 Descripción pública · Vista previa',
-      value: truncate(cfg.description, 900),
-      inline: false,
-    },
-    {
-      name: '🪶 Pie público · Vista previa',
-      value: truncate(cfg.footer, 900),
-      inline: false,
-    }
+    { name: '📝 Título público', value: cfg.title, inline: true },
+    { name: '🖼️ Banner', value: cfg.bannerUrl ? '[Ver banner](' + cfg.bannerUrl + ')' : 'Ninguno', inline: true },
+    { name: '📖 Descripción pública', value: truncate(cfg.description, 900), inline: false },
+    { name: '🪶 Pie público', value: truncate(cfg.footer, 900), inline: false }
   );
 
   return buildPaginatedEmbeds({
-    title: '⚙️ Gestión de Colores Exclusivos',
-    description:
-      'Configura los colores que estarán disponibles para los **Boosters** antes de enviar el embed al canal público.\n\n' +
-      `**Estado Actual:** \`${colorCount}/24 Colores Configurados\`\n` +
-      `**Canales Vinculados:** \`${cfg.sentMessages.length} embeds publicados\``,
+    title: '🎨 Colores Booster',
+    description: '**' + colorCount + '/24 colores** · **' + cfg.sentMessages.length + ' embeds publicados**',
     fields,
-    color: COLORS.primary || 0x5865F2,
+    color: 0xF47FFF,
     author: {
-      name: 'Panel de Configuración de Autoroles Booster',
+      name: guild?.name || 'Servidor',
       iconURL: guild?.iconURL?.({ size: 128 }) || undefined,
     },
   });
