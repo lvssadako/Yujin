@@ -14,7 +14,7 @@ const {
   PermissionFlagsBits
 } = require('discord.js');
 const logger = require('../../utils/logger');
-const { COLORS, LIMITS, buildPaginatedEmbeds } = require('../../utils/embedFactory');
+const { COLORS, LIMITS, truncate, buildPaginatedEmbeds } = require('../../utils/embedFactory');
 
 function isSafeImageUrl(value) {
   if (typeof value !== 'string' || value.length === 0 || value.length > 2048) return false;
@@ -258,6 +258,19 @@ function buildAdminEmbeds(guildId, guild) {
   fields.push(
     { name: '📝 Título del Embed', value: `\`${cfg.title}\``, inline: true },
     { name: '🖼️ Banner', value: cfg.bannerUrl ? `[Ver Banner](${cfg.bannerUrl})` : '`Ninguno`', inline: true }
+  );
+
+  fields.push(
+    {
+      name: '📖 Descripción pública · Vista previa',
+      value: truncate(cfg.description, 900),
+      inline: false,
+    },
+    {
+      name: '🪶 Pie público · Vista previa',
+      value: truncate(cfg.footer, 900),
+      inline: false,
+    }
   );
 
   return buildPaginatedEmbeds({
