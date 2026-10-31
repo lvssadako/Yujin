@@ -55,13 +55,14 @@ test('VALID_CATEGORIES contains all required categories', () => {
   assert.ok(VALID_CATEGORIES.includes('badges'));
 });
 
-test('getNotificationPreferences returns all enabled by default', () => {
+test('getNotificationPreferences enables everything by default except streak DMs', () => {
   const guildId = 'test_guild_notif_default';
   const userId = 'test_user_notif_default';
 
   const prefs = getNotificationPreferences(guildId, userId);
   assert.equal(prefs.all, true);
-  assert.equal(prefs.streaks, true);
+  assert.equal(prefs.streaks, false);
+  assert.equal(canSendDmNotification(guildId, userId, 'streaks'), false);
   assert.equal(prefs.warns, true);
   assert.equal(prefs.levels, true);
   assert.equal(prefs.boosts, true);
@@ -76,10 +77,10 @@ test('setNotificationPreference updates specific category and persists', () => {
   let updated = setNotificationPreference(guildId, userId, 'warns', false);
   assert.equal(updated.warns, false);
   assert.equal(updated.all, true);
-  assert.equal(updated.streaks, true);
+  assert.equal(updated.streaks, false);
 
   assert.equal(canSendDmNotification(guildId, userId, 'warns'), false);
-  assert.equal(canSendDmNotification(guildId, userId, 'streaks'), true);
+  assert.equal(canSendDmNotification(guildId, userId, 'streaks'), false);
 
   // Reactivar warns
   updated = setNotificationPreference(guildId, userId, 'warns', true);

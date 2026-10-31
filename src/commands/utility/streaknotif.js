@@ -12,8 +12,8 @@ function buildNotificationEmbed(guild, user, disabled, isStatusCheck = false) {
       .setTitle(disabled ? '🔕 Notificaciones de Racha: DESACTIVADAS' : '🔔 Notificaciones de Racha: ACTIVADAS')
       .setDescription(
         disabled
-          ? `Actualmente **NO recibirás** mensajes directos (DM) de recordatorio ni avisos de racha en **${guild.name}**.\n\n> 💡 Para activarlas nuevamente, usa \`/streaknotif estado: Activar\` o el prefijo \`&streaknotif on\`.`
-          : `Actualmente **SÍ recibirás** avisos por mensaje directo (DM) 3 horas antes de la medianoche si tu racha está en riesgo en **${guild.name}**.\n\n> 💡 Para desactivarlas, usa \`/streaknotif estado: Desactivar\` o el prefijo \`&streaknotif off\`.`
+          ? `Actualmente **NO recibirás** mensajes directos (DM) de recordatorio ni avisos de racha en **${guild.name}**. Vienen apagadas por defecto.\n\n> 💡 Para activarlas nuevamente, usa \`/streaknotif estado: Activar\` o el prefijo \`&streaknotif on\`.`
+          : `Actualmente **SÍ recibirás** avisos por mensaje directo (DM) 3 horas antes de la medianoche si tu racha activa (5 días o más) está en riesgo en **${guild.name}**.\n\n> 💡 Para desactivarlas, usa \`/streaknotif estado: Desactivar\` o el prefijo \`&streaknotif off\`.`
       )
       .setFooter({ text: `${guild.name} · Sistema de Rachas de Actividad` });
     return embed;
@@ -42,7 +42,7 @@ function buildNotificationEmbed(guild, user, disabled, isStatusCheck = false) {
       .setTitle('🔔 Notificaciones de Racha Activadas')
       .setDescription(
         `Has **activado** con éxito las alertas automáticas de racha por mensaje directo (DM) en **${guild.name}**.\n\n` +
-        `• Te enviaremos un DM de aviso 3 horas antes de la medianoche si aún no has escrito hoy y tu racha está en riesgo de perderse.`
+        `• Te enviaremos un DM de aviso 3 horas antes de la medianoche si aún no has escrito hoy y tu racha activa (5 días o más) está en riesgo de perderse.`
       )
       .addFields({
         name: '🔕 ¿Cómo desactivarlas?',

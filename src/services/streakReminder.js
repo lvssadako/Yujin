@@ -1,6 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
 const { readProfiles, writeProfiles } = require('../utils/profileStore');
-const { getFlameTier, getLocalDayInfo } = require('./streak/streakService');
+const { getFlameTier, getLocalDayInfo, isStreakActive, areStreakAlertsDisabled } = require('./streak/streakService');
 const { canSendDmNotification, sendDmNotification } = require('./notification/dmNotificationService');
 const logger = require('../utils/logger');
 
@@ -25,14 +25,14 @@ async function checkStreaks() {
 
     for (const [userId, profile] of Object.entries(guildUsers)) {
       const streak = Number(profile.streakDays) || 0;
-      if (streak < 1) continue;
+      if (!isStreakActive(streak) || profile.streakDisabled) continue; // Solo rachas activas (>= 5 días)
 
       const lastActive = Number(profile.lastActiveDay) || 0;
       if (lastActive === today) continue; // Ya envió mensaje hoy, racha a salvo
 
       const lastReminded = Number(profile.lastStreakReminderDay) || 0;
       if (lastReminded === today) continue; // Ya fue notificado hoy
-      if (profile.streakAlertsDisabled || !canSendDmNotification(guild.id, userId, 'streaks')) continue;
+      if (areStreakAlertsDisabled(profile) || !canSendDmNotification(guild.id, userId, 'streaks')) continue;
 
       try {
         const member = await guild.members.fetch(userId).catch(() => null);

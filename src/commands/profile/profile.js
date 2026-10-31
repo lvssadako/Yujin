@@ -9,6 +9,7 @@ const { normalizeExternalImageUrl } = require('../../utils/urlSafety');
 const { fetchImageBuffer: fetchBuffer } = require('../../services/image/imageService');
 const { readLevels, ensureUserData, xpToNext, getUserRank } = require('../../services/level').levelService;
 const { initFonts, FONT_FALLBACKS } = require('../../utils/canvasFontLoader');
+const { STREAK_ACTIVATION_DAYS } = require('../../services/streak/streakService');
 
 initFonts();
 
@@ -269,7 +270,7 @@ module.exports = {
       const tz = cfg.timezone || 0;
       const today = Math.floor((Date.now() + tz * 3600000) / 86400000);
       const lastActive = profileData.lastActiveDay || 0;
-      const isStreakActive = lastActive >= today - 1 && streakDays > 0;
+      const isStreakActive = lastActive >= today - 1 && streakDays >= STREAK_ACTIVATION_DAYS;
 
       const streakCenterX = avX + avSize / 2;
       const streakY = avY + avSize + Math.floor(32 * SCALE);

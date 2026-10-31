@@ -4,21 +4,38 @@ const { STREAK_TEMPLATES } = require('../../constants/streakThemes');
 const { readConfig } = require('../../utils/configCache');
 const logger = require('../../utils/logger');
 
+// La racha solo se considera activa (visible, con beneficios, recompensas y avisos)
+// a partir de este número de días consecutivos. Antes de eso se sigue contando,
+// pero queda "en formación" y no otorga nada.
+const STREAK_ACTIVATION_DAYS = 5;
+
+function isStreakActive(streakDays) {
+  return (Number(streakDays) || 0) >= STREAK_ACTIVATION_DAYS;
+}
+
+// Las alertas de racha por DM están apagadas por defecto: solo se envían si el
+// usuario las activó explícitamente (streakAlertsDisabled === false).
+function areStreakAlertsDisabled(profile) {
+  return !profile || profile.streakAlertsDisabled !== false;
+}
+
 const FLAME_TIERS = [
   { minDays: 60, name: 'Fénix Legendario', emoji: '👑', color: 0xFF4500, xpMultiplier: 1.35, shopDiscount: 25, badge: '🔥 Fénix Eterno', rewardCoins: 50000 },
   { minDays: 30, name: 'Fuego Cósmico', emoji: '🌟', color: 0x9B59B6, xpMultiplier: 1.25, shopDiscount: 20, badge: '🌟 Llama Cósmica', rewardCoins: 15000 },
   { minDays: 14, name: 'Llama Diamante', emoji: '💎', color: 0x3498DB, xpMultiplier: 1.15, shopDiscount: 15, badge: '💎 Fuego Puro', rewardCoins: 5000 },
   { minDays: 7,  name: 'Fuego Vivo', emoji: '🔥', color: 0xE67E22, xpMultiplier: 1.10, shopDiscount: 10, badge: '🔥 Racha 7D', rewardCoins: 1500 },
-  { minDays: 3,  name: 'Llama Eléctrica', emoji: '⚡', color: 0xF1C40F, xpMultiplier: 1.05, shopDiscount: 0, badge: null, rewardCoins: 500 },
-  { minDays: 1,  name: 'Chispa Inicial', emoji: '🕯️', color: 0x95A5A6, xpMultiplier: 1.00, shopDiscount: 0, badge: null, rewardCoins: 0 }
+  { minDays: STREAK_ACTIVATION_DAYS, name: 'Llama Eléctrica', emoji: '⚡', color: 0xF1C40F, xpMultiplier: 1.05, shopDiscount: 0, badge: null, rewardCoins: 500 }
 ];
+
+const FORMING_TIER = { minDays: 0, name: 'Racha en Formación', emoji: '🕯️', color: 0x95A5A6, xpMultiplier: 1.00, shopDiscount: 0, badge: null, rewardCoins: 0 };
+const NO_STREAK_TIER = { minDays: 0, name: 'Sin Racha', emoji: '💤', color: 0x2F3136, xpMultiplier: 1.00, shopDiscount: 0, badge: null, rewardCoins: 0 };
 
 function getFlameTier(streakDays) {
   const days = Math.max(0, Number(streakDays) || 0);
   for (const tier of FLAME_TIERS) {
     if (days >= tier.minDays) return tier;
   }
-  return { minDays: 0, name: 'Sin Racha', emoji: '💤', color: 0x2F3136, xpMultiplier: 1.00, shopDiscount: 0, badge: null, rewardCoins: 0 };
+  return days > 0 ? FORMING_TIER : NO_STREAK_TIER;
 }
 
 function getNextTier(streakDays) {
@@ -48,7 +65,7 @@ function recordMessageActivity(guildId, userId) {
   const { today } = getLocalDayInfo();
 
   if (u.lastActiveDay === today && !u.streakDisabled) {
-    return { updated: false, streakDays: u.streakDays || 0, isNewDay: false, alertsDisabled: Boolean(u.streakAlertsDisabled) };
+    return { updated: false, streakDays: u.streakDays || 0, isNewDay: false, isActive: isStreakActive(u.streakDays), alertsDisabled: areStreakAlertsDisabled(u) };
   }
 
   const wasDisabled = Boolean(u.streakDisabled);
@@ -66,7 +83,8 @@ function recordMessageActivity(guildId, userId) {
     logger.info(`[streak] Racha reactivada para ${userId} en ${guildId} tras enviar mensaje.`);
   } else if (isConsecutive) {
     newStreak = previousStreak + 1;
-  } else if (previousStreak > 0) {
+  } else if (isStreakActive(previousStreak)) {
+    // El congelador solo protege rachas ya activas (>= STREAK_ACTIVATION_DAYS)
     const inv = getInventory(guildId, userId);
     if (inv && (inv['congelador'] || 0) > 0) {
       removeItem(guildId, userId, 'congelador', 1);
@@ -104,7 +122,8 @@ function recordMessageActivity(guildId, userId) {
     tierUpgraded,
     coinsRewarded,
     tier: newTier,
-    alertsDisabled: Boolean(u.streakAlertsDisabled)
+    isActive: isStreakActive(newStreak),
+    alertsDisabled: areStreakAlertsDisabled(u)
   };
 }
 
@@ -160,7 +179,10 @@ function getUserStreakStatus(guildId, userId) {
     midnightTs,
     msRemaining,
     freezersCount,
-    alertsDisabled: Boolean(u.streakAlertsDisabled),
+    isActive: isStreakActive(streakDays),
+    activationDays: STREAK_ACTIVATION_DAYS,
+    daysToActivation: Math.max(0, STREAK_ACTIVATION_DAYS - streakDays),
+    alertsDisabled: areStreakAlertsDisabled(u),
     streakDisabled: isStreakDisabled,
     daysSinceActive,
     // Personalización global
@@ -202,11 +224,11 @@ function setGlobalStreakCustomization(userId, updates = {}) {
 }
 
 function setStreakAlertPreference(guildId, userId, disabled) {
-  const profiles = readProfiles();
-  const u = ensureUser(profiles, guildId, userId);
-  u.streakAlertsDisabled = Boolean(disabled);
-  writeProfiles(profiles);
-  return u.streakAlertsDisabled;
+  // Delegar en el servicio central de DMs para mantener sincronizados
+  // streakAlertsDisabled, dmNotifications.streaks y el interruptor general.
+  const { setNotificationPreference } = require('../notification/dmNotificationService');
+  const prefs = setNotificationPreference(guildId, userId, 'streaks', !disabled);
+  return !prefs.streaks;
 }
 
 function getStreakLeaderboard(guildId, limit = 10, guild = null) {
@@ -231,7 +253,7 @@ function getStreakLeaderboard(guildId, limit = 10, guild = null) {
       tier: getFlameTier(data.streakDisabled ? 0 : (data.streakDays || 0)),
       streakDisabled: Boolean(data.streakDisabled)
     }))
-    .filter(u => u.streakDays > 0 && !u.streakDisabled)
+    .filter(u => isStreakActive(u.streakDays) && !u.streakDisabled)
     .sort((a, b) => b.streakDays - a.streakDays);
 
   return {
@@ -307,7 +329,10 @@ function checkAndDisableInactiveStreaks(guildId, daysThreshold = 15, dryRun = fa
 }
 
 module.exports = {
+  STREAK_ACTIVATION_DAYS,
   FLAME_TIERS,
+  isStreakActive,
+  areStreakAlertsDisabled,
   getFlameTier,
   getNextTier,
   getLocalDayInfo,
