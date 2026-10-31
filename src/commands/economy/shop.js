@@ -2,6 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, Butt
 const { readConfig } = require('../../utils/configCache');
 const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
 const { getBalance, subtractCoins } = require('../../services/economy/index').economyService;
+const { isStreakActive, STREAK_ACTIVATION_DAYS } = require('../../services/streak/streakService');
 
 function asHours(ms) {
   return `${(ms / 3600000).toFixed(1)}h`;
@@ -18,7 +19,7 @@ function getRarityColor(rarity = 'common') {
 }
 
 function getDiscountForUser(item, userData) {
-  const streakDiscount = Number(userData.streakDays || 0) >= 3 ? 10 : 0;
+  const streakDiscount = isStreakActive(userData.streakDays) ? 10 : 0;
   const itemDiscount = Number(item.discountPercent) || 0;
   return Math.min(45, Math.max(0, itemDiscount + streakDiscount));
 }
@@ -165,7 +166,7 @@ function buildShopEmbed(cfg, userData) {
     .setTitle('🛒 Tienda premium del servidor')
     .setColor(0xF6C343)
     .setDescription('Compra boosts, packs y ofertas especiales. Mantén tu racha para obtener descuentos.')
-    .setFooter({ text: userData?.streakDays ? `Racha activa: ${userData.streakDays} días • Descuento por streak: 10%` : 'Mantén tu racha para activar descuento' });
+    .setFooter({ text: isStreakActive(userData?.streakDays) ? `Racha activa: ${userData.streakDays} días • Descuento por streak: 10%` : `Mantén tu racha ${STREAK_ACTIVATION_DAYS} días seguidos para activar el descuento` });
 
   sections.forEach(section => {
     const items = catalog.filter(item => item.category === section.key);

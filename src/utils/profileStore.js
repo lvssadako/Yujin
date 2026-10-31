@@ -62,7 +62,7 @@ function ensureUser(profiles, guildId, userId) {
   if (!u.dmNotifications || typeof u.dmNotifications !== 'object') {
     u.dmNotifications = {
       all: true,
-      streaks: u.streakAlertsDisabled ? false : true,
+      streaks: u.streakAlertsDisabled === false,
       warns: true,
       levels: true,
       boosts: true,

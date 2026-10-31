@@ -4,7 +4,8 @@ const {
   getUserStreakStatus,
   setGlobalStreakCustomization,
   setStreakAlertPreference,
-  getStreakLeaderboard
+  getStreakLeaderboard,
+  STREAK_ACTIVATION_DAYS
 } = require('../../services/streak/streakService');
 const { generateStreakCard } = require('../../services/streak/streakCard');
 const { buildStreakCustomizationPanel } = require('../../services/streak/streakCustomizer');
@@ -46,6 +47,14 @@ function buildLeaderboardEmbed(guild, lb) {
     .setTimestamp();
 }
 
+function buildFormingStreakNotice(status, isSelf) {
+  if (!status || status.isActive || status.streakDisabled) return undefined;
+  const remaining = status.daysToActivation;
+  const who = isSelf ? 'Tu racha' : 'Esta racha';
+  return `🕯️ ${who} está en formación: se activa al llegar a **${STREAK_ACTIVATION_DAYS} días seguidos** ` +
+    `(faltan **${remaining} día${remaining === 1 ? '' : 's'}**). Hasta entonces no otorga beneficios ni recompensas.`;
+}
+
 function buildTiersEmbed() {
   const lines = FLAME_TIERS.map(t => {
     const bonusXp = Math.round((t.xpMultiplier - 1) * 100);
@@ -63,7 +72,8 @@ function buildTiersEmbed() {
     .setAuthor({ name: '🔥 Niveles de Fuego y Recompensas de Racha' })
     .setColor(0xE67E22)
     .setDescription(
-      'Tu racha aumenta automáticamente cada día que **envías al menos un mensaje** en el servidor.\n\n' +
+      'Tu racha aumenta automáticamente cada día que **envías al menos un mensaje** en el servidor.\n' +
+      `Se **activa** al llegar a **${STREAK_ACTIVATION_DAYS} días seguidos**; antes de eso no otorga beneficios ni recompensas.\n\n` +
       lines.join('\n\n')
     )
     .addFields({
@@ -153,7 +163,7 @@ module.exports = {
         );
       }
 
-      return interaction.editReply({ files: [attachment], components });
+      return interaction.editReply({ content: buildFormingStreakNotice(status, isSelf), files: [attachment], components });
     }
 
     if (sub === 'customizar') {
@@ -320,9 +330,10 @@ module.exports = {
       );
     }
 
-    return message.reply({ files: [attachment], components });
+    return message.reply({ content: buildFormingStreakNotice(status, isSelf), files: [attachment], components });
   },
 
   buildLeaderboardEmbed,
-  buildTiersEmbed
+  buildTiersEmbed,
+  buildFormingStreakNotice
 };
