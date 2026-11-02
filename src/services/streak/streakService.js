@@ -5,9 +5,9 @@ const { readConfig } = require('../../utils/configCache');
 const logger = require('../../utils/logger');
 
 // La racha solo se considera activa (visible, con beneficios, recompensas y avisos)
-// a partir de este número de días consecutivos. Antes de eso se sigue contando,
-// pero queda "en formación" y no otorga nada.
-const STREAK_ACTIVATION_DAYS = 5;
+// a partir de STREAK_ACTIVATION_DAYS días consecutivos. Antes de eso se sigue
+// contando, pero queda "en formación" y no otorga nada.
+const { STREAK_ACTIVATION_DAYS } = require('../../constants/streakRules');
 
 function isStreakActive(streakDays) {
   return (Number(streakDays) || 0) >= STREAK_ACTIVATION_DAYS;
