@@ -1,5 +1,6 @@
+const { createEmbed, COLORS } = require('../../utils/ui');
 
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, } = require('discord.js');
 const { readWarns, writeWarns } = require('../../utils/warnStore');
 const { sendDmNotification } = require('../../services/notification/dmNotificationService');
 const crypto = require('crypto');
@@ -32,7 +33,7 @@ module.exports = {
       warns[guildId][target.id].push({ id: warnId, reason, date: Date.now(), modId: interaction.user.id });
       writeWarns(warns);
       
-      const emb = new EmbedBuilder().setColor(0xFFA500)
+      const emb = createEmbed().setColor(0xFFA500)
         .setAuthor({ name: '⚠️ Nueva Advertencia (Warn)' })
         .setThumbnail(target.displayAvatarURL({ dynamic: true }))
         .addFields(
@@ -55,7 +56,7 @@ module.exports = {
       const userWarns = warns[guildId][target.id];
       if (userWarns.length === 0) return interaction.reply({ content: '✅ Este usuario no tiene advertencias.', ephemeral: true });
       
-      const emb = new EmbedBuilder().setColor(0x5865F2).setTitle(`📋 Advertencias de ${target.tag}`)
+      const emb = createEmbed().setColor(COLORS.primary).setTitle(`📋 Advertencias de ${target.tag}`)
         .setDescription(userWarns.map((w, i) => `**${i + 1}.** [\`${w.id}\`] - ${w.reason} (Por: <@${w.modId}>)`).join('\n'));
       await interaction.reply({ embeds: [emb] });
     }
@@ -89,7 +90,7 @@ module.exports = {
       warns[guildId][target.id].push({ id: warnId, reason, date: Date.now(), modId: message.author.id });
       writeWarns(warns);
 
-      const emb = new EmbedBuilder().setColor(0xFFA500)
+      const emb = createEmbed().setColor(0xFFA500)
         .setAuthor({ name: '⚠️ Nueva Advertencia (Warn)' })
         .setThumbnail(target.displayAvatarURL({ dynamic: true }))
         .addFields(
@@ -111,7 +112,7 @@ module.exports = {
       const userWarns = warns[guildId]?.[target.id] || [];
       if (userWarns.length === 0) return message.reply('✅ Este usuario no tiene advertencias.');
 
-      const emb = new EmbedBuilder().setColor(0x5865F2).setTitle(`📋 Advertencias de ${target.tag}`)
+      const emb = createEmbed().setColor(COLORS.primary).setTitle(`📋 Advertencias de ${target.tag}`)
         .setDescription(userWarns.map((w, i) => `**${i+1}.** [\`${w.id}\`] - ${w.reason} (Por: <@${w.modId}>)`).join('\n'));
       await message.reply({ embeds: [emb] });
     } else if (sub === 'remove') {

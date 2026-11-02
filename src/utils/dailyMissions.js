@@ -2,6 +2,7 @@ const logger = require('./logger');
 const fs = require('fs');
 const path = require('path');
 const { readConfig } = require('./configCache');
+const { readJsonSafe, writeJsonAtomic } = require('./jsonStore');
 const { secureRandom } = require('./cryptoRandom');
 
 const dataDir = path.join(__dirname, '..', '..', 'data');
@@ -9,11 +10,10 @@ const filePath = path.join(dataDir, 'daily_missions.json');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
 function readStore() {
-  try { return JSON.parse(fs.readFileSync(filePath, 'utf8')); }
-  catch { return { guilds: {} }; }
+  return readJsonSafe(filePath, { guilds: {} });
 }
 function writeStore(obj) {
-  fs.writeFileSync(filePath, JSON.stringify(obj, null, 2), 'utf8');
+  writeJsonAtomic(filePath, obj);
 }
 
 function todayKey(tz) {
@@ -51,7 +51,7 @@ function baseTemplates(guild) {
     // 🟡 Legendarias (muy rara, 1 gema)
     { id: 'd_msg_500', type: 'messages', target: 500, reward: { coins: 1500, xp: 800, gems: 1 }, desc: 'Envía 500 mensajes', icon: '💬', weight: 0.5 },
     { id: 'd_voice_180', type: 'voice', target: 180, reward: { coins: 1200, xp: 600, gems: 1 }, desc: 'Pasa 3 horas en voz', icon: '🎤', weight: 0.5 },
-    { id: 'd_spend_1000', type: 'coins_spent', target: 2000, reward: { coins: 500, gems: 1 }, desc: 'Gasta 1000 monedas', icon: '💸', weight: 0.5 },
+    { id: 'd_spend_1000', type: 'coins_spent', target: 1000, reward: { coins: 500, gems: 1 }, desc: 'Gasta 1000 monedas', icon: '💸', weight: 0.5 },
     { id: 'd_chest_10', type: 'chests_opened', target: 10, reward: { coins: 1000, gems: 1 }, desc: 'Abre 10 cofres', icon: '🎁', weight: 0.3 },
   ];
   
@@ -110,6 +110,13 @@ function getDaily(guild, userId, tz) {
   const entry = store.guilds[gid]?.[userId];
   const day = todayKey(tz);
   if (!entry || entry.day !== day) return genDaily(guild, userId, tz);
+  const spending = entry.list.find(m => m.id === 'd_spend_1000' && m.target === 2000);
+  if (spending) {
+    spending.target = 1000;
+    spending.progress = Math.min(spending.progress || 0, spending.target);
+    spending.completed = spending.completed || spending.progress >= spending.target;
+    writeStore(store);
+  }
   return entry.list;
 }
 

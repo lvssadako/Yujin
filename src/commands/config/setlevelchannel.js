@@ -1,6 +1,6 @@
+const { createEmbed, COLORS } = require('../../utils/ui');
 const { 
   SlashCommandBuilder, 
-  EmbedBuilder, 
   PermissionFlagsBits, 
   ChannelType 
 } = require('discord.js');
@@ -9,9 +9,9 @@ const logger = require('../../utils/logger');
 
 function buildStatusEmbed(guild, channelId) {
   const channel = channelId ? guild.channels.cache.get(channelId) : null;
-  const embed = new EmbedBuilder()
+  const embed = createEmbed()
     .setTitle('📢 Canal de Notificaciones de Nivel (Level-Up)')
-    .setColor(channel ? 0x5865F2 : 0x95A5A6)
+    .setColor(channel ? 0xA78BFA : 0x94A3B8)
     .setThumbnail(guild.iconURL({ dynamic: true }))
     .addFields(
       {
@@ -101,10 +101,10 @@ module.exports = {
 
       logger.info(`[config] Canal de level-up configurado a ${channel.id} en ${interaction.guild.id}`);
 
-      const embed = new EmbedBuilder()
+      const embed = createEmbed()
         .setTitle('✅ Canal de Level-Up Configurado')
         .setDescription(`A partir de ahora, todos los anuncios de subida de nivel se enviarán en <#${channel.id}>.`)
-        .setColor(0x2ECC71)
+        .setColor(COLORS.success)
         .addFields(
           { name: 'Canal', value: `<#${channel.id}> (\`${channel.id}\`)`, inline: true },
           { name: 'Configurado por', value: `${interaction.user}`, inline: true }
@@ -123,10 +123,10 @@ module.exports = {
 
       logger.info(`[config] Canal de level-up removido en ${interaction.guild.id}`);
 
-      const embed = new EmbedBuilder()
+      const embed = createEmbed()
         .setTitle('🗑️ Canal de Level-Up Removido')
         .setDescription('El canal fijo de anuncios de subida de nivel ha sido eliminado. Los anuncios se enviarán en el mismo canal donde el usuario interactúe.')
-        .setColor(0xE74C3C)
+        .setColor(COLORS.error)
         .setTimestamp();
 
       return interaction.reply({ embeds: [embed] });
@@ -160,10 +160,10 @@ module.exports = {
 
       logger.info(`[config] Canal de level-up removido vía prefix en ${message.guild.id}`);
 
-      const embed = new EmbedBuilder()
+      const embed = createEmbed()
         .setTitle('🗑️ Canal de Level-Up Removido')
         .setDescription('El canal fijo de anuncios de subida de nivel ha sido eliminado. Los anuncios se enviarán en el mismo canal donde el usuario interactúe.')
-        .setColor(0xE74C3C)
+        .setColor(COLORS.error)
         .setTimestamp();
 
       return message.reply({ embeds: [embed] });
@@ -200,10 +200,10 @@ module.exports = {
 
     logger.info(`[config] Canal de level-up configurado a ${channelTarget.id} vía prefix en ${message.guild.id}`);
 
-    const embed = new EmbedBuilder()
+    const embed = createEmbed()
       .setTitle('✅ Canal de Level-Up Configurado')
       .setDescription(`A partir de ahora, todos los anuncios de subida de nivel se enviarán en <#${channelTarget.id}>.`)
-      .setColor(0x2ECC71)
+      .setColor(COLORS.success)
       .addFields(
         { name: 'Canal', value: `<#${channelTarget.id}> (\`${channelTarget.id}\`)`, inline: true },
         { name: 'Configurado por', value: `${message.author}`, inline: true }

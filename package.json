@@ -1,7 +1,7 @@
 {
   "name": "lcobot",
   "version": "1.0.0",
-  "description": "LCO Bot - menú de colores configurable",
+  "description": "LCO Bot - menÃº de colores configurable",
   "private": true,
   "license": "UNLICENSED",
   "main": "src/index.js",
@@ -11,13 +11,13 @@
     "start": "node src/index.js",
     "dev": "node --watch-path=src/index.js --watch-path=src/events --watch-path=config/default.json --watch-path=package.json --watch-path=.env --watch-preserve-output src/index.js",
     "watch": "node src/index.js",
-    "test": "node --test --test-concurrency=1 \"src/**/__tests__/*.test.js\""
+    "build:release": "node scripts/buildRelease.js"
   },
   "dependencies": {
-    "@napi-rs/canvas": "^1.0.8",
-    "discord.js": "^14.11.0",
+    "@napi-rs/canvas": "^1.0.13",
+    "discord.js": "^14.27.0",
     "dotenv": "^17.4.2",
     "winston": "^3.19.0",
-    "zod": "^4.4.3"
+    "zod": "^4.6.7"
   }
 }

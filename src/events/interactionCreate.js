@@ -1,11 +1,17 @@
 const logger = require('../utils/logger');
 const { Events } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
+const { readConfig } = require('../utils/configCache');
+const { validateRoleForAssignment } = require('../utils/roleValidation');
 
 module.exports = (client) => {
   client.on(Events.InteractionCreate, async (interaction) => {
     try {
+      if (interaction.isAutocomplete?.()) {
+        const cmd = client.commands.get(interaction.commandName);
+        if (cmd?.autocomplete) await cmd.autocomplete(interaction, client);
+        else await interaction.respond([]);
+        return;
+      }
       // Slash commands
       if (interaction.isChatInputCommand()) {
         logger.info(`🔹 Slash usado: ${interaction.commandName} por ${interaction.user.tag}`);
@@ -41,7 +47,7 @@ module.exports = (client) => {
       // BOTONES
       if (interaction.isButton()) {
                 // Botón de compra de boost XP en /shop
-                if (interaction.customId.startsWith('shop_buy_')) {
+                if ((interaction.customId.startsWith('shop_buy_') || interaction.customId.startsWith('shop_page_'))) {
                   const shop = require('../commands/economy/shop.js');
                   await shop.handleButton(interaction);
                   return;
@@ -115,12 +121,16 @@ module.exports = (client) => {
         }
         if (interaction.customId === 'lco_color_menu') {
           await interaction.deferReply({ flags: 64 });
-          const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, '../config.json'), 'utf8'));
+          const cfg = readConfig();
           const vipRoleId = cfg.vipRoleId;
           if (!vipRoleId) return interaction.editReply({ content: '❌ No hay rol requerido configurado.' });
 
           const member = interaction.member;
           const guild = interaction.guild;
+          if (!guild || !member?.roles?.cache) return interaction.editReply({ content: 'Este menú solo puede usarse en servidores.' });
+          if (!guild.members.me?.permissions.has('ManageRoles')) {
+            return interaction.editReply({ content: '⚠️ Necesito permiso para administrar roles. Pide al staff revisar mis permisos.' });
+          }
           const vipRole = guild.roles.cache.get(vipRoleId);
           if (!vipRole || !member.roles.cache.has(vipRoleId)) {
             const mention = vipRole ? `<@&${vipRoleId}>` : 'el rol requerido';
@@ -128,25 +138,23 @@ module.exports = (client) => {
           }
 
           const val = interaction.values[0];
-          const colorEntries = Object.entries(cfg.colors || {});
-          const colorRoleIds = colorEntries.map(([k, v]) => v.roleId);
-          try {
-            await member.roles.remove(colorRoleIds.filter(Boolean)).catch(() => {});
-          } catch (err) { logger.error('Error removiendo roles previos:', err); }
-
-          if (val === 'remove_color') {
-            return interaction.editReply({ content: '🎨 Has quitado tu color.' });
+          const item = cfg.colors?.[val];
+          if (val !== 'remove_color' && !item) return interaction.editReply({ content: '⚠️ Opción inválida.' });
+          const currentColors = Object.values(cfg.colors || {}).map(item => item.roleId)
+            .filter(id => id && member.roles.cache.has(id));
+          const checked = [...new Set([...currentColors, ...(item ? [item.roleId] : [])])];
+          if (checked.some(id => !validateRoleForAssignment(guild, id, 'color menu').valid)) {
+            return interaction.editReply({ content: '⚠️ No puedo cambiar ese color. Pide al staff revisar los permisos y la posición de los roles.' });
           }
-
-          const item = cfg.colors && cfg.colors[val];
-          if (!item) return interaction.editReply({ content: '⚠️ Opción inválida.' });
-
           try {
-            await member.roles.add(item.roleId);
-            return interaction.editReply({ content: `✅ Tu color fue cambiado a **${item.name}**.` });
-          } catch (err) {
-            logger.error('Error asignando rol:', err);
-            return interaction.editReply({ content: '⚠️ Error al asignar el rol (missing perms o posición de roles).' });
+            // Assign first: failure leaves the member's previous color intact.
+            if (item) await member.roles.add(item.roleId);
+            const remove = currentColors.filter(id => id !== item?.roleId);
+            if (remove.length) await member.roles.remove(remove);
+            return interaction.editReply({ content: item ? '✅ Tu color fue cambiado a **' + item.name + '**.' : '🎨 Has quitado tu color.' });
+          } catch (error) {
+            logger.error('Error cambiando color', { error: error.message });
+            return interaction.editReply({ content: '⚠️ No pude cambiar el color. Pide al staff revisar los permisos del bot.' });
           }
         }
       }

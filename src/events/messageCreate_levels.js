@@ -1,3 +1,4 @@
+const { createEmbed } = require('../utils/ui');
 const logger = require('../utils/logger');
 const { Events } = require('discord.js');
 const { updateTopRoles } = require('../commands/utility/toproles');
@@ -88,9 +89,18 @@ module.exports = (client) => {
 
       const guildId = message.guild.id;
       const userId = message.author.id;
+      let streakResult = { updated: false };
+      try { streakResult = recordMessageActivity(guildId, userId); }
+      catch (error) { logger.error('streak activity error:', error); }
 
       const levels = readLevels();
       const data = ensureUserData(levels, guildId, userId);
+      let levelsSaved = false;
+      const saveLevelProgress = () => {
+        if (levelsSaved) return;
+        writeLevels(levels);
+        levelsSaved = true;
+      };
 
       const cfg = readConfig();
 
@@ -164,6 +174,9 @@ module.exports = (client) => {
             leveledUpCount++;
           }
 
+          saveLevelProgress();
+          lastXpAward.set(userId, now);
+
           // Monedas cuando hay XP
           const baseCoins = secureRandomInt(1, 3);
           const boosterRole = message.guild?.roles?.premiumSubscriberRole;
@@ -214,7 +227,7 @@ module.exports = (client) => {
               }
               logger.warn(`[levels] ⚠️ Level-up duplicado detectado para ${message.author.tag}, ignorando anuncio`);
               lastXpAward.set(userId, now);
-              writeLevels(levels);
+              saveLevelProgress();
               return; // Salir sin enviar anuncio
             }
             levelUpDedup.set(userId, now);
@@ -347,6 +360,8 @@ module.exports = (client) => {
         }
       }
 
+      saveLevelProgress();
+
       // === DROP INTERACTIVO POR REACCIÓN ===
       dropState[guildId] = dropState[guildId] || { count: 0, lastDropMsgId: null };
       dropState[guildId].count++;
@@ -383,8 +398,8 @@ module.exports = (client) => {
         }
 
         // Enviar mensaje de drop embed
-        const { EmbedBuilder } = require('discord.js');
-        const dropEmbed = new EmbedBuilder()
+        const { } = require('discord.js');
+        const dropEmbed = createEmbed()
           .setColor(dropType === 'mega' ? 0xFFD700 : dropType === 'chest' ? 0x8BD3FF : 0x43b581)
           .setTitle(dropText)
           .setDescription(`Reacciona con ${dropIcon} en los próximos 30 segundos para participar.`);
@@ -420,7 +435,7 @@ module.exports = (client) => {
             }
 
             // Embed ganador
-            const winnerEmbed = new EmbedBuilder()
+            const winnerEmbed = createEmbed()
               .setColor(dropType === 'mega' ? 0xFFD700 : dropType === 'chest' ? 0x8BD3FF : 0x43b581)
               .setTitle(dropType === 'mega' ? '🏆 ¡MEGA DROP GANADO!' : dropType === 'chest' ? '🏆 ¡Drop de Cofre Ganado!' : '🏆 ¡Drop Ganado!')
               .setDescription(`<@${winnerId}> ha ganado **${prize} ${dropType === 'chest' ? 'cofre(s)' : 'monedas'}** ${dropType === 'mega' ? '💰💰💰' : dropIcon}`);
@@ -450,7 +465,6 @@ module.exports = (client) => {
       }
 
       // Streak diaria por actividad de mensajes
-      const streakResult = recordMessageActivity(guildId, userId);
       if (streakResult.updated && !streakResult.alertsDisabled) {
         if (streakResult.wasReactivated) {
           await sendDmNotification(message.author, {
@@ -484,7 +498,7 @@ module.exports = (client) => {
       }
 
       // Guardar niveles (mensajes + posible XP)
-      writeLevels(levels);
+      saveLevelProgress();
 
     } catch (err) {
       logger.error('levels messageCreate error:', err);

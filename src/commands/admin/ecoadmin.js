@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { createEmbed, COLORS } = require('../../utils/ui');
+const { SlashCommandBuilder, PermissionFlagsBits, } = require('discord.js');
 const { addCoins, removeCoins, getBalance } = require('../../services/economy').economyService;
 const { isOwnerOrDev } = require('../../utils/staffAuth');
 
@@ -27,8 +28,8 @@ async function handleEcoAdmin(guildId, executorId, subCommand, target, amount) {
     addCoins(guildId, target.id, amount);
     const newBal = getBalance(guildId, target.id);
     
-    const embed = new EmbedBuilder()
-      .setColor(0x57F287)
+    const embed = createEmbed()
+      .setColor(COLORS.success)
       .setAuthor({ name: '✅ Fondos Añadidos por Staff' })
       .addFields(
         { name: '👤 Usuario', value: `> <@${target.id}> (${target.tag || target.username})`, inline: false },
@@ -47,8 +48,8 @@ async function handleEcoAdmin(guildId, executorId, subCommand, target, amount) {
     }
     const newBal = getBalance(guildId, target.id);
     
-    const embed = new EmbedBuilder()
-      .setColor(0xED4245)
+    const embed = createEmbed()
+      .setColor(COLORS.error)
       .setAuthor({ name: '✅ Fondos Removidos por Staff' })
       .addFields(
         { name: '👤 Usuario', value: `> <@${target.id}> (${target.tag || target.username})`, inline: false },

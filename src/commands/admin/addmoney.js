@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { createEmbed, COLORS } = require('../../utils/ui');
+const { SlashCommandBuilder, PermissionFlagsBits, } = require('discord.js');
 const { addCoins, getBalance } = require('../../services/economy').economyService;
 const { isOwnerOrDev } = require('../../utils/staffAuth');
 
@@ -34,8 +35,8 @@ async function handleStaffAddMoney(guildId, executorId, targetUser, amount) {
   addCoins(guildId, targetUser.id, safeAmount);
   const newBal = getBalance(guildId, targetUser.id);
 
-  const embed = new EmbedBuilder()
-    .setColor(0x57F287)
+  const embed = createEmbed()
+    .setColor(COLORS.success)
     .setAuthor({ name: '🎁 Fondos Otorgados por Staff' })
     .addFields(
       { name: '👤 Destinatario', value: `> <@${targetUser.id}> (${targetUser.tag || targetUser.username})`, inline: false },

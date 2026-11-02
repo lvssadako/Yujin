@@ -1,3 +1,4 @@
+const { createEmbed, COLORS } = require('../../utils/ui');
 
 const fs = require('fs');
 const path = require('path');
@@ -105,10 +106,10 @@ async function createGiveaway(channel, prize, durationMs, winnerCount, hostId) {
   const endAt = Date.now() + durationMs;
   const endTs = Math.floor(endAt / 1000);
   
-  const emb = new EmbedBuilder()
+  const emb = createEmbed()
     .setTitle('🎁 ¡Sorteo Activo! 🎁')
     .setDescription(`**Premio:** ${prize}\n**Ganadores:** ${winnerCount}\n**Organizado por:** <@${hostId}>\n\n⏳ **Termina:** <t:${endTs}:R> (<t:${endTs}:f>)\n\n*¡Toca el botón 🎉 abajo para participar!*`)
-    .setColor(0x5865F2)
+    .setColor(COLORS.primary)
     .setFooter({ text: `Participantes: 0` })
     .setTimestamp(endAt);
     

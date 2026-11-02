@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { createEmbed, COLORS } = require('../../utils/ui');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { isOwnerOrDev, getStaffRole } = require('../../utils/staffAuth');
 const { getRecentProblemLogs } = require('../../utils/logReader');
 const { createErrorEmbed } = require('../../utils/embedFactory');
@@ -29,8 +30,8 @@ async function renderLogsEmbed(client, user, filter = 'all', limit = 15) {
   const logs = getRecentProblemLogs({ limit, filter });
 
   if (logs.length === 0) {
-    return new EmbedBuilder()
-      .setColor(0x57F287)
+    return createEmbed()
+      .setColor(COLORS.success)
       .setAuthor({ name: '📜 Registro de Errores y Advertencias', iconURL: client.user.displayAvatarURL() })
       .setDescription(
         `> 👤 **Autenticado:** ${staffRole} (<@${user.id}>)\n\n` +
@@ -55,8 +56,8 @@ async function renderLogsEmbed(client, user, filter = 'all', limit = 15) {
   }
   if (currentChunk) chunks.push(currentChunk);
 
-  const embed = new EmbedBuilder()
-    .setColor(logs.some(l => l.level === 'error') ? 0xED4245 : 0xF1C40F)
+  const embed = createEmbed()
+    .setColor(logs.some(l => l.level === 'error') ? 0xFB7185 : 0xE9C46A)
     .setAuthor({
       name: `📜 Últimos ${logs.length} Incidentes (Errores / Advertencias)`,
       iconURL: client.user.displayAvatarURL()

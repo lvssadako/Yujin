@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { createEmbed } = require('../../utils/ui');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { readConfig: readCfg, writeConfig: writeCfg } = require('../../utils/configCache');
 
 module.exports = {
@@ -29,7 +30,7 @@ module.exports = {
         return interaction.reply({ content: 'No hay recompensas configuradas.', ephemeral: true });
       }
 
-      const embed = new EmbedBuilder()
+      const embed = createEmbed()
         .setTitle('🎁 Recompensas por nivel')
         .setColor(0x8BD3FF)
         .setTimestamp();
@@ -79,7 +80,7 @@ module.exports = {
       const entries = Object.entries(rewards).map(([lvl, roleId]) => ({ lvl: Number(lvl), roleId })).sort((a, b) => a.lvl - b.lvl);
       if (entries.length === 0) return message.reply('No hay recompensas por nivel configuradas.');
 
-      const embed = new EmbedBuilder().setTitle('🎁 Recompensas por nivel').setColor(0x8BD3FF).setTimestamp();
+      const embed = createEmbed().setTitle('🎁 Recompensas por nivel').setColor(0x8BD3FF).setTimestamp();
       for (const e of entries) {
         const role = message.guild.roles.cache.get(e.roleId);
         embed.addFields({ name: `Nivel ${e.lvl}`, value: role ? `${role}` : 'Rol no encontrado', inline: false });

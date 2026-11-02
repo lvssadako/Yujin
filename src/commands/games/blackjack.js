@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { createEmbed, COLORS } = require('../../utils/ui');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { getBalance, addCoins, removeCoins } = require('../../services/economy/index').economyService;
 const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
 const { secureChoice } = require('../../utils/cryptoRandom');
@@ -88,8 +89,8 @@ const blackjack = {
 // Generar Embed para el turno actual
 function buildTurnEmbed(partida, user) {
   const valJ = blackjack.valor(partida.manoJugador);
-  const embed = new EmbedBuilder()
-    .setColor(0x5865f2)
+  const embed = createEmbed()
+    .setColor(COLORS.primary)
     .setAuthor({
       name: `🃏 Mesa de Blackjack • ${user.username}`,
       iconURL: user.displayAvatarURL({ dynamic: true })
@@ -175,13 +176,13 @@ async function terminarPartida(interaction, partida, motivo) {
   const valB = blackjack.valor(partida.manoBot);
 
   let titulo = '🃏 Blackjack - Fin de Partida';
-  let color = 0x5865f2;
+  let color = 0xA78BFA;
   let mensajeResultado = '';
   let gananciaNeta = 0;
 
   if (valJ > 21) {
     // Jugador se pasó
-    color = 0xed4245;
+    color = 0xFB7185;
     titulo = '💥 ¡Te has pasado!';
     mensajeResultado = `Superaste los 21 puntos (${valJ}). Has perdido tu apuesta de **${partida.apuesta.toLocaleString()} 🪙**.`;
     gananciaNeta = -partida.apuesta;
@@ -189,7 +190,7 @@ async function terminarPartida(interaction, partida, motivo) {
     u.gambleStats.lossesToday = (u.gambleStats.lossesToday || 0) + partida.apuesta;
   } else if (valB > 21) {
     // Bot se pasó
-    color = 0x57f287;
+    color = 0x6EE7B7;
     titulo = '🎉 ¡El bot se pasó! ¡Victoria!';
     const ganancia = partida.apuesta * 2;
     addCoins(partida.guildId, partida.userId, ganancia);
@@ -198,7 +199,7 @@ async function terminarPartida(interaction, partida, motivo) {
     u.gambleStats.wins = (u.gambleStats.wins || 0) + 1;
   } else if (valJ > valB) {
     // Jugador tiene mano más alta
-    color = 0x57f287;
+    color = 0x6EE7B7;
     titulo = '🎉 ¡Has ganado!';
     const ganancia = partida.apuesta * 2;
     addCoins(partida.guildId, partida.userId, ganancia);
@@ -214,7 +215,7 @@ async function terminarPartida(interaction, partida, motivo) {
     mensajeResultado = `Ambos obtuvieron ${valJ} puntos.\nSe te ha devuelto tu apuesta íntegra de **${partida.apuesta.toLocaleString()} 🪙**.`;
   } else {
     // Bot gana
-    color = 0xed4245;
+    color = 0xFB7185;
     titulo = '💀 La casa gana';
     mensajeResultado = `La mano del bot (${valB}) supera la tuya (${valJ}). Has perdido **${partida.apuesta.toLocaleString()} 🪙**.`;
     gananciaNeta = -partida.apuesta;
@@ -225,7 +226,7 @@ async function terminarPartida(interaction, partida, motivo) {
   writeProfiles(profiles);
 
   const user = interaction.user || (interaction.message ? interaction.message.author : { username: 'Jugador', displayAvatarURL: () => null });
-  const embed = new EmbedBuilder()
+  const embed = createEmbed()
     .setColor(color)
     .setAuthor({
       name: `🃏 Resultado Blackjack • ${user.username}`,
@@ -296,8 +297,8 @@ async function terminarPartidaAbandono(interaction, partida) {
   u.gambleStats.lossesToday = (u.gambleStats.lossesToday || 0) + partida.apuesta;
   writeProfiles(profiles);
 
-  const embed = new EmbedBuilder()
-    .setColor(0xed4245)
+  const embed = createEmbed()
+    .setColor(COLORS.error)
     .setTitle('⏳ Partida cancelada por inactividad')
     .setDescription(`No realizaste ninguna acción en 60 segundos.\nSe dio por perdida la apuesta de **${partida.apuesta.toLocaleString()} 🪙**.`)
     .setFooter({ text: 'Blackjack vs Bot' });

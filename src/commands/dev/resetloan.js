@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { createEmbed, COLORS } = require('../../utils/ui');
+const { SlashCommandBuilder, PermissionFlagsBits, } = require('discord.js');
 const { resetLoan, getLoan } = require('../../services/economy/loanService');
 const { isOwnerOrDev } = require('../../utils/staffAuth');
 const { createErrorEmbed } = require('../../utils/embedFactory');
@@ -18,8 +19,8 @@ async function handleResetLoanCommand(guildId, executorId, targetUser) {
     return { error: `❌ ${result.reason}` };
   }
 
-  const embed = new EmbedBuilder()
-    .setColor(0x57F287)
+  const embed = createEmbed()
+    .setColor(COLORS.success)
     .setAuthor({ name: '🛠️ Deuda de Préstamo Reiniciada — Developer Action' })
     .addFields(
       { name: '👤 Usuario Regularizado', value: `> <@${targetUser.id}> (${targetUser.tag || targetUser.username})`, inline: false },

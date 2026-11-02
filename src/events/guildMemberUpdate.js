@@ -1,8 +1,9 @@
+const { createEmbed } = require('../utils/ui');
 const logger = require('../utils/logger');
 // ...existing code...
 const fs = require('fs');
 const path = require('path');
-const { EmbedBuilder } = require('discord.js');
+const { } = require('discord.js');
 
 // ...existing code...
 module.exports = (client) => {
@@ -56,7 +57,7 @@ module.exports = (client) => {
         const oldBoosts = oldMember.guild.premiumSubscriptionCount || 0;
         const newBoosts = newMember.guild.premiumSubscriptionCount || 0;
 
-        const embed = new EmbedBuilder()
+        const embed = createEmbed()
           .setTimestamp()
           .setFooter({ text: `Servidor: ${newMember.guild.name}` })
           .setThumbnail(newMember.user.displayAvatarURL({ dynamic: true }));

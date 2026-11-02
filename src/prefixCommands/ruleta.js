@@ -1,6 +1,7 @@
+const { createEmbed, COLORS } = require('../utils/ui');
 // Comando ruleta prefix
 const { getBalance, removeCoins, addCoins } = require('../services/economy').economyService;
-const { EmbedBuilder } = require('discord.js');
+const { } = require('discord.js');
 
 module.exports = {
   name: 'ruleta',
@@ -29,10 +30,10 @@ module.exports = {
     }
 
     // Animación de giro
-    const animEmbed = new EmbedBuilder()
+    const animEmbed = createEmbed()
       .setTitle('🎰 Ruleta')
       .setDescription('🔄 Girando la ruleta...\n\n🟢 🔴 ⚫ 🟢 🔴 ⚫ 🟢 🔴 ⚫')
-      .setColor(0x5865f2)
+      .setColor(COLORS.primary)
       .setFooter({ text: `Usuario: ${message.author.username}` })
       .setTimestamp();
     const animMsg = await message.reply({ embeds: [animEmbed] });
@@ -56,11 +57,11 @@ const { secureRandomInt } = require('../utils/cryptoRandom');
         ganancia = apuestaA === 'verde' ? apuesta * 15 : apuesta * 2;
         addCoins(guildId, userId, ganancia);
         resultadoVisual = `🟢 Ganaste **${ganancia}** monedas!`;
-        embedColor = 0x57F287; // verde si gana
+        embedColor = 0x6EE7B7; // verde si gana
         mensaje += '\n' + resultadoVisual;
       } else {
         resultadoVisual = `🔴 Perdiste **${apuesta}** monedas.`;
-        embedColor = 0xED4245; // rojo si pierde
+        embedColor = 0xFB7185; // rojo si pierde
         mensaje += '\nNo acertaste el color. ¡Suerte la próxima!\n' + resultadoVisual;
       }
     } else if (apuestaA === 'numero') {
@@ -70,11 +71,11 @@ const { secureRandomInt } = require('../utils/cryptoRandom');
         ganancia = apuesta * 36;
         addCoins(guildId, userId, ganancia);
         resultadoVisual = `🟢 Ganaste **${ganancia}** monedas!`;
-        embedColor = 0x57F287; // verde si gana
+        embedColor = 0x6EE7B7; // verde si gana
         mensaje += `\n¡Increíble! Acertaste el número y ganaste **${ganancia}** monedas.\n` + resultadoVisual;
       } else {
         resultadoVisual = `🔴 Perdiste **${apuesta}** monedas.`;
-        embedColor = 0xED4245; // rojo si pierde
+        embedColor = 0xFB7185; // rojo si pierde
         mensaje += `\nNo acertaste el número (${numeroApostado}). ¡Suerte la próxima!\n` + resultadoVisual;
       }
     }
@@ -83,7 +84,7 @@ const { secureRandomInt } = require('../utils/cryptoRandom');
     mensaje += `\n💰 Tu saldo actual: **${saldoFinal}** monedas.`;
 
     // Crear embed resultado
-    const embed = new EmbedBuilder()
+    const embed = createEmbed()
       .setTitle('🎰 Ruleta')
       .setDescription(mensaje)
       .setColor(embedColor)

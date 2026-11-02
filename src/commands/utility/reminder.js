@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { createEmbed, COLORS } = require('../../utils/ui');
+const { SlashCommandBuilder, } = require('discord.js');
 const { addReminder, getUserReminders, readReminders, writeReminders } = require('../../utils/reminderStore');
 const crypto = require('crypto');
 const reminderLoader = require('../../events/reminderLoader');
@@ -87,8 +88,8 @@ module.exports = {
             addReminder(reminder);
             reminderLoader.scheduleReminder(client, reminder);
             
-            const embed = new EmbedBuilder()
-                .setColor(0x5865F2)
+            const embed = createEmbed()
+                .setColor(COLORS.primary)
                 .setAuthor({ name: '⏰ Recordatorio Programado' })
                 .addFields(
                     { name: '📝 Mensaje', value: `> ${message}`, inline: false },
@@ -107,8 +108,8 @@ module.exports = {
                 return interaction.reply({ content: 'No tienes recordatorios activos.', ephemeral: true });
             }
             
-            const embed = new EmbedBuilder()
-                .setColor(0x5865F2)
+            const embed = createEmbed()
+                .setColor(COLORS.primary)
                 .setAuthor({ name: '⏰ Tus Recordatorios' })
                 .setDescription(reminders.map((r, i) => `🔔 \`#${i + 1}\` (ID: ${r.id}) | "> ${r.message.substring(0, 30)}${r.message.length > 30 ? '...' : ''}" | <t:${Math.floor(r.fireAt / 1000)}:R>`).join('\n'))
                 .setFooter({ text: `Tienes ${reminders.length} recordatorio(s) ✨` })
@@ -169,8 +170,8 @@ module.exports = {
             addReminder(reminder);
             reminderLoader.scheduleReminder(client, reminder);
             
-            const embed = new EmbedBuilder()
-                .setColor(0x5865F2)
+            const embed = createEmbed()
+                .setColor(COLORS.primary)
                 .setAuthor({ name: '⏰ Recordatorio Programado' })
                 .addFields(
                     { name: '📝 Mensaje', value: `> ${msg}`, inline: false },
@@ -189,8 +190,8 @@ module.exports = {
                 return message.reply('No tienes recordatorios activos.');
             }
             
-            const embed = new EmbedBuilder()
-                .setColor(0x5865F2)
+            const embed = createEmbed()
+                .setColor(COLORS.primary)
                 .setAuthor({ name: '⏰ Tus Recordatorios' })
                 .setDescription(reminders.map((r, i) => `🔔 \`#${i + 1}\` (ID: ${r.id}) | "> ${r.message.substring(0, 30)}${r.message.length > 30 ? '...' : ''}" | <t:${Math.floor(r.fireAt / 1000)}:R>`).join('\n'))
                 .setFooter({ text: `Tienes ${reminders.length} recordatorio(s) ✨` })

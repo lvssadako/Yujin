@@ -1,8 +1,8 @@
+const { createEmbed } = require('../../utils/ui');
 const logger = require('../../utils/logger');
 const {
   SlashCommandBuilder,
   PermissionFlagsBits,
-  EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
@@ -212,7 +212,7 @@ module.exports = {
         const list = Object.values(cfg.colors).length
           ? Object.values(cfg.colors).map(c => `• ${c.name} → <@&${c.roleId}>`).join('\n')
           : 'Sin colores configurados.';
-        const embed = new EmbedBuilder()
+        const embed = createEmbed()
           .setTitle('⚙️ Configuración del menú de colores')
           .addFields(
             { name: 'Rol requerido', value: vip, inline: false },
@@ -242,7 +242,7 @@ module.exports = {
           .addOptions(options)
         );
 
-        const embed = new EmbedBuilder()
+        const embed = createEmbed()
           .setTitle('🎨 Selector de colores')
           .setDescription(`Selecciona **un** color. Necesitas el rol <@&${cfg.vipRoleId}> para usar este menú.`)
           .setColor('#f4a4ff');
@@ -344,7 +344,7 @@ module.exports = {
       const list = Object.values(cfg.colors).length
         ? Object.values(cfg.colors).map(c => `• ${c.name} → <@&${c.roleId}>`).join('\n')
         : 'Sin colores configurados.';
-      const embed = new EmbedBuilder()
+      const embed = createEmbed()
         .setTitle('⚙️ Configuración del menú de colores')
         .addFields(
           { name: 'Rol requerido', value: vip, inline: false },
@@ -382,7 +382,7 @@ module.exports = {
         .addOptions(options)
       );
 
-      const embed = new EmbedBuilder()
+      const embed = createEmbed()
         .setTitle('🎨 Selector de colores')
         .setDescription(`Selecciona **un** color. Necesitas el rol <@&${cfg.vipRoleId}> para usar este menú.`)
         .setColor('#f4a4ff');

@@ -1,6 +1,6 @@
+const { createEmbed, COLORS } = require('../../utils/ui');
 const {
   SlashCommandBuilder,
-  EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
@@ -59,8 +59,8 @@ async function startReactDuel(channel, guildId, userA, userB, bet, initialIntera
     activeDuels.delete(duelKeyB);
   };
 
-  const challengeEmbed = new EmbedBuilder()
-    .setColor(0xF1C40F)
+  const challengeEmbed = createEmbed()
+    .setColor(COLORS.economy)
     .setAuthor({ name: '⚔️ Reto de Duelo de Reacción' })
     .setDescription(
       `> <@${userA.id}> ha retado a <@${userB.id}> a un **Duelo de Reacción**!\n\n` +
@@ -107,8 +107,8 @@ async function startReactDuel(channel, guildId, userA, userB, bet, initialIntera
     if (i.customId.startsWith('decline_duel_')) {
       challengeCollector.stop('declined');
       cleanup();
-      const declineEmbed = new EmbedBuilder()
-        .setColor(0xED4245)
+      const declineEmbed = createEmbed()
+        .setColor(COLORS.error)
         .setAuthor({ name: '⚔️ Duelo Rechazado' })
         .setDescription(`> <@${userB.id}> ha rechazado el duelo de <@${userA.id}>.`)
         .setTimestamp();
@@ -124,8 +124,8 @@ async function startReactDuel(channel, guildId, userA, userB, bet, initialIntera
 
       if (freshBalA < bet || freshBalB < bet) {
         cleanup();
-        const noFundsEmbed = new EmbedBuilder()
-          .setColor(0xED4245)
+        const noFundsEmbed = createEmbed()
+          .setColor(COLORS.error)
           .setAuthor({ name: '❌ Duelo Cancelado' })
           .setDescription('> Uno de los jugadores ya no cuenta con los fondos necesarios en su billetera.')
           .setTimestamp();
@@ -135,8 +135,8 @@ async function startReactDuel(channel, guildId, userA, userB, bet, initialIntera
       removeCoins(guildId, userA.id, bet);
       removeCoins(guildId, userB.id, bet);
 
-      const prepEmbed = new EmbedBuilder()
-        .setColor(0x5865F2)
+      const prepEmbed = createEmbed()
+        .setColor(COLORS.primary)
         .setAuthor({ name: '⚡ ¡Duelo Aceptado!' })
         .setDescription(
           `> <@${userA.id}> vs <@${userB.id}>\n\n` +
@@ -163,8 +163,8 @@ async function startReactDuel(channel, guildId, userA, userB, bet, initialIntera
       setTimeout(async () => {
         const triggerTime = Date.now();
 
-        const triggerEmbed = new EmbedBuilder()
-          .setColor(0x57F287)
+        const triggerEmbed = createEmbed()
+          .setColor(COLORS.success)
           .setAuthor({ name: '🔥 ¡FUEGO! ¡PRESIONA YA!' })
           .setDescription(
             `> <@${userA.id}> ⚔️ <@${userB.id}>\n\n` +
@@ -222,8 +222,8 @@ async function startReactDuel(channel, guildId, userA, userB, bet, initialIntera
           pLoser.gambleStats.losses = (pLoser.gambleStats.losses || 0) + 1;
           writeProfiles(profiles);
 
-          const endEmbed = new EmbedBuilder()
-            .setColor(0x57F287)
+          const endEmbed = createEmbed()
+            .setColor(COLORS.success)
             .setAuthor({ name: '🏆 ¡Victoria en el Duelo!' })
             .setDescription(
               `> 🎉 <@${winner.id}> fue más rápido y venció a <@${loser.id}>!\n\n` +
@@ -253,8 +253,8 @@ async function startReactDuel(channel, guildId, userA, userB, bet, initialIntera
             addCoins(guildId, userA.id, bet);
             addCoins(guildId, userB.id, bet);
 
-            const timeoutEmbed = new EmbedBuilder()
-              .setColor(0x95A5A6)
+            const timeoutEmbed = createEmbed()
+              .setColor(COLORS.neutral)
               .setAuthor({ name: '⌛ Duelo Terminado por Inactividad' })
               .setDescription('> Ninguno de los participantes reaccionó a tiempo. Las apuestas han sido devueltas.')
               .setTimestamp();
@@ -269,8 +269,8 @@ async function startReactDuel(channel, guildId, userA, userB, bet, initialIntera
   challengeCollector.on('end', async (_, reason) => {
     if (reason === 'time') {
       cleanup();
-      const timeoutEmbed = new EmbedBuilder()
-        .setColor(0x95A5A6)
+      const timeoutEmbed = createEmbed()
+        .setColor(COLORS.neutral)
         .setAuthor({ name: '⌛ Reto Expirado' })
         .setDescription(`> <@${userB.id}> no respondió al reto a tiempo.`)
         .setTimestamp();

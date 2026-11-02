@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { createEmbed } = require('../../utils/ui');
+const { SlashCommandBuilder, } = require('discord.js');
 const { getInventory, addCoins, getBalance } = require('../../services/economy').economyService;
 const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
 
@@ -42,23 +43,23 @@ async function handleFish(guildId, userId) {
   const rand = secureRandom();
   let reward = 0;
   let msg = '';
-  let color = 0x3498DB;
+  let color = 0xA78BFA;
   
   if (rand < 0.2) {
     msg = '> Solo pescaste una bota vieja... No ganas nada. 🥾';
-    color = 0x95A5A6;
+    color = 0x94A3B8;
   } else if (rand < 0.6) {
     reward = secureRandomInt(50, 150);
     msg = `> ¡Pescaste un pez común! Lo vendiste por **${reward} 🪙**. 🐟`;
-    color = 0x2ECC71;
+    color = 0x6EE7B7;
   } else if (rand < 0.9) {
     reward = secureRandomInt(150, 350);
     msg = `> ¡Atrapaste un pez raro! Lo vendiste por **${reward} 🪙**. 🐠`;
-    color = 0x9B59B6;
+    color = 0xA78BFA;
   } else {
     reward = secureRandomInt(500, 1000);
     msg = `> ¡INCREÍBLE! Pescaste un **Tiburón Dorado**. Lo vendiste por **${reward} 🪙**. 🦈✨`;
-    color = 0xF1C40F;
+    color = 0xE9C46A;
   }
 
   if (reward > 0) {
@@ -68,8 +69,8 @@ async function handleFish(guildId, userId) {
   
   const bal = getBalance(guildId, userId);
   
-  const embed = new EmbedBuilder()
-    .setColor(penaltyLevel >= 2 ? 0xE67E22 : color)
+  const embed = createEmbed()
+    .setColor(penaltyLevel >= 2 ? 0xFBBF24 : color)
     .setAuthor({ name: '🎣 Día de Pesca' })
     .addFields(
       { name: '🎣 Resultado', value: msg, inline: false },

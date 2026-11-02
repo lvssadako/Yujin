@@ -4,6 +4,7 @@ const path = require('path');
 const { SlashCommandBuilder, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const { readProfiles, ensureUser } = require('../../utils/profileStore');
+const { getUserStreakStatus } = require('../../services/streak/streakService');
 const { readConfig } = require('../../utils/configCache');
 const { normalizeExternalImageUrl } = require('../../utils/urlSafety');
 const { fetchImageBuffer: fetchBuffer } = require('../../services/image/imageService');
@@ -138,6 +139,7 @@ module.exports = {
       const profiles = readProfiles();
       const userProfile = ensureUser(profiles, interaction.guildId, targetUser.id);
 
+      const streakStatus = getUserStreakStatus(interaction.guildId, targetUser.id, { profiles, includeInventory: false });
       const profileData = {
         title: userProfile.title || '',
         accent: userProfile.accent || '#e94560',
@@ -146,8 +148,8 @@ module.exports = {
         bgOpacity: typeof userProfile.bgOpacity === 'number' ? userProfile.bgOpacity : 0.75,
         equippedBadges: userProfile.equippedBadges || [],
         earnedBadges: userProfile.earnedBadges || [],
-        streakDays: userProfile.streakDays || 0,
-        lastActiveDay: userProfile.lastActiveDay || 0
+        streakDays: streakStatus.streakDays,
+        lastActiveDay: streakStatus.lastActiveDay
       };
 
       const featuredBadgeId = userProfile.featuredBadge;
@@ -266,8 +268,7 @@ module.exports = {
 
       // 4. Píldora de Racha (Debajo del Avatar)
       const streakDays = profileData.streakDays || 0;
-      const tz = cfg.timezone || 0;
-      const today = Math.floor((Date.now() + tz * 3600000) / 86400000);
+      const today = streakStatus.today;
       const lastActive = profileData.lastActiveDay || 0;
       const isStreakActive = lastActive >= today - 1 && streakDays > 0;
 

@@ -1,6 +1,7 @@
+const { createEmbed } = require('../../utils/ui');
 const fs = require('fs');
 const path = require('path');
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 
 const dataDir = path.join(__dirname, '..', '..', '..', 'data');
 const boostsPath = path.join(dataDir, 'boosts.json');
@@ -26,7 +27,7 @@ module.exports = {
     const guildCounts = readBoosts()[interaction.guild.id] || {};
 
     if (boosters.size === 0) {
-      const e = new EmbedBuilder()
+      const e = createEmbed()
         .setTitle('🔰 Boosters del servidor')
         .setDescription(`Boosts totales: **${totalBoosts}**\n\nNadie está boosteando ahora.`)
         .setColor(0xFFD166)
@@ -62,7 +63,7 @@ module.exports = {
       ]
     };
 
-    const embed = new EmbedBuilder()
+    const embed = createEmbed()
       .setTitle('🔰 Lista de Boosters')
       .setColor(0xFFD166)
       .setDescription(`Boosts totales: **${totalBoosts}**\n\n${boostersList}\n\nSelecciona un usuario para ver su información detallada.`)
@@ -83,7 +84,7 @@ module.exports = {
     if (entry && typeof entry === 'object' && entry.count) userTotal = entry.count;
     else if (typeof entry === 'number') userTotal = entry;
 
-    const embed = new EmbedBuilder()
+    const embed = createEmbed()
       .setTitle(`🚀 Booster: ${member.user.username}`)
       .setColor(0xFFD166)
       .setDescription(`**Usuario:** <@${member.id}>\n**Join Date:** ${joinDate}\n**Boost Desde:** ${boostSince}\n**User Total:** ${userTotal}`)

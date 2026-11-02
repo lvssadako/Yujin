@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { createEmbed } = require('../../utils/ui');
+const { SlashCommandBuilder, PermissionFlagsBits, } = require('discord.js');
 const logger = require('../../utils/logger');
 
 module.exports = {
@@ -22,7 +23,7 @@ module.exports = {
 
       await interaction.guild.members.unban(userId, reason);
 
-      const embed = new EmbedBuilder()
+      const embed = createEmbed()
         .setColor(0x00FF00)
         .setTitle('✅ Usuario Desbaneado')
         .setDescription(`**${bannedUser.user.tag}** (${userId}) ha sido desbaneado.`)
@@ -53,7 +54,7 @@ module.exports = {
         return message.reply('❌ Ese usuario no se encuentra en la lista de baneados.');
       }
       await message.guild.members.unban(userId, reason);
-      const embed = new EmbedBuilder()
+      const embed = createEmbed()
         .setColor(0x00FF00)
         .setTitle('✅ Usuario Desbaneado')
         .setDescription(`**${bannedUser.user.tag}** (${userId}) ha sido desbaneado.`)

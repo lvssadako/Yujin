@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { createEmbed, COLORS } = require('../../utils/ui');
+const { SlashCommandBuilder, } = require('discord.js');
 const { getBalance, removeCoins, addItem } = require('../../services/economy').economyService;
 
 const ITEMS = {
@@ -21,8 +22,8 @@ async function handleBuy(guildId, userId, itemId) {
   
   const newBal = getBalance(guildId, userId);
   
-  const embed = new EmbedBuilder()
-    .setColor(0x57F287)
+  const embed = createEmbed()
+    .setColor(COLORS.success)
     .setAuthor({ name: '🛍️ Compra Exitosa' })
     .addFields(
       { name: '📦 Objeto Adquirido', value: `> **${item.name}**\n> *${item.desc}*`, inline: false },

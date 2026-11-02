@@ -1,6 +1,7 @@
+const { createEmbed } = require('../utils/ui');
 ﻿const fs = require('fs');
 const path = require('path');
-const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { PermissionFlagsBits } = require('discord.js');
 
 const dataDir = path.join(__dirname, '..', '..', 'data');
 const boostsPath = path.join(dataDir, 'boosts.json');
@@ -28,7 +29,7 @@ module.exports = {
     const allCounts = readBoosts()[message.guild.id] || {};
 
     if (boosters.size === 0) {
-      const e = new EmbedBuilder()
+      const e = createEmbed()
         .setTitle('🔰 Boosters del servidor')
         .setDescription(`Boosts totales: **${totalBoosts}**\n\nNadie está boosteando ahora.`)
         .setColor(0xFFD166)
@@ -46,7 +47,7 @@ module.exports = {
       return '1';
     }).join('\n') || '—';
 
-    const embed = new EmbedBuilder()
+    const embed = createEmbed()
       .setTitle('🔰 Boosters del servidor')
       .setColor(0xFFD166)
       .setTimestamp()

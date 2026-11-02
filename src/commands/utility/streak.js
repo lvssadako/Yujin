@@ -1,10 +1,12 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { createEmbed } = require('../../utils/ui');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const {
   FLAME_TIERS,
   getUserStreakStatus,
   setGlobalStreakCustomization,
   setStreakAlertPreference,
-  getStreakLeaderboard
+  getStreakLeaderboard,
+  setUserStreakTimezone
 } = require('../../services/streak/streakService');
 const { generateStreakCard } = require('../../services/streak/streakCard');
 const { buildStreakCustomizationPanel } = require('../../services/streak/streakCustomizer');
@@ -23,62 +25,54 @@ function canUseCustomStreakUrl(member, userLevelData, userStreak) {
 
 function buildLeaderboardEmbed(guild, lb) {
   const medals = ['🥇', '🥈', '🥉'];
-  const lines = lb.top.map((u, i) => {
-    const medal = medals[i] || `**#${i + 1}**`;
-    const statusIcon = u.isActiveToday ? '🟢' : '⏳';
-    return `${medal} <@${u.userId}> — ${u.tier.emoji} **${u.streakDays} días** (${u.tier.name}) ${statusIcon}`;
-  });
-
-  return new EmbedBuilder()
-    .setAuthor({ name: `🏆 Tabla de Rachas — ${guild.name}`, iconURL: guild.iconURL({ dynamic: true }) })
-    .setColor(0xF1C40F)
-    .setDescription(
-      lines.length > 0
-        ? lines.join('\n\n')
-        : '*No hay rachas activas en este momento. ¡Sé el primero en chatear!*'
-    )
-    .addFields({
-      name: '📈 Estadísticas del Servidor',
-      value: `> 👥 **Usuarios con racha activa:** ${lb.totalActive}\n> 🔥 **Mayor racha actual:** ${lb.highestStreak} días\n> 🟢 = *Ya escribió hoy* · ⏳ = *Pendiente de escribir hoy*`,
-      inline: false
-    })
-    .setFooter({ text: 'Escribe todos los días en el servidor para escalar el ranking' })
-    .setTimestamp();
+  const lines = lb.top.map((user, index) => (medals[index] || '**' + (index + 1) + '.**') + ' <@' + user.userId + '> · **' + user.streakDays + ' días**\n' + user.tier.name + ' · ' + (user.isActiveToday ? 'Actividad de hoy registrada' : 'Pendiente de escribir hoy'));
+  return createEmbed().setAuthor({ name: 'Yujin · Rachas' }).setTitle('La constancia tiene su lugar')
+    .setDescription(lines.join('\n\n') || 'Todavía no hay rachas activas. Envía un mensaje para comenzar la tuya.')
+    .addFields({ name: 'Rachas activas', value: String(lb.totalActive), inline: true }, { name: 'Mayor racha actual', value: lb.highestStreak + ' días', inline: true })
+    .setFooter({ text: 'Cada persona tiene su propio día según su zona horaria · Configúrala con /streak zona' });
+}
+function buildTiersEmbed() {
+  const embed = createEmbed().setAuthor({ name: 'Yujin · Rachas' }).setTitle('Cada día cuenta')
+    .setDescription('Envía al menos un mensaje cada día para mantener tu racha de actividad. El día cambia a medianoche en tu zona horaria.');
+  for (const tier of FLAME_TIERS) {
+    const perks = [];
+    const bonusXp = Math.round((tier.xpMultiplier - 1) * 100);
+    if (bonusXp > 0) perks.push('+' + bonusXp + '% XP');
+    if (tier.shopDiscount > 0) perks.push(tier.shopDiscount + '% de descuento');
+    if (tier.rewardCoins > 0) perks.push(tier.rewardCoins.toLocaleString('es-MX') + ' monedas al alcanzar el hito');
+    if (tier.badge) perks.push('Insignia: ' + tier.badge);
+    embed.addFields({ name: tier.name + ' · Desde ' + tier.minDays + ' días', value: perks.join(' · ') || 'Tu primer paso hacia una nueva racha.', inline: false });
+  }
+  return embed.setFooter({ text: 'Un congelador protege un día sin actividad · Consulta los objetos en /buy' });
 }
 
-function buildTiersEmbed() {
-  const lines = FLAME_TIERS.map(t => {
-    const bonusXp = Math.round((t.xpMultiplier - 1) * 100);
-    const perks = [];
-    if (bonusXp > 0) perks.push(`+${bonusXp}% XP Extra`);
-    if (t.shopDiscount > 0) perks.push(`${t.shopDiscount}% Descuento Tienda`);
-    if (t.rewardCoins > 0) perks.push(`🎁 Recompensa: ${t.rewardCoins.toLocaleString()} 🪙`);
-    if (t.badge) perks.push(`Insignia: ${t.badge}`);
-    const perksText = perks.length > 0 ? perks.join(' · ') : 'Reconocimiento inicial';
-
-    return `${t.emoji} **${t.name}** (Desde ${t.minDays} días)\n> ╰ *${perksText}*`;
-  });
-
-  return new EmbedBuilder()
-    .setAuthor({ name: '🔥 Niveles de Fuego y Recompensas de Racha' })
-    .setColor(0xE67E22)
-    .setDescription(
-      'Tu racha aumenta automáticamente cada día que **envías al menos un mensaje** en el servidor.\n\n' +
-      lines.join('\n\n')
-    )
-    .addFields({
-      name: '🧊 ¿Cómo proteger tu racha?',
-      value: '> Compra un **🧊 Congelador de Racha** en `/buy` por 3,500 🪙 para salvar tu racha automáticamente si olvidas chatear un día.',
-      inline: false
-    })
-    .setFooter({ text: 'El contador se reinicia a medianoche si no envías ningún mensaje.' })
-    .setTimestamp();
+const POPULAR_ZONES = [
+  ['Ciudad de México', 'America/Mexico_City'], ['Tijuana', 'America/Tijuana'],
+  ['Bogotá', 'America/Bogota'], ['Lima', 'America/Lima'], ['Buenos Aires', 'America/Argentina/Buenos_Aires'],
+  ['Santiago', 'America/Santiago'], ['Caracas', 'America/Caracas'], ['Madrid', 'Europe/Madrid'],
+  ['Nueva York', 'America/New_York'], ['Los Ángeles', 'America/Los_Angeles'], ['UTC', 'UTC']
+];
+const searchText = value => String(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/_/g, ' ').toLowerCase();
+function timezoneMessage(status) {
+  return '**Zona de tu racha: ' + status.timeZone + '**' +
+    (status.timezoneConfigured === false ? ' (por defecto)' : '') +
+    '\nEl día cambia a las **12:00 a. m.** en esa zona. Próximo cambio: <t:' + status.midnightTs + ':R>.' +
+    '\nElige tu ciudad con /streak zona o &streak zona America/Mexico_City. Puedes cambiarla una vez cada 24 horas.';
+}
+function chooseTimezone(guildId, userId, input) {
+  try {
+    const result = input ? setUserStreakTimezone(userId, input) : getUserStreakStatus(guildId, userId);
+    return timezoneMessage(result);
+  } catch (error) {
+    if (/Zona horaria inválida|una vez cada 24 horas|Usuario inválido/.test(error.message)) return '❌ ' + error.message;
+    throw error;
+  }
 }
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('streak')
-    .setDescription('Sistema de Rachas de Actividad por Chat.')
+    .setDescription('Consulta y personaliza tu racha de actividad y tu zona horaria.')
     .addSubcommand(sub =>
       sub.setName('ver')
         .setDescription('Muestra tu tarjeta visual de racha o la de otro usuario')
@@ -126,11 +120,28 @@ module.exports = {
               { name: '🔕 Desactivar recordatorios por DM', value: 'off' }
             )
         )
-    ),
+    )
+    .addSubcommand(sub => sub.setName('zona')
+      .setDescription('Consulta o elige la zona horaria para tu racha')
+      .addStringOption(opt => opt.setName('nombre').setDescription('Ciudad o zona, por ejemplo America/Mexico_City')
+        .setRequired(false).setAutocomplete(true).setMaxLength(100))),
+
+  async autocomplete(interaction) {
+    const query = searchText(interaction.options.getFocused() || '');
+    const zones = POPULAR_ZONES.concat(Intl.supportedValuesOf('timeZone').map(zone => [zone, zone]));
+    const seen = new Set();
+    const matches = zones.filter(([name, value]) => {
+      if (seen.has(value) || !searchText(name + ' ' + value).includes(query)) return false;
+      seen.add(value); return true;
+    }).slice(0, 25).map(([name, value]) => ({ name: (name === value ? value : name + ' · ' + value).slice(0, 100), value }));
+    return interaction.respond(matches);
+  },
 
   async execute(interaction) {
     const sub = interaction.options.getSubcommand() || 'ver';
     const guild = interaction.guild;
+    if (!guild) return interaction.reply({ content: '❌ Este comando solo puede usarse en servidores.', ephemeral: true });
+    if (sub === 'zona') return interaction.reply({ content: chooseTimezone(guild.id, interaction.user.id, interaction.options.getString('nombre')), ephemeral: true });
 
     if (sub === 'ver') {
       await interaction.deferReply();
@@ -146,14 +157,14 @@ module.exports = {
           new ActionRowBuilder().addComponents(
             new ButtonBuilder()
               .setCustomId('streak_open_customizer')
-              .setLabel('Personalizar Tarjeta')
+              .setLabel('Personalizar tarjeta')
               .setEmoji('🎨')
               .setStyle(ButtonStyle.Primary)
           )
         );
       }
 
-      return interaction.editReply({ files: [attachment], components });
+      return interaction.editReply({ content: timezoneMessage(status), files: [attachment], components });
     }
 
     if (sub === 'customizar') {
@@ -226,7 +237,7 @@ module.exports = {
 
       setGlobalStreakCustomization(interaction.user.id, updates);
 
-      const embed = new EmbedBuilder()
+      const embed = createEmbed()
         .setAuthor({ name: '✅ Tarjeta de Racha Actualizada Globalmente' })
         .setColor(updates.streakAccent || '#57F287')
         .setDescription(`Tus preferencias globales han sido guardadas:\n\n${changes.join('\n')}\n\n*Usa \`/streak\` para ver tu nueva tarjeta.*`)
@@ -265,6 +276,7 @@ module.exports = {
 
     const sub = (args[0] || '').toLowerCase();
     const guild = message.guild;
+    if (['zona', 'timezone', 'horario'].includes(sub)) return message.reply(chooseTimezone(guild.id, message.author.id, args.slice(1).join(' ')));
 
     if (sub === 'top' || sub === 'leaderboard') {
       const lb = getStreakLeaderboard(guild.id, 10, guild);
@@ -313,14 +325,14 @@ module.exports = {
         new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setCustomId('streak_open_customizer')
-            .setLabel('Personalizar Tarjeta')
+            .setLabel('Personalizar tarjeta')
             .setEmoji('🎨')
             .setStyle(ButtonStyle.Primary)
         )
       );
     }
 
-    return message.reply({ files: [attachment], components });
+    return message.reply({ content: timezoneMessage(status), files: [attachment], components });
   },
 
   buildLeaderboardEmbed,

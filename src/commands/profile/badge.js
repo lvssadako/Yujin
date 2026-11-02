@@ -1,3 +1,4 @@
+const { createEmbed, COLORS } = require('../../utils/ui');
 const logger = require('../../utils/logger');
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
@@ -416,7 +417,7 @@ module.exports = {
       const { coins } = getBalance(interaction.guildId, interaction.user.id);
 
       // ✅ Embed sin barra (color 0x2b2d31 = gris Discord)
-      const embed = new EmbedBuilder()
+      const embed = createEmbed()
         .setColor(0x2b2d31) // Sin barra visible
         .setTitle('🛒 Tienda de Insignias')
         .setDescription(
@@ -585,7 +586,7 @@ module.exports = {
       // ✅ Usar editReply (ya se hizo deferReply)
       return interaction.editReply({
         embeds: [
-          new EmbedBuilder()
+          createEmbed()
             .setColor(0x2b2d31)
             .setTitle('🛒 Rotación forzada')
             .setDescription(list)
@@ -683,7 +684,7 @@ module.exports = {
       const b1 = profiles.badges[offerId];
       const b2 = profiles.badges[requestId];
       
-      const embed = new EmbedBuilder()
+      const embed = createEmbed()
         .setColor(0xFF9800)
         .setTitle('🔄 Solicitud de Intercambio')
         .setDescription(
@@ -750,7 +751,7 @@ module.exports = {
           
           await i.update({
             content: `✅ Intercambio completado`,
-            embeds: [new EmbedBuilder()
+            embeds: [createEmbed()
               .setColor(0x4CAF50)
               .setTitle('✅ Intercambio Exitoso')
               .setDescription(
@@ -821,7 +822,7 @@ module.exports = {
             return `${r.emoji} ${b.icon} **${b.name}**`;
           }).join('\n');
 
-          const embed = new EmbedBuilder()
+          const embed = createEmbed()
             .setColor(0x2196F3)
             .setTitle('🏆 Catálogo de Insignias')
             .addFields({
@@ -903,8 +904,8 @@ module.exports = {
       const allBadges = Object.values(profiles.badges || {}).filter(b => b.autoGrant);
       const earned = new Set(userProfile.earnedBadges || []);
       
-      const embed = new EmbedBuilder()
-        .setColor(0x3498db)
+      const embed = createEmbed()
+        .setColor(COLORS.primary)
         .setTitle(`📊 Progreso de Logros - ${targetUser.username}`);
       
       for (const badge of allBadges) {
@@ -986,8 +987,8 @@ module.exports = {
             }).join('\n')
           : '—';
 
-        const embed = new EmbedBuilder()
-          .setColor(0xF6C343)
+        const embed = createEmbed()
+          .setColor(COLORS.economy)
           .setTitle('🎖 Tus insignias');
 
         if (featuredBadge) {

@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { createEmbed } = require('../../utils/ui');
+const { SlashCommandBuilder, } = require('discord.js');
 const { getBalance } = require('../../services/economy/index').economyService;
 const { readProfiles } = require('../../utils/profileStore');
 
@@ -34,7 +35,7 @@ async function handleTop(guildId, guildName, guild = null) {
     return `${rank} <@${u.id}> — ${u.total.toLocaleString()} 🪙 *(${u.coins.toLocaleString()} 👛 + ${u.bank.toLocaleString()} 🏦)*`;
   }).join('\n');
   
-  const embed = new EmbedBuilder()
+  const embed = createEmbed()
     .setColor(0xFFD700)
     .setAuthor({ name: '🏆 Top 10 Economía' })
     .addFields({ name: 'Millonarios del Servidor', value: `> \n${descriptionStr.split('\n').map(line => '> ' + line).join('\n')}`, inline: false })
