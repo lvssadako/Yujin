@@ -466,7 +466,8 @@ module.exports = (client) => {
 
       // Streak diaria por actividad de mensajes
       if (streakResult.updated && !streakResult.alertsDisabled) {
-        if (streakResult.wasReactivated) {
+        // La racha reactivada vuelve al día 1: aún no está activa, así que no se avisa.
+        if (streakResult.wasReactivated && streakResult.isActive) {
           await sendDmNotification(message.author, {
             guildId,
             guildName: message.guild.name,

@@ -50,18 +50,20 @@ const CATEGORY_METADATA = {
  */
 function getNotificationPreferences(guildId, userId) {
   if (!guildId || !userId) {
-    return { all: true, streaks: true, warns: true, levels: true, boosts: true, badges: true };
+    return { all: true, streaks: false, warns: true, levels: true, boosts: true, badges: true };
   }
 
   const profiles = readProfiles();
   const u = ensureUser(profiles, guildId, userId);
 
   const notifs = u.dmNotifications || {};
-  const streaksDefault = u.streakAlertsDisabled ? false : true;
+  // Los DMs de racha están apagados por defecto: solo se activan cuando el
+  // usuario los habilita explícitamente (streakAlertsDisabled === false).
+  const streaksEnabled = u.streakAlertsDisabled === false;
 
   return {
     all: typeof notifs.all === 'boolean' ? notifs.all : true,
-    streaks: typeof notifs.streaks === 'boolean' ? notifs.streaks : streaksDefault,
+    streaks: streaksEnabled,
     warns: typeof notifs.warns === 'boolean' ? notifs.warns : true,
     levels: typeof notifs.levels === 'boolean' ? notifs.levels : true,
     boosts: typeof notifs.boosts === 'boolean' ? notifs.boosts : true,
@@ -91,7 +93,7 @@ function setNotificationPreference(guildId, userId, category, enabled) {
   if (!u.dmNotifications) {
     u.dmNotifications = {
       all: true,
-      streaks: u.streakAlertsDisabled ? false : true,
+      streaks: u.streakAlertsDisabled === false,
       warns: true,
       levels: true,
       boosts: true,

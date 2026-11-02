@@ -3,6 +3,7 @@ const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = re
 const { readConfig } = require('../../utils/configCache');
 const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
 const { getBalance, subtractCoins } = require('../../services/economy/index').economyService;
+const { isStreakActive, STREAK_ACTIVATION_DAYS } = require('../../services/streak/streakService');
 
 function asHours(ms) {
   return `${(ms / 3600000).toFixed(1)}h`;
@@ -19,7 +20,7 @@ function getRarityColor(rarity = 'common') {
 }
 
 function getDiscountForUser(item, userData) {
-  const streakDiscount = Number(userData.streakDays || 0) >= 3 ? 10 : 0;
+  const streakDiscount = isStreakActive(userData.streakDays) ? 10 : 0;
   const itemDiscount = Number(item.discountPercent) || 0;
   return Math.min(45, Math.max(0, itemDiscount + streakDiscount));
 }

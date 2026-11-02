@@ -6,7 +6,8 @@ const {
   setGlobalStreakCustomization,
   setStreakAlertPreference,
   getStreakLeaderboard,
-  setUserStreakTimezone
+  setUserStreakTimezone,
+  STREAK_ACTIVATION_DAYS
 } = require('../../services/streak/streakService');
 const { generateStreakCard } = require('../../services/streak/streakCard');
 const { buildStreakCustomizationPanel } = require('../../services/streak/streakCustomizer');
@@ -33,7 +34,8 @@ function buildLeaderboardEmbed(guild, lb) {
 }
 function buildTiersEmbed() {
   const embed = createEmbed().setAuthor({ name: 'Yujin · Rachas' }).setTitle('Cada día cuenta')
-    .setDescription('Envía al menos un mensaje cada día para mantener tu racha de actividad. El día cambia a medianoche en tu zona horaria.');
+    .setDescription('Envía al menos un mensaje cada día para mantener tu racha de actividad. El día cambia a medianoche en tu zona horaria.\n' +
+      `Se **activa** al llegar a **${STREAK_ACTIVATION_DAYS} días seguidos**; antes de eso no otorga beneficios ni recompensas.`);
   for (const tier of FLAME_TIERS) {
     const perks = [];
     const bonusXp = Math.round((tier.xpMultiplier - 1) * 100);
@@ -67,6 +69,14 @@ function chooseTimezone(guildId, userId, input) {
     if (/Zona horaria inválida|una vez cada 24 horas|Usuario inválido/.test(error.message)) return '❌ ' + error.message;
     throw error;
   }
+}
+
+function buildFormingStreakNotice(status, isSelf) {
+  if (!status || status.isActive || status.streakDisabled) return undefined;
+  const remaining = status.daysToActivation;
+  const who = isSelf ? 'Tu racha' : 'Esta racha';
+  return `🕯️ ${who} está en formación: se activa al llegar a **${STREAK_ACTIVATION_DAYS} días seguidos** ` +
+    `(faltan **${remaining} día${remaining === 1 ? '' : 's'}**). Hasta entonces no otorga beneficios ni recompensas.`;
 }
 
 module.exports = {
@@ -164,7 +174,7 @@ module.exports = {
         );
       }
 
-      return interaction.editReply({ content: timezoneMessage(status), files: [attachment], components });
+      return interaction.editReply({ content: [buildFormingStreakNotice(status, isSelf), timezoneMessage(status)].filter(Boolean).join('\n\n'), files: [attachment], components });
     }
 
     if (sub === 'customizar') {
@@ -332,9 +342,10 @@ module.exports = {
       );
     }
 
-    return message.reply({ content: timezoneMessage(status), files: [attachment], components });
+    return message.reply({ content: [buildFormingStreakNotice(status, isSelf), timezoneMessage(status)].filter(Boolean).join('\n\n'), files: [attachment], components });
   },
 
   buildLeaderboardEmbed,
-  buildTiersEmbed
+  buildTiersEmbed,
+  buildFormingStreakNotice
 };

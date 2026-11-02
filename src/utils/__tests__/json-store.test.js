@@ -385,7 +385,7 @@ test('process termination after rename retains the complete new JSON without a t
   assert.deepEqual(f.names(), ['store.json']);
 });
 
-// Load only committed-branch consumer source, with synthetic data paths and a
+// Load consumer source with synthetic data paths and a
 // no-op logger. No imports of the bot entry point, Discord or operational data.
 function consumer(relative, root, cache = new Map()) {
   if (cache.has(relative)) return cache.get(relative);
@@ -396,6 +396,9 @@ function consumer(relative, root, cache = new Map()) {
     module, __dirname: path.dirname(path.join(root, relative)), Buffer, Date,
     require(id) {
       if (id.endsWith('/jsonStore')) return store;
+      // Share the same reentrant lock as jsonStore's loan delegation.
+      // Its data directory comes from the synthetic consumer, never production.
+      if (id.endsWith('/economyLock')) return require('../../services/economy/economyLock');
       if (id.endsWith('/logger')) return { info() {}, warn() {}, error() {} };
       if (['fs', 'node:fs', 'path', 'node:path'].includes(id)) return require(id);
       if (id.startsWith('.')) {
@@ -423,9 +426,15 @@ test('critical consumers reject corruption before changing balances, loans, prof
     const dataFile = path.join(f.dir, 'data', filename);
     fs.writeFileSync(dataFile, '{damaged');
     const c = consumer(relative, f.dir);
-    assert.throws(() => operation(c), code('JSON_CORRUPT'), relative);
+    const economic = filename === 'economy.json' || filename === 'loans.json';
+    // Managed economic files use the loan store's strict JSON parser.
+    assert.throws(() => operation(c), economic ? SyntaxError : code('JSON_CORRUPT'), relative);
     assert.equal(fs.readFileSync(dataFile, 'utf8'), '{damaged');
-    assert.deepEqual(fs.readdirSync(path.dirname(dataFile)), [filename]);
+    const names = fs.readdirSync(path.dirname(dataFile));
+    assert.deepEqual(names.filter(name => name !== '.economy-lock'), [filename]);
+    if (names.includes('.economy-lock')) {
+      assert.deepEqual(fs.readdirSync(path.join(f.dir, 'data/.economy-lock')), []);
+    }
   }
 });
 

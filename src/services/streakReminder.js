@@ -1,13 +1,14 @@
 const { createEmbed } = require('../utils/ui');
 const { } = require('discord.js');
-const { readProfiles } = require('../utils/profileStore');
+const { readProfiles, migrateStreakPreferences } = require('../utils/profileStore');
 const { getUserStreakStatus, markStreakReminderSent } = require('./streak/streakService');
 const { canSendDmNotification, sendDmNotification } = require('./notification/dmNotificationService');
 const logger = require('../utils/logger');
 let clientRef = null, intervalRef = null, startupTimer = null, checking = false, generation = 0;
 
 function eligible(status) {
-  return status.streakDays > 0 && !status.streakDisabled && !status.isActiveToday &&
+  // Solo rachas activas (>= STREAK_ACTIVATION_DAYS) reciben recordatorio.
+  return status.isActive && !status.streakDisabled && !status.isActiveToday &&
     !status.alreadyReminded && !status.alertsDisabled && status.msRemaining > 0 && status.msRemaining <= 3 * 3600000;
 }
 async function checkStreaks() {
@@ -49,6 +50,13 @@ async function checkStreaks() {
 function init(client) {
   stop();
   clientRef = client;
+  // Antes de enviar cualquier recordatorio, validar qué usuarios ya tenían
+  // una racha de 5 días o más para conservar (o no) su configuración previa.
+  try {
+    migrateStreakPreferences();
+  } catch (err) {
+    logger.error('[streakReminder] Error validando preferencias de racha:', { error: err.message });
+  }
   intervalRef = setInterval(checkStreaks, 20 * 60 * 1000);
   startupTimer = setTimeout(checkStreaks, 5000);
   logger.info('Recordatorios de rachas por zona horaria iniciados.');

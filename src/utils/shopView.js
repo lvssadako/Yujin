@@ -1,13 +1,14 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { createEmbed, formatNumber, clip } = require('./ui');
+const { STREAK_ACTIVATION_DAYS } = require('../constants/streakRules');
 
 function buildCatalogView(catalog, userData, discountFor, priceFor, requestedPage = 0, ownerId = '') {
   const pages = Math.max(1, Math.ceil(catalog.length / 8));
   const page = Math.max(0, Math.min(pages - 1, Number(requestedPage) || 0));
   const items = catalog.slice(page * 8, page * 8 + 8);
-  const discountActive = Number(userData.streakDays || 0) >= 3;
+  const discountActive = Number(userData.streakDays || 0) >= STREAK_ACTIVATION_DAYS;
   const embed = createEmbed().setAuthor({ name: 'Yujin ♥ · Tienda' }).setTitle('🛍️ Un impulso para tu próxima meta')
-    .setDescription('Elige un producto para comprarlo. Los boosts se activan o se guardan en tu cola.\n' + (discountActive ? '**Descuento por racha activo: 10 %.**' : 'Consigue una racha de actividad de 3 días para activar el descuento del 10 %.'))
+    .setDescription('Elige un producto para comprarlo. Los boosts se activan o se guardan en tu cola.\n' + (discountActive ? '**Descuento por racha activo: 10 %.**' : 'Consigue una racha de actividad de ' + STREAK_ACTIVATION_DAYS + ' días para activar el descuento del 10 %.'))
     .setFooter({ text: 'Precios para quien abrió la tienda · Página ' + (page + 1) + ' de ' + pages + ' · ' + catalog.length + ' productos' });
   for (const item of items) {
     const discount = discountFor(item, userData);
