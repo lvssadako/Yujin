@@ -2,10 +2,10 @@ const { Events } = require('discord.js');
 const logger = require('../utils/logger');
 const { updateTopRoles } = require('../commands/utility/toproles');
 const { handleLevelRoles } = require('../utils/levelRoles');
+const { updateMissionProgress } = require('../utils/dailyMissions');
 const { readConfig } = require('../utils/configCache');
-const { readLevels, writeLevels, ensureUserData } = require('../services/level').levelService;
+const { readLevels, writeLevels, ensureUserData, xpToNext } = require('../services/level').levelService;
 
-function xpToNext(level) { return 100 * Math.pow(level + 1, 2); }
 
 function getRoleBonusPercent(cfg, member) {
   const bonuses = cfg.roleXpBonuses || {};
@@ -55,8 +55,9 @@ const sessions = new Map();
 const TICK_MS = 60_000;
 const makeKey = (gid, uid) => `${gid}:${uid}`;
 
-async function awardVoice(guild, userId, member, channelId, sinceMs) {
-  const now = Date.now();
+async function awardVoice(guild, userId, member, channelId, sinceMs, untilMs = Date.now()) {
+  if (member?.user?.bot) return;
+  const now = untilMs;
   const elapsedSec = Math.max(0, Math.floor((now - sinceMs) / 1000));
   if (elapsedSec <= 0) return;
 
@@ -105,9 +106,18 @@ async function awardVoice(guild, userId, member, channelId, sinceMs) {
   }
 
   let leveledUp = false;
-  while (data.xp >= xpToNext(data.level)) { data.level += 1; leveledUp = true; }
+  while (data.xp >= xpToNext(data.level)) {
+    data.xp -= xpToNext(data.level);
+    data.level += 1;
+    leveledUp = true;
+  }
 
-  await writeLevels(levels);
+  writeLevels(levels);
+  // Mission errors must not replay an interval whose XP/time is already persisted.
+  try {
+    updateMissionProgress(guild, userId, 'voice', elapsedSec / 60);
+    if (gained) updateMissionProgress(guild, userId, 'xp_gain', gained);
+  } catch (error) { logger.error('[levels voice] mission progress error', { error: error.message }); }
 
   const bonusText = roleBonusPercent ? ` +${roleBonusPercent}%` : '';
   const chanText = chanMult !== 1 ? `, canal x${chanMult}` : '';
@@ -172,63 +182,100 @@ async function awardVoice(guild, userId, member, channelId, sinceMs) {
   }
 }
 
-function startTimer(guild, userId) {
-  const key = makeKey(guild.id, userId);
-  const s = sessions.get(key);
-  if (!s) return;
-  if (s.timer) clearTimeout(s.timer);
+let stopping = false;
 
-  s.timer = setTimeout(async function tick() {
-    try {
-      const member = await guild.members.fetch(userId).catch(() => null);
-      if (!member || !member.voice?.channelId) {
-        await awardVoice(guild, userId, member, s.channelId, s.lastAwardAt);
-        sessions.delete(key);
-        return;
-      }
-      await awardVoice(guild, userId, member, s.channelId, s.lastAwardAt);
-      s.lastAwardAt = Date.now();
-      startTimer(guild, userId);
-    } catch (e) {
-      logger.error('[levels voice] tick error:', { error: e?.message || e });
-      s.lastAwardAt = Date.now();
-      startTimer(guild, userId);
-    }
-  }, TICK_MS);
+function flushSession(s, until, member = s.member, channelId = s.channelId) {
+  s.queue = s.queue.catch(() => {}).then(async () => {
+    const since = s.lastAwardAt;
+    const seconds = Math.max(0, Math.floor((until - since) / 1000));
+    if (!seconds) return;
+    await awardVoice(s.guild, s.userId, member, channelId, since, until);
+    s.lastAwardAt = since + seconds * 1000;
+  });
+  return s.queue;
 }
 
-module.exports = (client) => {
-  client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
+function startTimer(guild, userId) {
+  const key = makeKey(guild.id, userId), s = sessions.get(key);
+  if (!s || stopping) return;
+  if (s.timer) clearTimeout(s.timer);
+  s.timer = setTimeout(async () => {
+    if (stopping || sessions.get(key) !== s) return;
     try {
-      const guild = newState.guild || oldState.guild;
-      const userId = newState.id;
-      const was = oldState.channelId;
-      const now = newState.channelId;
-      if (was === now) return;
+      const cutoff = Date.now();
+      const member = guild.members.cache.get(userId) || s.member;
+      if (member) s.member = member;
+      const left = member?.voice && !member.voice.channelId;
+      if (left) { sessions.delete(key); s.timer = null; }
+      await flushSession(s, cutoff, member);
+    } catch (error) {
+      logger.error('[levels voice] tick error', { error: error.message });
+    } finally {
+      if (sessions.get(key) === s) startTimer(guild, userId);
+    }
+  }, TICK_MS);
+  s.timer?.unref?.();
+}
 
-      if (was) {
-        const key = makeKey(guild.id, userId);
-        const s = sessions.get(key);
-        if (s) {
-          const member = await guild.members.fetch(userId).catch(() => null);
-          await awardVoice(guild, userId, member, s.channelId, s.lastAwardAt);
-          if (!now) {
-            if (s.timer) clearTimeout(s.timer);
-            sessions.delete(key);
-          } else {
-            s.channelId = now;
-            s.lastAwardAt = Date.now();
-            startTimer(guild, userId);
-          }
+function startSession(guild, userId, channelId, member, now = Date.now()) {
+  if (stopping || member?.user?.bot) return;
+  const key = makeKey(guild.id, userId);
+  if (sessions.has(key)) return;
+  sessions.set(key, { guild, userId, channelId, member, lastAwardAt: now, timer: null, queue: Promise.resolve() });
+  startTimer(guild, userId);
+}
+
+async function stopVoiceSessions() {
+  stopping = true;
+  const cutoff = Date.now();
+  const pending = [...sessions.values()].map(s => {
+    if (s.timer) clearTimeout(s.timer);
+    return flushSession(s, cutoff).catch(error => logger.error('[levels voice] shutdown flush error', { error: error.message }));
+  });
+  sessions.clear();
+  await Promise.all(pending);
+}
+
+module.exports = client => {
+  stopping = false;
+  client.on(Events.ClientReady, () => {
+    // Only time since this process became ready is counted; downtime is not invented.
+    for (const guild of client.guilds.cache.values()) {
+      for (const state of guild.voiceStates.cache.values()) {
+        if (state.channelId) startSession(guild, state.id, state.channelId, state.member || guild.members.cache.get(state.id));
+      }
+    }
+  });
+  client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
+    if (stopping) return;
+    try {
+      const guild = newState.guild || oldState.guild, userId = newState.id;
+      const member = newState.member || oldState.member || guild.members.cache.get(userId);
+      if (member?.user?.bot) return;
+      const key = makeKey(guild.id, userId), s = sessions.get(key);
+      const cutoff = Date.now(), current = newState.channelId;
+      if (oldState.channelId === current) {
+        if (current && !s) startSession(guild, userId, current, member, cutoff);
+        if (s && member) s.member = member;
+        return;
+      }
+      if (s) {
+        const previousChannel = s.channelId;
+        const pending = flushSession(s, cutoff, oldState.member || s.member || member, previousChannel);
+        if (s.timer) clearTimeout(s.timer);
+        if (!current) sessions.delete(key);
+        else {
+          s.channelId = current;
+          s.member = member || s.member;
+          startTimer(guild, userId);
         }
+        await pending;
+      } else if (current) {
+        startSession(guild, userId, current, member, cutoff);
       }
-      if (!was && now) {
-        const key = makeKey(guild.id, userId);
-        sessions.set(key, { channelId: now, joinedAt: Date.now(), lastAwardAt: Date.now(), timer: null });
-        startTimer(guild, userId);
-      }
-    } catch (err) {
-      logger.error('[levels voice] voiceStateUpdate error:', { error: err.message, stack: err.stack });
+    } catch (error) {
+      logger.error('[levels voice] voiceStateUpdate error', { error: error.message, stack: error.stack });
     }
   });
 };
+module.exports.stopVoiceSessions = stopVoiceSessions;

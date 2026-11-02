@@ -4,6 +4,8 @@ const path = require('path');
 const { readJsonSafe, writeJsonAtomic } = require('../../utils/jsonStore');
 const { readProfiles, ensureUser } = require('../../utils/profileStore');
 
+const { buildLeaderboard, voiceMilliseconds, selectCurrentMembers } = require('./ranking');
+
 const dataDir = path.join(__dirname, '..', '..', '..', 'data');
 const levelsPath = path.join(dataDir, 'levels.json');
 
@@ -12,7 +14,7 @@ function getDayKey(date = new Date()) {
 }
 
 function getWeekKey(date = new Date()) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   const dayNum = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
@@ -86,19 +88,8 @@ function getUserData(levels, guildId, userId) {
   
   const userData = levels.guilds[guildId][userId];
 
-  // Migración de voz legacy
-  if (userData.voiceMs == null) {
-    if (userData.voiceTime != null) {
-      const vt = Number(userData.voiceTime);
-      userData.voiceMs = vt >= 3600000 ? vt : vt * 1000;
-      delete userData.voiceTime;
-    } else if (userData.voiceMinutes != null) {
-      userData.voiceMs = userData.voiceMinutes * 60000;
-      delete userData.voiceMinutes;
-    } else {
-      userData.voiceMs = 0;
-    }
-  }
+  // Legacy voiceTime is recorded in seconds by the voice event.
+  userData.voiceMs = voiceMilliseconds(userData);
 
   userData.textXp = userData.textXp || 0;
   userData.voiceXp = userData.voiceXp || 0;
@@ -138,24 +129,10 @@ function addMessageCount(guildId, userId) {
 }
 
 function getUserRank(guildId, userId, levels, guild = null) {
-  const allLevels = levels || readLevels();
-  const guildData = allLevels.guilds?.[guildId] || allLevels[guildId] || {};
-  const sorted = Object.entries(guildData)
-    .filter(([id]) => {
-      if (guild) {
-        const member = guild.members?.cache?.get(id);
-        const user = guild.client?.users?.cache?.get(id) || member?.user;
-        if (user?.bot) return false;
-      }
-      return true;
-    })
-    .map(([id, data]) => ({ id, level: data.level || 0, xp: data.xp || 0 }))
-    .sort((a, b) => {
-      if (b.level !== a.level) return b.level - a.level;
-      return b.xp - a.xp;
-    });
-  const idx = sorted.findIndex(u => u.id === userId);
-  return idx >= 0 ? idx + 1 : null;
+  const entries = buildLeaderboard(levels || readLevels(), guildId, 'global', 'general',
+    Infinity, guild, getDayKey(), getWeekKey());
+  const index = entries.findIndex(entry => entry.id === userId);
+  return index >= 0 ? index + 1 : null;
 }
 
 function xpToNext(level) {
@@ -240,87 +217,12 @@ function removeXp(guildId, userId, amount) {
 const penalizeXp = removeXp;
 
 function getLeaderboard(guildId, timeframe = 'global', category = 'general', limit = 10, guild = null) {
-  const levels = readLevels();
-  const guildData = levels.guilds?.[guildId] || levels[guildId] || {};
-  const currentDay = getDayKey();
-  const currentWeek = getWeekKey();
+  return buildLeaderboard(readLevels(), guildId, timeframe, category, limit, guild, getDayKey(), getWeekKey());
+}
 
-  const entries = Object.entries(guildData)
-    .filter(([id]) => {
-      if (guild) {
-        const member = guild.members?.cache?.get(id);
-        const user = guild.client?.users?.cache?.get(id) || member?.user;
-        if (user?.bot) return false;
-      }
-      return true;
-    })
-    .map(([id, raw]) => {
-    const d = { ...raw };
-    const daily = (d.daily && d.daily.day === currentDay) ? d.daily : { xp: 0, textXp: 0, voiceXp: 0, messages: 0, voiceMs: 0 };
-    const weekly = (d.weekly && d.weekly.week === currentWeek) ? d.weekly : { xp: 0, textXp: 0, voiceXp: 0, messages: 0, voiceMs: 0 };
-
-    let score = 0;
-    let detail = '';
-
-    if (timeframe === 'daily') {
-      if (category === 'text') {
-        score = daily.textXp || 0;
-        detail = `${daily.messages || 0} msgs • ${score.toLocaleString()} XP`;
-      } else if (category === 'voice') {
-        score = daily.voiceXp || 0;
-        const mins = Math.floor((daily.voiceMs || 0) / 60000);
-        detail = `${mins} min • ${score.toLocaleString()} XP`;
-      } else {
-        score = daily.xp || 0;
-        detail = `${score.toLocaleString()} XP hoy`;
-      }
-    } else if (timeframe === 'weekly') {
-      if (category === 'text') {
-        score = weekly.textXp || 0;
-        detail = `${weekly.messages || 0} msgs • ${score.toLocaleString()} XP`;
-      } else if (category === 'voice') {
-        score = weekly.voiceXp || 0;
-        const mins = Math.floor((weekly.voiceMs || 0) / 60000);
-        detail = `${mins} min • ${score.toLocaleString()} XP`;
-      } else {
-        score = weekly.xp || 0;
-        detail = `${score.toLocaleString()} XP esta semana`;
-      }
-    } else { // global
-      if (category === 'text') {
-        score = d.textXp || d.messages || 0;
-        detail = `${d.messages || 0} msgs • ${(d.textXp || 0).toLocaleString()} XP`;
-      } else if (category === 'voice') {
-        score = d.voiceXp || d.voiceMs || 0;
-        const mins = Math.floor((d.voiceMs || 0) / 60000);
-        detail = `${mins} min • ${(d.voiceXp || 0).toLocaleString()} XP`;
-      } else {
-        score = (d.level || 0) * 1_000_000 + (d.xp || 0);
-        detail = `Nivel ${d.level || 0} • ${(d.xp || 0).toLocaleString()} XP`;
-      }
-    }
-
-    return {
-      id,
-      level: d.level || 0,
-      xp: d.xp || 0,
-      score,
-      detail,
-      timeframe,
-      category,
-      messages: d.messages || 0,
-      voiceMs: d.voiceMs || 0,
-      textXp: d.textXp || 0,
-      voiceXp: d.voiceXp || 0,
-      daily,
-      weekly
-    };
-  });
-
-  return entries
-    .filter(e => e.score > 0 || timeframe === 'global')
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+async function getGuildLeaderboard(guild, timeframe = 'global', category = 'general', limit = 10) {
+  const entries = getLeaderboard(guild.id, timeframe, category, Infinity, guild);
+  return selectCurrentMembers(entries, guild, limit);
 }
 
 const levelService = {
@@ -337,6 +239,7 @@ const levelService = {
   removeXp,
   penalizeXp,
   getLeaderboard,
+  getGuildLeaderboard,
   getDayKey,
   getWeekKey
 };

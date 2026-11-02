@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { createEmbed } = require('../../utils/ui');
+const { SlashCommandBuilder, PermissionFlagsBits, } = require('discord.js');
 const { checkAndDisableInactiveStreaks } = require('../../services/streak/streakService');
 const { isOwnerOrDev } = require('../../utils/staffAuth');
 const { COLORS } = require('../../utils/embedFactory');
@@ -15,7 +16,7 @@ function isStaffOrAdmin(member) {
 
 function buildStreakCheckEmbed(guild, result) {
   const isAudit = Boolean(result.dryRun);
-  const embed = new EmbedBuilder()
+  const embed = createEmbed()
     .setColor(isAudit ? COLORS.primary : (result.disabledCount > 0 ? COLORS.warning : COLORS.success))
     .setAuthor({
       name: `Auditoría de Rachas de Actividad · ${guild.name}`,

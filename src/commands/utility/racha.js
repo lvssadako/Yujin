@@ -52,8 +52,13 @@ module.exports = {
               { name: '🔕 Desactivar recordatorios por DM', value: 'off' }
             )
         )
-    ),
+    )
+    .addSubcommand(sub => sub.setName('zona')
+      .setDescription('Consulta o elige la zona horaria para tu racha')
+      .addStringOption(opt => opt.setName('nombre').setDescription('Ciudad o zona, por ejemplo America/Mexico_City')
+        .setRequired(false).setAutocomplete(true).setMaxLength(100))),
 
+  autocomplete: streakCmd.autocomplete,
   execute: streakCmd.execute,
   executePrefix: streakCmd.executePrefix
 };

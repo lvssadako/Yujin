@@ -1,5 +1,6 @@
+const { createEmbed } = require('../../utils/ui');
 const logger = require('../../utils/logger');
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { addChests, removeChest, getChestCount } = require('../../utils/chestStore');
 const { getBalance, removeCoins } = require('../../services/economy/index').economyService;
 const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
@@ -41,7 +42,7 @@ module.exports = {
       await interaction.deferReply();
       const count = getChestCount(guildId, userId);
       const { coins, gems } = getBalance(guildId, userId);
-      const embed = new EmbedBuilder()
+      const embed = createEmbed()
         .setColor(0x2b2d31)
         .setTitle('<:chest:1439431665704239236> Tu Inventario')
         .addFields(
@@ -161,7 +162,7 @@ async function handleChestOpen(interaction, cantidad, isButton = false, useReply
       }
     }
 
-    const embed = new EmbedBuilder()
+    const embed = createEmbed()
       .setColor(0x2b2d31)
       .setTitle(`🎁 Abriste ${results.length} cofre${results.length > 1 ? 's' : ''}`)
       .setFooter({ text: `Cofres restantes: ${getChestCount(guildId, userId)}` })

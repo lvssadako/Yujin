@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { createEmbed, COLORS } = require('../../utils/ui');
+const { SlashCommandBuilder, } = require('discord.js');
 const { getBalance, addCoins, removeCoins, addBank, removeBank } = require('../../services/economy').economyService;
 
 async function handleBank(guildId, userId, subCommand, qtyStr) {
@@ -14,8 +15,8 @@ async function handleBank(guildId, userId, subCommand, qtyStr) {
     
     const newBal = getBalance(guildId, userId);
     
-    const embed = new EmbedBuilder()
-      .setColor(0x57F287)
+    const embed = createEmbed()
+      .setColor(COLORS.success)
       .setAuthor({ name: '🏦 Depósito Exitoso' })
       .addFields(
         { name: '📥 Monto Depositado', value: `> **${amount.toLocaleString()} 🪙**`, inline: false },
@@ -36,8 +37,8 @@ async function handleBank(guildId, userId, subCommand, qtyStr) {
     
     const newBal = getBalance(guildId, userId);
     
-    const embed = new EmbedBuilder()
-      .setColor(0xF1C40F)
+    const embed = createEmbed()
+      .setColor(COLORS.economy)
       .setAuthor({ name: '🏦 Retiro Exitoso' })
       .addFields(
         { name: '📤 Monto Retirado', value: `> **${amount.toLocaleString()} 🪙**`, inline: false },

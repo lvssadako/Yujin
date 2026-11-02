@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { createEmbed } = require('../../utils/ui');
+const { SlashCommandBuilder, } = require('discord.js');
 const {
   VALID_CATEGORIES,
   CATEGORY_METADATA,
@@ -7,92 +8,7 @@ const {
 } = require('../../services/notification/dmNotificationService');
 const { COLORS } = require('../../utils/embedFactory');
 
-function buildStatusEmbed(guild, user, prefs) {
-  const isAllDisabled = prefs.all === false;
-  const embed = new EmbedBuilder()
-    .setColor(isAllDisabled ? COLORS.error : COLORS.primary)
-    .setAuthor({
-      name: `Preferencias de Notificaciones por DM · ${user.username}`,
-      iconURL: user.displayAvatarURL({ dynamic: true })
-    })
-    .setTitle(isAllDisabled ? '🔕 Notificaciones Generales: SILENCIADAS' : '🔔 Notificaciones Generales: ACTIVAS')
-    .setDescription(
-      isAllDisabled
-        ? `Actualmente **NO recibirás ningún mensaje directo (DM)** de **${guild.name}**.\n\n> 💡 Para activarlas nuevamente, usa \`/notificaciones activar\` o \`&notificaciones on\`.`
-        : `Aquí puedes personalizar qué tipos de avisos directos (DM) deseas recibir de **${guild.name}**:\n`
-    )
-    .setFooter({ text: `${guild.name} · Sistema de Preferencias de Usuario` })
-    .setTimestamp();
-
-  for (const catKey of VALID_CATEGORIES) {
-    if (catKey === 'all') continue;
-    const meta = CATEGORY_METADATA[catKey];
-    const isEnabled = prefs.all !== false && prefs[catKey] !== false;
-    const badge = isEnabled ? '🟢 **Activada**' : '🔴 **Desactivada**';
-    embed.addFields({
-      name: `${meta.emoji} ${meta.label}`,
-      value: `> Estado: ${badge}\n> *${meta.description}*`,
-      inline: false
-    });
-  }
-
-  embed.addFields({
-    name: '⚙️ Comandos Rápidos',
-    value:
-      `• Desactivar todo: \`/notificaciones desactivar\` o \`&notificaciones off\`\n` +
-      `• Activar todo: \`/notificaciones activar\` o \`&notificaciones on\`\n` +
-      `• Por categoría: \`/notificaciones desactivar tipo: [categoría]\` o \`&notificaciones off [categoría]\``,
-    inline: false
-  });
-
-  return embed;
-}
-
-function buildResultEmbed(guild, user, category, enabled, updatedPrefs) {
-  const meta = CATEGORY_METADATA[category] || { label: category, emoji: '🔔' };
-  const embed = new EmbedBuilder().setTimestamp();
-
-  if (!enabled) {
-    embed
-      .setColor(COLORS.error)
-      .setAuthor({ name: `Notificaciones Actualizadas · ${user.username}`, iconURL: user.displayAvatarURL({ dynamic: true }) })
-      .setTitle(`🔕 ${meta.emoji} Notificaciones Desactivadas`)
-      .setDescription(
-        category === 'all'
-          ? `Has **desactivado con éxito todas las notificaciones por DM** de **${guild.name}**.\n\n` +
-            `• El bot no te enviará mensajes directos automáticos.\n` +
-            `• Tu actividad en el servidor se seguirá registrando normalmente.`
-          : `Has **desactivado** las notificaciones de **${meta.label}** por DM en **${guild.name}**.\n\n` +
-            `• Ya no recibirás avisos directos de esta categoría.`
-      )
-      .addFields({
-        name: '💡 ¿Cómo volver a activarlas?',
-        value: `> Usa \`/notificaciones activar tipo: ${category}\` o \`&notificaciones on ${category}\` en cualquier momento.`,
-        inline: false
-      })
-      .setFooter({ text: `${guild.name} · Preferencias de Notificación` });
-  } else {
-    embed
-      .setColor(COLORS.success)
-      .setAuthor({ name: `Notificaciones Actualizadas · ${user.username}`, iconURL: user.displayAvatarURL({ dynamic: true }) })
-      .setTitle(`🔔 ${meta.emoji} Notificaciones Activadas`)
-      .setDescription(
-        category === 'all'
-          ? `Has **activado con éxito todas las notificaciones por DM** de **${guild.name}**.\n\n` +
-            `• Recibirás avisos directos de rachas, moderación, subidas de nivel y beneficios de boost.`
-          : `Has **activado** las notificaciones de **${meta.label}** por DM en **${guild.name}**.\n\n` +
-            `• Comenzarás a recibir avisos directos de esta categoría.`
-      )
-      .addFields({
-        name: '🔕 ¿Cómo silenciarlas?',
-        value: `> Puedes desactivarlas con \`/notificaciones desactivar tipo: ${category}\` o \`&notificaciones off ${category}\`.`,
-        inline: false
-      })
-      .setFooter({ text: `${guild.name} · Preferencias de Notificación` });
-  }
-
-  return embed;
-}
+const { buildStatusEmbed, buildResultEmbed } = require('../../utils/notificationView');
 
 function resolveCategoryInput(input) {
   if (!input) return 'all';

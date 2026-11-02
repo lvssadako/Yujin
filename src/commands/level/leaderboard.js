@@ -1,3 +1,4 @@
+const { BRAND, formatNumber, formatVoiceTime } = require('../../utils/ui');
 const { SlashCommandBuilder, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const logger = require('../../utils/logger');
@@ -9,14 +10,14 @@ const { initFonts, FONT_FALLBACKS } = require('../../utils/canvasFontLoader');
 initFonts();
 
 const THEME = {
-  panel: '#1E1F22',
-  card: '#2B2D31',
-  cardAlt: '#313338',
-  accentA: '#5865F2',
-  accentB: '#EB459E',
-  text: '#F2F3F5',
-  textDim: '#949BA4',
-  rankColors: ['#FEE75C', '#C0C0C0', '#CD7F32'] // Gold, Silver, Bronze
+  panel: '#15131D',
+  card: '#211E2B',
+  cardAlt: '#252132',
+  accentA: '#A78BFA',
+  accentB: '#C4B5FD',
+  text: '#F5F3FF',
+  textDim: '#B4ADCA',
+  rankColors: ['#E9C46A', '#CDD3E1', '#D9A68C'] // Gold, Silver, Bronze
 };
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -35,7 +36,7 @@ async function fetchAvatarBuffer(url) {
   return fetchImageBuffer(url, { timeoutMs: 6000 });
 }
 
-async function drawCircularAvatar(ctx, buffer, x, y, size, borderColor) {
+async function drawCircularAvatar(ctx, buffer, x, y, size, borderColor, name = '') {
   try {
     if (!buffer) throw new Error('no buffer');
     const img = await loadImage(buffer);
@@ -56,26 +57,29 @@ async function drawCircularAvatar(ctx, buffer, x, y, size, borderColor) {
     ctx.fillStyle = '#4E5058';
     roundRect(ctx, x, y, size, size, 12);
     ctx.fill();
+    ctx.fillStyle = THEME.text;
+    ctx.font = 'bold 30px ' + FONT_FALLBACKS;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const initial = String(name).match(/[\p{L}\p{N}]/u)?.[0]?.toUpperCase() || '?';
+    ctx.fillText(initial, x + size / 2, y + size / 2);
     ctx.restore();
   }
 }
 
 function getTimeframeTitle(timeframe) {
-  switch (timeframe) {
-    case 'daily': return '☀️ Top Diario (Hoy)';
-    case 'weekly': return '📅 Top Semanal (Esta Semana)';
-    case 'global':
-    default: return '🌍 Top Global (Todos los tiempos)';
-  }
+  return { daily: 'Hoy', weekly: 'Esta semana', global: 'Histórico' }[timeframe] || 'Histórico';
 }
-
-function getCategorySubtitle(category) {
-  switch (category) {
-    case 'text': return '💬 Clasificación por Actividad de Mensajes en Texto';
-    case 'voice': return '🎙️ Clasificación por Tiempo en Canales de Voz';
-    case 'general':
-    default: return '🏆 Clasificación General por Nivel y Experiencia';
-  }
+function getCategorySubtitle(category, timeframe = 'global') {
+  if (category === 'text') return 'Mensajes enviados';
+  if (category === 'voice') return 'Tiempo en llamada';
+  return timeframe === 'global' ? 'Nivel y XP acumulado' : 'XP ganado en el período';
+}
+function fitCanvasText(ctx, text, width) {
+  const original = String(text || '');
+  let value = original;
+  while (value.length && ctx.measureText(value + (value === original ? '' : '…')).width > width) value = value.slice(0, -1);
+  return value + (value === original ? '' : '…');
 }
 
 async function renderLeaderboardCanvas(guild, leaderboardEntries, timeframe, category, client) {
@@ -90,7 +94,7 @@ async function renderLeaderboardCanvas(guild, leaderboardEntries, timeframe, cat
 
   const width = 1200;
   const rowH = 100;
-  const headerH = 150;
+  const headerH = 174;
   const gap = 14;
   const count = Math.max(1, filteredEntries.length);
   const height = headerH + count * (rowH + gap) + 40;
@@ -111,14 +115,39 @@ async function renderLeaderboardCanvas(guild, leaderboardEntries, timeframe, cat
   roundRect(ctx, 20, 20, width - 40, headerH - 30, 16);
   ctx.fill();
 
-  // Header Title
+  ctx.fillStyle = THEME.accentA;
+  ctx.fillRect(45, 27, 46, 4);
   ctx.fillStyle = THEME.text;
-  ctx.font = `bold 36px ${FONT_FALLBACKS}`;
-  ctx.fillText(guild.name || 'Servidor', 45, 70);
-
+  ctx.font = 'bold 36px ' + FONT_FALLBACKS;
+  ctx.fillText('Ranking de la comunidad', 45, 73);
+  ctx.font = '22px ' + FONT_FALLBACKS;
   ctx.fillStyle = THEME.textDim;
-  ctx.font = `bold 20px ${FONT_FALLBACKS}`;
-  ctx.fillText(`${getTimeframeTitle(timeframe)} • ${getCategorySubtitle(category)}`, 45, 110);
+  ctx.fillText(fitCanvasText(ctx, guild.name || 'Servidor', 760), 45, 110);
+  ctx.fillStyle = THEME.accentB;
+  ctx.font = '20px ' + FONT_FALLBACKS;
+  ctx.fillText(getTimeframeTitle(timeframe) + ' · ' + getCategorySubtitle(category, timeframe), 45, 145);
+  ctx.textAlign = 'right';
+  ctx.font = 'bold 16px ' + FONT_FALLBACKS;
+  ctx.fillStyle = THEME.textDim;
+  ctx.fillText(BRAND.name, width - 136, 65);
+  ctx.font = '18px ' + FONT_FALLBACKS;
+  ctx.fillText(filteredEntries.length + ' participantes', width - 136, 97);
+  ctx.textAlign = 'left';
+  try {
+    const portrait = await loadImage(BRAND.avatarPath);
+    ctx.save();
+    try {
+      ctx.beginPath();
+      ctx.arc(width - 78, 82, 38, 0, Math.PI * 2);
+      ctx.clip();
+      const cropSize = Math.min(portrait.width, portrait.height);
+      ctx.drawImage(portrait, (portrait.width - cropSize) / 2, (portrait.height - cropSize) / 2, cropSize, cropSize, width - 116, 44, 76, 76);
+    } finally {
+      ctx.restore();
+    }
+  } catch {
+    // El ranking sigue funcionando si el recurso de marca no está disponible.
+  }
 
   // If empty
   if (filteredEntries.length === 0) {
@@ -133,6 +162,7 @@ async function renderLeaderboardCanvas(guild, leaderboardEntries, timeframe, cat
   const startY = headerH + 10;
   const avatarSize = 74;
 
+  const profiles = readProfiles();
   for (let i = 0; i < filteredEntries.length; i++) {
     const entry = filteredEntries[i];
     const y = startY + i * (rowH + gap);
@@ -165,7 +195,6 @@ async function renderLeaderboardCanvas(guild, leaderboardEntries, timeframe, cat
     let avatarBuf = null;
     let username = entry.id;
 
-    const profiles = readProfiles();
     const userProfile = ensureUser(profiles, guild.id, entry.id);
     const userBarColor = userProfile.barColor || userProfile.accent || THEME.accentA;
 
@@ -186,7 +215,7 @@ async function renderLeaderboardCanvas(guild, leaderboardEntries, timeframe, cat
     } catch {}
 
     const borderColor = (i < 3) ? THEME.rankColors[i] : '#35373C';
-    await drawCircularAvatar(ctx, avatarBuf, avX, avY, avatarSize, borderColor);
+    await drawCircularAvatar(ctx, avatarBuf, avX, avY, avatarSize, borderColor, username);
 
     // Username (Server Display Name)
     const nameX = avX + avatarSize + 22;
@@ -205,11 +234,17 @@ async function renderLeaderboardCanvas(guild, leaderboardEntries, timeframe, cat
     // Detail subtitle
     ctx.fillStyle = THEME.textDim;
     ctx.font = `17px ${FONT_FALLBACKS}`;
-    ctx.fillText(entry.detail, nameX, nameY + 30);
+    ctx.fillText(fitCanvasText(ctx, entry.detail, 455), nameX, nameY + 30);
 
     // Right side metric (Score / Level Badge)
     const rightX = width - 260;
-    if (category === 'general') {
+    if (category === 'general' && timeframe !== 'global') {
+      ctx.fillStyle = THEME.text;
+      ctx.font = 'bold 26px ' + FONT_FALLBACKS;
+      ctx.textAlign = 'right';
+      ctx.fillText(formatNumber(entry.score) + ' XP', width - 60, nameY + 12);
+      ctx.textAlign = 'left';
+    } else if (category === 'general') {
       const levelText = `Nivel ${entry.level}`;
       ctx.fillStyle = THEME.text;
       ctx.font = `bold 26px ${FONT_FALLBACKS}`;
@@ -242,17 +277,17 @@ async function renderLeaderboardCanvas(guild, leaderboardEntries, timeframe, cat
     } else if (category === 'voice') {
       const mins = Math.floor((timeframe === 'global' ? entry.voiceMs : (timeframe === 'weekly' ? entry.weekly.voiceMs : entry.daily.voiceMs)) / 60000);
       const hours = (mins / 60).toFixed(1);
-      ctx.fillStyle = '#57F287';
+      ctx.fillStyle = THEME.accentB;
       ctx.font = `bold 24px ${FONT_FALLBACKS}`;
       ctx.textAlign = 'right';
-      ctx.fillText(`🎙️ ${hours} hrs (${mins}m)`, width - 60, nameY + 12);
+      ctx.fillText(formatVoiceTime(mins * 60000), width - 60, nameY + 12);
       ctx.textAlign = 'left';
     } else if (category === 'text') {
       const msgs = timeframe === 'global' ? entry.messages : (timeframe === 'weekly' ? entry.weekly.messages : entry.daily.messages);
-      ctx.fillStyle = '#5865F2';
+      ctx.fillStyle = '#A78BFA';
       ctx.font = `bold 24px ${FONT_FALLBACKS}`;
       ctx.textAlign = 'right';
-      ctx.fillText(`💬 ${msgs.toLocaleString()} msgs`, width - 60, nameY + 12);
+      ctx.fillText(formatNumber(msgs) + ' mensajes', width - 60, nameY + 12);
       ctx.textAlign = 'left';
     }
   }
@@ -286,26 +321,27 @@ function buildNavigationComponents(activeTimeframe, activeCategory) {
       .setCustomId('lb_cat_general')
       .setLabel('General')
       .setEmoji('🏆')
-      .setStyle(activeCategory === 'general' ? ButtonStyle.Success : ButtonStyle.Secondary),
+      .setStyle(activeCategory === 'general' ? ButtonStyle.Primary : ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId('lb_cat_text')
-      .setLabel('Chat Texto')
+      .setLabel('Mensajes')
       .setEmoji('💬')
-      .setStyle(activeCategory === 'text' ? ButtonStyle.Success : ButtonStyle.Secondary),
+      .setStyle(activeCategory === 'text' ? ButtonStyle.Primary : ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId('lb_cat_voice')
-      .setLabel('Canales Voz')
+      .setLabel('Tiempo en voz')
       .setEmoji('🎙️')
-      .setStyle(activeCategory === 'voice' ? ButtonStyle.Success : ButtonStyle.Secondary)
+      .setStyle(activeCategory === 'voice' ? ButtonStyle.Primary : ButtonStyle.Secondary)
   );
 
   return [timeRow, catRow];
 }
 
 module.exports = {
+  renderLeaderboardCanvas, buildNavigationComponents, getCategorySubtitle, getTimeframeTitle,
   data: new SlashCommandBuilder()
     .setName('leaderboard')
-    .setDescription('🏆 Clasificación y tops de usuarios por nivel, chat de texto y voz')
+    .setDescription('Consulta los rankings de XP, mensajes y tiempo en voz.')
     .addStringOption(opt =>
       opt.setName('periodo')
         .setDescription('Filtra la clasificación por período de tiempo')
@@ -321,7 +357,7 @@ module.exports = {
         .setDescription('Filtra por tipo de actividad')
         .setRequired(false)
         .addChoices(
-          { name: '🏆 General (Nivel & XP Total)', value: 'general' },
+          { name: 'General · Nivel / XP del período', value: 'general' },
           { name: '💬 Chat Texto (Mensajes)', value: 'text' },
           { name: '🎙️ Canales de Voz (Tiempo en llamada)', value: 'voice' }
         )
@@ -338,11 +374,11 @@ module.exports = {
     let currentCategory = interaction.options?.getString('categoria') || 'general';
 
     const renderCurrent = async () => {
-      const entries = levelService.getLeaderboard(interaction.guildId, currentTimeframe, currentCategory, 10, interaction.guild);
+      const entries = await levelService.getGuildLeaderboard(interaction.guild, currentTimeframe, currentCategory, 10);
       const buffer = await renderLeaderboardCanvas(interaction.guild, entries, currentTimeframe, currentCategory, client || interaction.client);
       const attach = new AttachmentBuilder(buffer, { name: 'leaderboard.png' });
       const components = buildNavigationComponents(currentTimeframe, currentCategory);
-      return { files: [attach], components };
+      return { files: [attach], attachments: [], components };
     };
 
     const initialData = await renderCurrent();
@@ -353,16 +389,29 @@ module.exports = {
       time: 90_000
     });
 
+    let renderQueue = Promise.resolve();
     collector.on('collect', async i => {
-      if (i.customId.startsWith('lb_time_')) {
-        currentTimeframe = i.customId.replace('lb_time_', '');
-      } else if (i.customId.startsWith('lb_cat_')) {
-        currentCategory = i.customId.replace('lb_cat_', '');
+      try {
+        await i.deferUpdate();
+        renderQueue = renderQueue.then(async () => {
+          if (i.customId.startsWith('lb_time_')) {
+            currentTimeframe = i.customId.replace('lb_time_', '');
+          } else if (i.customId.startsWith('lb_cat_')) {
+            currentCategory = i.customId.replace('lb_cat_', '');
+          }
+          const updatedData = await renderCurrent();
+          await interaction.editReply(updatedData);
+        }).catch(async error => {
+          logger.error('[leaderboard] No se pudo actualizar la tabla', { error: error.message });
+          await i.followUp({
+            content: 'No pude consultar el ranking en este momento. Intenta nuevamente.',
+            ephemeral: true
+          }).catch(() => {});
+        });
+        await renderQueue;
+      } catch (error) {
+        logger.warn('[leaderboard] Interaccion expirada', { error: error.message });
       }
-
-      await i.deferUpdate();
-      const updatedData = await renderCurrent();
-      await interaction.editReply(updatedData);
     });
 
     collector.on('end', async () => {
@@ -398,6 +447,7 @@ module.exports = {
       else if (['texto', 'text', 'chat'].includes(a1)) category = 'text';
     }
 
+    let replyMessage;
     const fakeInteraction = {
       guild: message.guild,
       guildId: message.guild.id,
@@ -410,7 +460,11 @@ module.exports = {
       deferred: false,
       reply: async (data) => message.reply(data),
       deferReply: async () => {},
-      editReply: async (data) => message.reply(data)
+      editReply: async (data) => {
+        if (replyMessage) return replyMessage.edit(data);
+        replyMessage = await message.reply(data);
+        return replyMessage;
+      }
     };
 
     await module.exports.execute(fakeInteraction, client || message.client);

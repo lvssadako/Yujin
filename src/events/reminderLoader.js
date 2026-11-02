@@ -1,4 +1,5 @@
-const { EmbedBuilder } = require('discord.js');
+const { createEmbed } = require('../utils/ui');
+const { } = require('discord.js');
 const { getActiveReminders, readReminders, writeReminders } = require('../utils/reminderStore');
 
 const timers = new Map();
@@ -27,7 +28,7 @@ function scheduleReminder(client, reminder) {
 async function executeReminder(client, reminder) {
     timers.delete(reminder.id);
 
-    const embed = new EmbedBuilder()
+    const embed = createEmbed()
         .setColor(0xFAA61A)
         .setAuthor({ name: '⏰ ¡Recordatorio!' })
         .addFields(

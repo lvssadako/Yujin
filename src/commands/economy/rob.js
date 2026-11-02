@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { createEmbed, COLORS } = require('../../utils/ui');
+const { SlashCommandBuilder, } = require('discord.js');
 const { getBalance, addCoins, removeCoins, getInventory, removeItem } = require('../../services/economy/index').economyService;
 const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
 
@@ -33,8 +34,8 @@ async function handleRob(guildId, userId, targetUser) {
     const fine = 500;
     removeCoins(guildId, userId, fine);
     
-    const embed = new EmbedBuilder()
-      .setColor(0xED4245)
+    const embed = createEmbed()
+      .setColor(COLORS.error)
       .setAuthor({ name: '🛡️ Robo Bloqueado' })
       .addFields(
         { name: '📝 Resumen', value: `> ¡Intentaste robar a **${targetUser.tag || targetUser.username}** pero tenía un **Escudo Anti-Robo**!\n> Tu ataque fue bloqueado y su escudo se rompió.`, inline: false },
@@ -54,8 +55,8 @@ const { secureRandom } = require('../../utils/cryptoRandom');
     removeCoins(guildId, targetUser.id, stolen);
     addCoins(guildId, userId, stolen);
     
-    const embed = new EmbedBuilder()
-      .setColor(0x57F287)
+    const embed = createEmbed()
+      .setColor(COLORS.success)
       .setAuthor({ name: '🥷 Robo Exitoso' })
       .addFields(
         { name: '💰 Botín Obtenido', value: `> Lograste robarle **${stolen} 🪙** a **${targetUser.tag || targetUser.username}** sin ser detectado.`, inline: false },
@@ -69,8 +70,8 @@ const { secureRandom } = require('../../utils/cryptoRandom');
     const fine = 250;
     removeCoins(guildId, userId, fine);
     
-    const embed = new EmbedBuilder()
-      .setColor(0xED4245)
+    const embed = createEmbed()
+      .setColor(COLORS.error)
       .setAuthor({ name: '🚨 Robo Fallido' })
       .addFields(
         { name: '⚖️ Consecuencias', value: `> ¡Te atrapó la policía intentando robar a **${targetUser.tag || targetUser.username}**!`, inline: false },

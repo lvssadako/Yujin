@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { createEmbed } = require('../../utils/ui');
+const { SlashCommandBuilder, } = require('discord.js');
 const { getBalance, addCoins } = require('../../services/economy/index').economyService;
 const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
 
@@ -49,8 +50,8 @@ async function handleWork(guildId, userId) {
   const msg = (secureChoice(MESSAGES) || MESSAGES[0]).replace('{coins}', coins);
   const bal = getBalance(guildId, userId);
   
-  const embed = new EmbedBuilder()
-    .setColor(incomeMultiplier < 1 ? 0xE67E22 : 0x57F287)
+  const embed = createEmbed()
+    .setColor(incomeMultiplier < 1 ? 0xFBBF24 : 0x6EE7B7)
     .setAuthor({ name: '💼 Trabajo Completado' })
     .addFields(
       { name: '💰 Ganancias', value: `> ${msg}`, inline: false },

@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { createEmbed } = require('../../utils/ui');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { readConfig } = require('../../utils/configCache');
 const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
 const { getBalance, subtractCoins } = require('../../services/economy/index').economyService;
@@ -154,54 +155,18 @@ function grantBoostToUser(guildId, userId, boostDef, quantity = 1) {
   writeProfiles(profiles);
 }
 
-function buildShopEmbed(cfg, userData) {
+const { buildCatalogView } = require('../../utils/shopView');
+
+function buildShopEmbed(cfg, userData, page = 0, ownerId = '') {
   const catalog = normalizeCatalog(cfg);
-  const sections = [
-    { key: 'featured', title: '🔥 Oferta especial', emoji: '🔥' },
-    { key: 'boosts', title: '⚡ Boosts XP', emoji: '⚡' },
-    { key: 'packs', title: '📦 Packs', emoji: '📦' }
-  ];
-
-  const embed = new EmbedBuilder()
-    .setTitle('🛒 Tienda premium del servidor')
-    .setColor(0xF6C343)
-    .setDescription('Compra boosts, packs y ofertas especiales. Mantén tu racha para obtener descuentos.')
-    .setFooter({ text: isStreakActive(userData?.streakDays) ? `Racha activa: ${userData.streakDays} días • Descuento por streak: 10%` : `Mantén tu racha ${STREAK_ACTIVATION_DAYS} días seguidos para activar el descuento` });
-
-  sections.forEach(section => {
-    const items = catalog.filter(item => item.category === section.key);
-    if (!items.length) return;
-
-    const lines = items.map(item => {
-      const discount = getDiscountForUser(item, userData);
-      const finalPrice = getFinalPrice(item, userData);
-      const suffix = item.featured ? ' • OFERTA' : '';
-      const extra = item.kind === 'bundle' && item.included?.length
-        ? ` • Incluye ${item.included.length} boosts`
-        : item.kind === 'boost'
-          ? ` • ${item.multiplier}x • ${asHours(item.durationMs)}`
-          : '';
-      const rarity = item.rarity ? ` • ${String(item.rarity).toUpperCase()}` : '';
-      const priceLabel = discount > 0 ? `**${finalPrice} 🪙** *(antes: ${item.price} 🪙)*` : `**${item.price} 🪙**`;
-
-      return `> 🏷️ **${item.name}${suffix}**\n> ╰ *${item.description}*\n> 💰 **Precio:** ${priceLabel}${extra}${rarity}${discount > 0 ? ` • -${discount}%` : ''} | 🆔 \`${item.id}\``;
-    });
-
-    embed.addFields({
-      name: `${section.emoji} ${section.title}`,
-      value: lines.join('\n\n'),
-      inline: false
-    });
-  });
-
-  return { catalog, embed };
+  return { catalog, ...buildCatalogView(catalog, userData, getDiscountForUser, getFinalPrice, page, ownerId) };
 }
 
 module.exports = {
   name: 'shop',
   data: new SlashCommandBuilder()
     .setName('shop')
-    .setDescription('Tienda premium del servidor')
+    .setDescription('Explora boosts, packs y ofertas para tu progreso.')
     .addStringOption(o =>
       o.setName('id')
         .setDescription('ID del item a comprar directamente')
@@ -212,19 +177,19 @@ module.exports = {
     const cfg = readConfig();
     const profiles = readProfiles();
     const userData = ensureUser(profiles, interaction.guildId, interaction.user.id);
-    const { catalog, embed } = buildShopEmbed(cfg, userData);
+    const { catalog, embed, components } = buildShopEmbed(cfg, userData, 0, interaction.user.id);
     const buyId = interaction.options.getString('id');
 
     if (buyId) {
       const item = findItemById(catalog, buyId);
-      if (!item) return interaction.reply({ content: 'ID inválido.', ephemeral: true });
+      if (!item) return interaction.reply({ content: 'No encontré ese producto. Abre /shop para consultar los IDs disponibles.', ephemeral: true });
 
       const finalPrice = getFinalPrice(item, userData);
       const bal = getBalance(interaction.guildId, interaction.user.id);
-      if (bal.coins < finalPrice) return interaction.reply({ content: 'Fondos insuficientes.', ephemeral: true });
+      if (bal.coins < finalPrice) return interaction.reply({ content: 'No tienes suficientes monedas en la billetera. Consulta /balance o retira monedas con /bank withdraw.', ephemeral: true });
 
       const success = subtractCoins(interaction.guildId, interaction.user.id, finalPrice);
-      if (!success) return interaction.reply({ content: 'Error al procesar pago.', ephemeral: true });
+      if (!success) return interaction.reply({ content: 'No pude completar la compra. Revisa tu saldo antes de intentarlo de nuevo.', ephemeral: true });
 
       let purchaseSummary = `✅ Comprado: **${item.name}**`;
       let confirmFields = [];
@@ -254,7 +219,7 @@ module.exports = {
         ];
       }
 
-      const purchaseEmbed = new EmbedBuilder()
+      const purchaseEmbed = createEmbed()
         .setTitle('Compra realizada')
         .setColor(getRarityColor(item.rarity))
         .setDescription(purchaseSummary)
@@ -263,35 +228,18 @@ module.exports = {
       return interaction.reply({ embeds: [purchaseEmbed], ephemeral: true });
     }
 
-    const rows = [];
-    let row = new ActionRowBuilder();
-    let i = 0;
-    let rowCount = 0;
-
-    catalog.forEach(item => {
-      if (i > 0 && i % 5 === 0) {
-        rows.push(row);
-        row = new ActionRowBuilder();
-        rowCount++;
-        if (rowCount >= 5) return;
-      }
-
-      if (rowCount < 5) {
-        row.addComponents(
-          new ButtonBuilder()
-            .setCustomId(`shop_buy_${item.id}`)
-            .setLabel(item.name.length > 18 ? `${item.name.slice(0, 17)}…` : item.name)
-            .setStyle(item.featured ? ButtonStyle.Success : ButtonStyle.Primary)
-        );
-        i++;
-      }
-    });
-
-    if (row.components && row.components.length > 0 && rowCount < 5) rows.push(row);
-    return interaction.reply({ embeds: [embed], components: rows.length ? rows : [] });
+    return interaction.reply({ embeds: [embed], components });
   },
 
   async handleButton(interaction) {
+    if (interaction.customId.startsWith('shop_page_')) {
+      const match = /^shop_page_(\d{17,20})_(-?\d+)$/.exec(interaction.customId);
+      if (!match || match[1] !== interaction.user.id) return interaction.reply({ content: 'Abre /shop o &shop para explorar tu propia tienda.', flags: 64 });
+      const profiles = readProfiles();
+      const userData = ensureUser(profiles, interaction.guildId, interaction.user.id);
+      const view = buildShopEmbed(readConfig(), userData, Number(match[2]), interaction.user.id);
+      return interaction.update({ embeds: [view.embed], components: view.components });
+    }
     const cfg = readConfig();
     const profiles = readProfiles();
     const userData = ensureUser(profiles, interaction.guildId, interaction.user.id);
@@ -299,14 +247,14 @@ module.exports = {
     const id = interaction.customId.replace('shop_buy_', '');
     const item = findItemById(catalog, id);
 
-    if (!item) return interaction.reply({ content: 'ID inválido.', ephemeral: true });
+    if (!item) return interaction.reply({ content: 'No encontré ese producto. Abre /shop para consultar los IDs disponibles.', ephemeral: true });
 
     const finalPrice = getFinalPrice(item, userData);
     const bal = getBalance(interaction.guildId, interaction.user.id);
-    if (bal.coins < finalPrice) return interaction.reply({ content: 'Fondos insuficientes.', ephemeral: true });
+    if (bal.coins < finalPrice) return interaction.reply({ content: 'No tienes suficientes monedas en la billetera. Consulta /balance o retira monedas con /bank withdraw.', ephemeral: true });
 
     const success = subtractCoins(interaction.guildId, interaction.user.id, finalPrice);
-    if (!success) return interaction.reply({ content: 'Error al procesar pago.', ephemeral: true });
+    if (!success) return interaction.reply({ content: 'No pude completar la compra. Revisa tu saldo antes de intentarlo de nuevo.', ephemeral: true });
 
     if (item.kind === 'bundle' && item.included?.length) {
       item.included.forEach(includedId => {
@@ -320,8 +268,8 @@ module.exports = {
         }, 1);
       });
 
-      const bundleEmbed = new EmbedBuilder()
-        .setTitle('🎁 Pack comprado')
+      const bundleEmbed = createEmbed()
+        .setTitle('Pack comprado')
         .setColor(getRarityColor(item.rarity))
         .setDescription(`✅ Compraste **${item.name}**.`)
         .addFields(
@@ -334,8 +282,8 @@ module.exports = {
 
     grantBoostToUser(interaction.guildId, interaction.user.id, item, 1);
 
-    const embed = new EmbedBuilder()
-      .setTitle('Compra de Boost XP')
+    const embed = createEmbed()
+      .setTitle('Boost comprado')
       .setColor(getRarityColor(item.rarity))
       .setDescription(`✅ Comprado: **${item.name}**`)
       .addFields(
@@ -351,19 +299,19 @@ module.exports = {
     const cfg = readConfig();
     const profiles = readProfiles();
     const userData = ensureUser(profiles, message.guild.id, message.author.id);
-    const { catalog, embed } = buildShopEmbed(cfg, userData);
+    const { catalog, embed, components } = buildShopEmbed(cfg, userData, 0, message.author.id);
     const buyId = args[0];
 
     if (buyId) {
       const item = findItemById(catalog, buyId);
-      if (!item) return message.reply('❌ ID de item no válido.');
+      if (!item) return message.reply('No encontré ese producto. Abre &shop para consultar los IDs disponibles.');
 
       const finalPrice = getFinalPrice(item, userData);
       const bal = getBalance(message.guild.id, message.author.id);
-      if (bal.coins < finalPrice) return message.reply('❌ Fondos insuficientes para esta compra.');
+      if (bal.coins < finalPrice) return message.reply('No tienes suficientes monedas en la billetera. Consulta &balance o retira monedas con &bank withdraw.');
 
       const success = subtractCoins(message.guild.id, message.author.id, finalPrice);
-      if (!success) return message.reply('❌ Error al procesar el pago.');
+      if (!success) return message.reply('No pude completar la compra. Revisa tu saldo antes de intentarlo de nuevo.');
 
       if (item.kind === 'bundle' && item.included?.length) {
         item.included.forEach(includedId => {
@@ -379,8 +327,8 @@ module.exports = {
         grantBoostToUser(message.guild.id, message.author.id, item, 1);
       }
 
-      const purchaseEmbed = new EmbedBuilder()
-        .setTitle('✅ Compra Realizada')
+      const purchaseEmbed = createEmbed()
+        .setTitle('Compra realizada')
         .setColor(getRarityColor(item.rarity))
         .setDescription(`Has adquirido con éxito: **${item.name}** por **${finalPrice} 🪙**.`)
         .setTimestamp();
@@ -388,30 +336,6 @@ module.exports = {
       return message.reply({ embeds: [purchaseEmbed] });
     }
 
-    const rows = [];
-    let row = new ActionRowBuilder();
-    let i = 0;
-    let rowCount = 0;
-
-    catalog.forEach(item => {
-      if (i > 0 && i % 5 === 0) {
-        rows.push(row);
-        row = new ActionRowBuilder();
-        rowCount++;
-        if (rowCount >= 5) return;
-      }
-      if (rowCount < 5) {
-        row.addComponents(
-          new ButtonBuilder()
-            .setCustomId(`shop_buy_${item.id}`)
-            .setLabel(item.name.length > 18 ? `${item.name.slice(0, 17)}…` : item.name)
-            .setStyle(item.featured ? ButtonStyle.Success : ButtonStyle.Primary)
-        );
-        i++;
-      }
-    });
-
-    if (row.components && row.components.length > 0 && rowCount < 5) rows.push(row);
-    return message.reply({ embeds: [embed], components: rows.length ? rows : [] });
+    return message.reply({ embeds: [embed], components });
   }
 };

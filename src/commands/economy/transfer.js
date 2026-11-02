@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { createEmbed } = require('../../utils/ui');
+const { SlashCommandBuilder, } = require('discord.js');
 const { getBalance, addCoins, removeCoins } = require('../../services/economy/index').economyService;
 const { getLoan, recordLoanTransfer } = require('../../services/economy/loanService');
 const { penalizeXp } = require('../../services/level/index').levelService;
@@ -50,7 +51,7 @@ async function handleTransfer(guildId, userId, targetUser, cantidad) {
     };
   }
   
-  const embed = new EmbedBuilder()
+  const embed = createEmbed()
     .setColor(loanWarning ? 0xFEE75C : 0x43b581)
     .setAuthor({ name: loanWarning ? '⚠️ Transferencia Realizada con Advertencia' : '💸 Transferencia Realizada' })
     .addFields(

@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { createEmbed, COLORS } = require('../../utils/ui');
+const { SlashCommandBuilder, } = require('discord.js');
 const { getUserLoanSummary } = require('../../services/economy/loanService');
 const { loanPaymentService } = require('../../services/economy/loanPaymentService');
 const { loanGrantService } = require('../../services/economy/loanGrantService');
@@ -6,10 +7,10 @@ const { loanGrantService } = require('../../services/economy/loanGrantService');
 // ─── Constantes de penalización ───────────────────────────────────────────────
 
 const PENALTY_INFO = [
-  { emoji: '✅', label: 'Sin penalización',                          color: 0x57F287 },
-  { emoji: '⚠️', label: 'Advertencia — deuda creciente (>= 1.5x)',   color: 0xF1C40F },
-  { emoji: '🔶', label: 'Penalización media — Trabajo/Pesca al 50% (>= 2.0x)', color: 0xE67E22 },
-  { emoji: '🔴', label: 'Penalización severa — Trabajo/Pesca al 25% (techo 2.5x)', color: 0xED4245 }
+  { emoji: '✅', label: 'Sin penalización',                          color: 0x6EE7B7 },
+  { emoji: '⚠️', label: 'Advertencia — deuda creciente (>= 1.5x)',   color: 0xE9C46A },
+  { emoji: '🔶', label: 'Penalización media — Trabajo/Pesca al 50% (>= 2.0x)', color: 0xFBBF24 },
+  { emoji: '🔴', label: 'Penalización severa — Trabajo/Pesca al 25% (techo 2.5x)', color: 0xFB7185 }
 ];
 
 // ─── Subcomando: take ─────────────────────────────────────────────────────────
@@ -27,9 +28,9 @@ async function handleTake(guildId, userId, amountStr, source, deliveryId) {
   const newBal = { coins: result.coins };
   const initialInterest = result.initialInterest;
 
-  const embed = new EmbedBuilder()
-    .setColor(0x5865F2)
-    .setAuthor({ name: '🏦 Préstamo Aprobado' })
+  const embed = createEmbed()
+    .setColor(COLORS.primary)
+    .setAuthor({ name: 'Yujin · Préstamos' }).setTitle('Préstamo aprobado')
     .addFields(
       { name: '💵 Monto Recibido', value: `> **${amount.toLocaleString()} 🪙**`, inline: true },
       { name: '🏷️ Interés Inicial (Apertura)', value: `> **${initialInterest.toLocaleString()} 🪙** *(5%)*`, inline: true },
@@ -67,23 +68,23 @@ async function handleRepay(guildId, userId, amountStr, source, deliveryId) {
   const newBal = { coins: result.coins };
 
   if (result.cleared) {
-    const embed = new EmbedBuilder()
-      .setColor(0x57F287)
-      .setAuthor({ name: '🎉 ¡Préstamo Pagado Completamente!' })
+    const embed = createEmbed()
+      .setColor(COLORS.success)
+      .setAuthor({ name: 'Yujin · Préstamos' }).setTitle('Préstamo liquidado')
       .addFields(
         { name: '💸 Pago Realizado', value: `> **${result.paid.toLocaleString()} 🪙**`, inline: true },
         { name: '👛 Balance Restante', value: `> **${newBal.coins.toLocaleString()} 🪙**`, inline: true },
-        { name: '🏆 Estado', value: `> ✅ **Libre de deudas.** ¡Felicitaciones!`, inline: false }
+        { name: '🏆 Estado', value: `**Sin deuda pendiente.**`, inline: false }
       )
-      .setFooter({ text: '¡Ya puedes solicitar otro préstamo si lo necesitas!' })
+      .setFooter({ text: 'Consulta tu saldo con /balance o &balance.' })
       .setTimestamp();
     return { embed };
   }
 
   const penInfo = PENALTY_INFO[result.penaltyLevel] || PENALTY_INFO[0];
-  const embed = new EmbedBuilder()
-    .setColor(0xF1C40F)
-    .setAuthor({ name: '💳 Pago Parcial Registrado' })
+  const embed = createEmbed()
+    .setColor(COLORS.economy)
+    .setAuthor({ name: 'Yujin · Préstamos' }).setTitle('Pago registrado')
     .addFields(
       { name: '💸 Pago Realizado', value: `> **${result.paid.toLocaleString()} 🪙**`, inline: true },
       { name: '📉 Deuda Restante', value: `> **${result.remaining.toLocaleString()} 🪙**`, inline: true },
@@ -102,11 +103,11 @@ async function handleStatus(guildId, userId) {
   const summary = getUserLoanSummary(guildId, userId);
 
   if (!summary.active) {
-    const embed = new EmbedBuilder()
-      .setColor(0x57F287)
+    const embed = createEmbed()
+      .setColor(COLORS.success)
       .setAuthor({ name: '🏦 Estado del Préstamo' })
-      .setDescription('> ✅ **Sin deudas activas.** ¡Estás libre!')
-      .setFooter({ text: 'Usa /loan take para solicitar un préstamo.' })
+      .setDescription('No tienes ningún préstamo activo.')
+      .setFooter({ text: 'Consulta las condiciones antes de solicitar un préstamo con /loan take.' })
       .setTimestamp();
     return { embed };
   }
@@ -158,8 +159,8 @@ async function handleStatus(guildId, userId) {
     });
   }
 
-  const embed = new EmbedBuilder()
-    .setColor(summary.isCapped ? 0xED4245 : penInfo.color)
+  const embed = createEmbed()
+    .setColor(summary.isCapped ? 0xFB7185 : penInfo.color)
     .setAuthor({ name: '🏦 Estado del Préstamo' })
     .addFields(fields)
     .setFooter({ text: 'Usa /loan repay <cantidad|all> para realizar un pago.' })

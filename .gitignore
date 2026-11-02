@@ -37,3 +37,14 @@ backups/
 temp/
 context/
 temp_check/
+
+!config.json
+
+!src/commands/config.json
+
+!src/**/__tests__/fixtures/*.json
+
+!src/**/__tests__/fixtures/**/*.json
+
+# Paquetes finales generados localmente
+dist/

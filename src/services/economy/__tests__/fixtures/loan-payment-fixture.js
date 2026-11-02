@@ -23,7 +23,8 @@ function fixture(t, coins = 5000, { withLoan = true } = {}) {
     'src/services/economy/loanPaymentService.js',
     'src/services/economy/loanGrantService.js',
     'src/services/economy/loanPaymentStore.js',
-    'src/utils/jsonStore.js'
+    'src/utils/jsonStore.js',
+    'src/utils/ui.js'
   ];
   function copy(file) {
     assert.ok(!path.isAbsolute(file) && !file.split('/').includes('..'));

@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { createEmbed } = require('../../utils/ui');
+const { SlashCommandBuilder, PermissionFlagsBits, } = require('discord.js');
 const logger = require('../../utils/logger');
 
 module.exports = {
@@ -38,7 +39,7 @@ module.exports = {
 
     try {
       await targetMember.timeout(minutes * 60 * 1000, reason);
-      const embed = new EmbedBuilder()
+      const embed = createEmbed()
         .setColor(0xFFA500)
         .setTitle('⏱️ Usuario Aislado')
         .setDescription(`**${targetUser.tag}** ha sido aislado por **${minutes} minutos**.`)
@@ -86,7 +87,7 @@ module.exports = {
 
     try {
       await targetMember.timeout(minutes * 60 * 1000, reason);
-      const embed = new EmbedBuilder()
+      const embed = createEmbed()
         .setColor(0xFFA500)
         .setTitle('⏱️ Usuario Aislado')
         .setDescription(`**${targetUser.tag}** ha sido aislado por **${minutes} minutos**.`)

@@ -1,9 +1,10 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { createEmbed } = require('../../utils/ui');
+const { SlashCommandBuilder, } = require('discord.js');
 const { getUserStreakStatus, setStreakAlertPreference } = require('../../services/streak/streakService');
 const { COLORS } = require('../../utils/embedFactory');
 
 function buildNotificationEmbed(guild, user, disabled, isStatusCheck = false) {
-  const embed = new EmbedBuilder().setTimestamp();
+  const embed = createEmbed().setTimestamp();
 
   if (isStatusCheck) {
     embed

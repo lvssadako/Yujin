@@ -25,6 +25,7 @@ module.exports = {
     const args = [apuesta.toString(), multiplicador.toString()];
 
     const msg = {
+      id: interaction.id,
       guildId: interaction.guildId,
       guild: interaction.guild,
       author: interaction.user,

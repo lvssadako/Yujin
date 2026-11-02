@@ -1,5 +1,6 @@
+const { createEmbed } = require('../utils/ui');
 // Prefix command for coinflip (adaptado para no usar interaction.deferReply)
-const { EmbedBuilder } = require('discord.js');
+const { } = require('discord.js');
 const crypto = require('crypto');
 const { getBalance, addCoins, removeCoins } = require('../services/economy').economyService;
 const { readProfiles, writeProfiles, ensureUser } = require('../utils/profileStore');
@@ -44,7 +45,7 @@ module.exports = {
     const flip = crypto.randomInt(0, 2) === 0 ? 'cara' : 'cruz';
     const win = pick === flip;
     let sentMsg = await message.reply({ embeds: [
-      new EmbedBuilder()
+      createEmbed()
         .setColor(0xffc107)
         .setTitle('🪙 Coinflip')
         .setDescription('🔄 Girando la moneda...')
@@ -56,7 +57,7 @@ module.exports = {
       const payout = bet * 2;
       addCoins(guildId, userId, payout);
       u.gambleStats.wins = (u.gambleStats.wins || 0) + 1;
-      resultEmbed = new EmbedBuilder()
+      resultEmbed = createEmbed()
         .setColor(0x43b581)
         .setTitle('🪙 Coinflip - ¡GANASTE!')
         .setDescription(
@@ -67,7 +68,7 @@ module.exports = {
     } else {
       u.gambleStats.losses = (u.gambleStats.losses || 0) + 1;
       u.gambleStats.lossesToday = (u.gambleStats.lossesToday || 0) + bet;
-      resultEmbed = new EmbedBuilder()
+      resultEmbed = createEmbed()
         .setColor(0xdd2e44)
         .setTitle('🪙 Coinflip - Perdiste')
         .setDescription(

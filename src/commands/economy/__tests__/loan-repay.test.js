@@ -25,7 +25,8 @@ function fixture(t, coins) {
     'src/services/economy/loanPaymentService.js',
     'src/services/economy/loanGrantService.js',
     'src/services/economy/loanPaymentStore.js',
-    'src/utils/jsonStore.js'
+    'src/utils/jsonStore.js',
+    'src/utils/ui.js'
   ]) {
     const destination = path.join(root, file);
     fs.mkdirSync(path.dirname(destination), { recursive: true });

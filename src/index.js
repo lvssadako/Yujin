@@ -53,6 +53,14 @@ const loaderPaths = {
   constantsDir: path.join(__dirname, 'constants'),
   utilsDir: path.join(__dirname, 'utils')
 };
+try {
+  const recovered = require('./services/economy/dailyRewardService').dailyRewardService.recover();
+  const streaksRecovered = require('./services/streak/streakService').recoverStreakActivities();
+  logger.info('Recompensas pendientes verificadas', { recovered, streaksRecovered });
+} catch (error) {
+  logger.error('No se pudieron recuperar recompensas pendientes', { error: error.message });
+  process.exit(1);
+}
 const registry = loadCommandRegistry(loaderPaths);
 
 for (const [name, cmd] of registry.commands.entries()) {
@@ -73,6 +81,7 @@ if (process.env.DISABLE_HOT_RELOAD !== 'true') {
   });
 }
 
+let stopEconomyBackupFn = null;
 client.once(Events.ClientReady, async () => {
   // Programar rotación de tienda
   scheduleShopRotation(() => {
@@ -83,8 +92,7 @@ client.once(Events.ClientReady, async () => {
 
   // Backup diario de economía
   try {
-    require('./tools/economyBackupDaily').backupEconomyDaily();
-    logger.info('Backup diario de economía ejecutado');
+    stopEconomyBackupFn = require('./services/economy/economyBackupService').startBackupScheduler();
   } catch (err) {
     logger.error('Error en backup diario de economía', { error: err.message, stack: err.stack });
   }
@@ -239,6 +247,11 @@ async function gracefulShutdown(signal) {
   if (isShuttingDown) return;
   isShuttingDown = true;
   logger.info(`Señal ${signal} recibida. Iniciando apagado controlado (Graceful Shutdown)...`);
+
+  try {
+    if (stopEconomyBackupFn) stopEconomyBackupFn();
+    await require('./events/voiceStateUpdate_levels').stopVoiceSessions();
+  } catch (error) { logger.error('Error al guardar sesiones de voz', { error: error.message }); }
 
   try {
     const { stopShopRotation } = require('./utils/badgeShop');

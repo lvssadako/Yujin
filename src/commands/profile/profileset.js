@@ -1,5 +1,6 @@
+const { createEmbed } = require('../../utils/ui');
 const logger = require('../../utils/logger');
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
 const { normalizeExternalImageUrl } = require('../../utils/urlSafety');
 const { THEME_PRESETS, WALLPAPER_PRESETS } = require('../../constants/profileThemes');
@@ -22,7 +23,7 @@ function buildCustomizationPanel(guildId, userId, member) {
   const isUnlocked = canUseCustomUrl(member, lvlData, user.streakDays);
   const serverName = member?.displayName || member?.user?.displayName || member?.user?.username || 'Usuario';
 
-  const embed = new EmbedBuilder()
+  const embed = createEmbed()
     .setAuthor({ name: `🎨 Estudio de Personalización de Perfil: ${serverName}`, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
     .setColor(user.accent || '#E94560')
     .setDescription('Personaliza cada aspecto de tu tarjeta de perfil visual en tiempo real usando los controles abajo.')
@@ -260,7 +261,7 @@ module.exports = {
 
     writeProfiles(profiles);
 
-    const embed = new EmbedBuilder()
+    const embed = createEmbed()
       .setAuthor({ name: '✅ Perfil Actualizado con Éxito' })
       .setColor(user.accent || '#57F287')
       .setDescription(`Tus preferencias de perfil han sido guardadas:\n\n${changes.join('\n')}`)

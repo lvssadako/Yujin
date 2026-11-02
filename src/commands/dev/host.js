@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { createEmbed, COLORS } = require('../../utils/ui');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { isOwnerOrDev, getStaffRole } = require('../../utils/staffAuth');
 const { getHostMetrics, formatBytes, formatDuration, makeProgressBar } = require('../../utils/hostMonitor');
 const { createErrorEmbed } = require('../../utils/embedFactory');
@@ -10,8 +11,8 @@ async function renderHostEmbed(client, user) {
   const ramBar = makeProgressBar(metrics.memory.percent, 10);
   const diskBar = metrics.disk ? makeProgressBar(metrics.disk.percent, 10) : '`N/A`';
 
-  const embed = new EmbedBuilder()
-    .setColor(0x5865F2)
+  const embed = createEmbed()
+    .setColor(COLORS.primary)
     .setAuthor({
       name: `🖥️ Monitoreo de Recursos — VM Anfitriona (${metrics.os.platform === 'linux' ? 'Ubuntu / Linux' : metrics.os.platform})`,
       iconURL: client.user.displayAvatarURL()

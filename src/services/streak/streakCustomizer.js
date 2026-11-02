@@ -1,3 +1,4 @@
+const { createEmbed } = require('../../utils/ui');
 const {
   ModalBuilder,
   TextInputBuilder,
@@ -6,8 +7,7 @@ const {
   StringSelectMenuBuilder,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder
-} = require('discord.js');
+  } = require('discord.js');
 const { readProfiles, ensureUser, ensureGlobalUser } = require('../../utils/profileStore');
 const { normalizeExternalImageUrl } = require('../../utils/urlSafety');
 const { STREAK_TEMPLATES } = require('../../constants/streakThemes');
@@ -43,7 +43,7 @@ function buildStreakCustomizationPanel(guildId, userId, member) {
   const tpl = g.streakTemplate && STREAK_TEMPLATES[g.streakTemplate];
   const activeColor = g.streakAccent || tpl?.accent || '#FF4500';
 
-  const embed = new EmbedBuilder()
+  const embed = createEmbed()
     .setAuthor({
       name: `🔥 Estudio Global de Racha: ${member.user.username}`,
       iconURL: member.user.displayAvatarURL({ dynamic: true })

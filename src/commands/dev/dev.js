@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { createEmbed, COLORS } = require('../../utils/ui');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const util = require('node:util');
 const path = require('node:path');
 const os = require('node:os');
@@ -49,8 +50,8 @@ async function handleStatus(client, user) {
   const owners = getOwnerIds();
   const devs = getDeveloperIds();
 
-  const embed = new EmbedBuilder()
-    .setColor(0x5865F2)
+  const embed = createEmbed()
+    .setColor(COLORS.primary)
     .setAuthor({ name: '🛠️ Panel de Control — Developer & Owner', iconURL: client.user.displayAvatarURL() })
     .setDescription(`Sesión activa autenticada como: **${staffRole}** (<@${user.id}>)`)
     .addFields(
@@ -132,8 +133,8 @@ async function handleEval(code, client, interactionOrMessage) {
     formattedResult = formattedResult.slice(0, 1800) + '\n... (salida truncada)';
   }
 
-  const embed = new EmbedBuilder()
-    .setColor(isError ? 0xED4245 : 0x57F287)
+  const embed = createEmbed()
+    .setColor(isError ? 0xFB7185 : 0x6EE7B7)
     .setAuthor({ name: isError ? '❌ Error en Eval' : '✅ Resultado de Eval' })
     .addFields(
       {
@@ -246,8 +247,8 @@ async function handleLoan(guildId, targetUser, action) {
 
   if (action === 'status') {
     const summary = getUserLoanSummary(guildId, userId);
-    const embed = new EmbedBuilder()
-      .setColor(summary.active ? 0xF1C40F : 0x57F287)
+    const embed = createEmbed()
+      .setColor(summary.active ? 0xE9C46A : 0x6EE7B7)
       .setTitle(`🏦 Inspección de Préstamo — ${targetUser.tag}`)
       .setDescription(
         summary.active

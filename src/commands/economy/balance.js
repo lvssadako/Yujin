@@ -1,63 +1,38 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
+const { createEmbed, formatNumber, clip } = require('../../utils/ui');
 const { getBalance, getInventory } = require('../../services/economy').economyService;
 
 async function renderBalance(guildId, target) {
-    const bal = getBalance(guildId, target.id);
-    const inv = getInventory(guildId, target.id);
-    const invText = Object.keys(inv).length > 0 
-      ? Object.entries(inv).map(([item, count]) => `> **${item}**: x${count}`).join('\n')
-      : '> *Mochila vacía.*';
-
-    const displayName = target.displayName || target.globalName || target.username;
-
-    // Mostrar info de préstamo si existe
-    let loanField = null;
-    try {
-      const { getLoan, MAX_DEBT_MULTIPLIER } = require('../../services/economy/loanService');
-      const loan = getLoan(guildId, target.id);
-      if (loan && loan.active) {
-        const penaltyDesc = ['Sin penalización', '⚠️ Advertencia', '🔶 Ingresos -50%', '🔴 Ingresos -75%'];
-        const isCapped = loan.balance >= Math.floor(loan.principal * (MAX_DEBT_MULTIPLIER || 2.5));
-        const cappedTag = isCapped ? ' 🔒 *(Tope)*' : '';
-        loanField = {
-          name: '🏦 Préstamo Activo',
-          value: `> **Deuda:** ${loan.balance.toLocaleString()} 🪙 *(principal: ${loan.principal.toLocaleString()})*${cappedTag}\n> **Interés:** ${(loan.interestRate * 100).toFixed(0)}% · Día ${loan.tickCount}\n> **Penalización:** ${penaltyDesc[loan.penaltyLevel] || 'Sin penalización'}`,
-          inline: false
-        };
-      }
-    } catch {}
-
-    const embed = new EmbedBuilder()
-      .setColor(0xF1C40F)
-      .setAuthor({ name: `Estado de Cuenta de ${displayName}`, iconURL: target.displayAvatarURL() })
-      .addFields(
-        { name: '💰 Billetera', value: `**\`${bal.coins.toLocaleString()}\`** 🪙`, inline: true },
-        { name: '🏦 Banco', value: `**\`${bal.bank.toLocaleString()}\`** 🪙`, inline: true },
-        { name: '💎 Total', value: `**\`${(bal.coins + bal.bank).toLocaleString()}\`** 🪙`, inline: true },
-        { name: '🎒 Mochila', value: invText, inline: false }
-      )
-      .setFooter({ text: 'Usa /bank para guardar dinero y /buy para objetos.' })
-      .setTimestamp();
-
-    if (loanField) embed.addFields(loanField);
-
-    return embed;
-}
-
-module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('balance')
-    .setDescription('Revisa tu balance (Billetera y Banco) e inventario rápido.')
-    .addUserOption(opt => opt.setName('usuario').setDescription('Ver el balance de otro usuario').setRequired(false)),
-  async execute(interaction) {
-    const target = interaction.options.getUser('usuario') || interaction.user;
-    const emb = await renderBalance(interaction.guildId, target);
-    await interaction.reply({ embeds: [emb] });
-  },
-  async executePrefix(message, args, client) {
-    let target = message.author;
-    if (message.mentions.users.size > 0) target = message.mentions.users.first();
-    const emb = await renderBalance(message.guild.id, target);
-    await message.reply({ embeds: [emb] });
+  const balance = getBalance(guildId, target.id);
+  const inventory = Object.entries(getInventory(guildId, target.id));
+  const items = inventory.slice(0, 15).map(([item, count]) => '• ' + clip(item, 36) + ' × ' + formatNumber(count));
+  if (inventory.length > 15) items.push('… y ' + (inventory.length - 15) + ' objetos más.');
+  const embed = createEmbed().setAuthor({ name: 'Yujin ♥ · Economía', iconURL: target.displayAvatarURL() })
+    .setTitle(clip('Cuenta de ' + (target.displayName || target.globalName || target.username), 256))
+    .addFields(
+      { name: 'Billetera', value: '**' + formatNumber(balance.coins) + '** monedas', inline: true },
+      { name: 'Banco', value: '**' + formatNumber(balance.bank) + '** monedas', inline: true },
+      { name: 'Total', value: '**' + formatNumber(balance.coins + balance.bank) + '** monedas', inline: true },
+      { name: 'Inventario', value: items.join('\n') || 'Tu mochila está vacía. Explora `/shop` o `/buy` para conseguir objetos.', inline: false }
+    ).setFooter({ text: 'Guarda monedas con /bank deposit · Explora /shop y /buy' });
+  const { getLoan, MAX_DEBT_MULTIPLIER } = require('../../services/economy/loanService');
+  const loan = getLoan(guildId, target.id);
+  if (loan?.active) {
+    const penalty = ['Sin penalización', 'Advertencia', 'Ingresos de trabajo y pesca al 50%', 'Ingresos de trabajo y pesca al 25%'];
+    const capped = loan.balance >= Math.floor(loan.principal * MAX_DEBT_MULTIPLIER);
+    embed.addFields({ name: 'Préstamo activo', value: '**' + formatNumber(loan.balance) + ' monedas** de deuda' + (capped ? ' · Tope alcanzado' : '') + '\nInterés diario: ' + (loan.interestRate * 100).toFixed(0) + '% · ' + (penalty[loan.penaltyLevel] || penalty[0]) + '\nConsulta `/loan status` o realiza un pago con `/loan repay`.', inline: false });
   }
+  return embed;
+}
+module.exports = {
+  data: new SlashCommandBuilder().setName('balance').setDescription('Consulta tu saldo, inventario y préstamo activo.').addUserOption(option => option.setName('usuario').setDescription('Usuario que quieres consultar')),
+  async execute(interaction) {
+    if (!interaction.guildId) return interaction.reply({ content: 'Abre este comando en un servidor para consultar la cuenta.', flags: 64 });
+    return interaction.reply({ embeds: [await renderBalance(interaction.guildId, interaction.options.getUser('usuario') || interaction.user)] });
+  },
+  async executePrefix(message) {
+    if (!message.guild) return message.reply('Abre este comando en un servidor para consultar la cuenta.');
+    return message.reply({ embeds: [await renderBalance(message.guild.id, message.mentions.users.first() || message.author)] });
+  },
+  renderBalance,
 };

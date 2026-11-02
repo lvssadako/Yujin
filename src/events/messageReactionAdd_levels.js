@@ -82,6 +82,8 @@ module.exports = (client) => {
 
       const oldLevel = data.level;
       data.xp += gained;
+      data.daily.xp = (data.daily.xp || 0) + gained;
+      data.weekly.xp = (data.weekly.xp || 0) + gained;
 
       updateMissionProgress(message.guild, user.id, 'reactions', 1);
       updateMissionProgress(message.guild, user.id, 'xp_gain', gained);

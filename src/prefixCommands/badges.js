@@ -1,6 +1,6 @@
+const { createEmbed, COLORS } = require('../utils/ui');
 const logger = require('../utils/logger');
 const { 
-  EmbedBuilder, 
   ButtonBuilder, 
   ActionRowBuilder, 
   ButtonStyle, 
@@ -82,8 +82,8 @@ module.exports = {
           return `\`${page * itemsPerPage + index + 1}.\` ${b.icon || '🏅'} **${b.name}** [ID: \`${id}\`] • ${rarityInfo.emoji} *${rarityInfo.name}*${statusTag}`;
         }).join('\n');
 
-        const embed = new EmbedBuilder()
-          .setColor(0x5865F2)
+        const embed = createEmbed()
+          .setColor(COLORS.primary)
           .setAuthor({ name: `Insignias de ${message.author.username}`, iconURL: message.author.displayAvatarURL() })
           .setTitle(`🏅 Tus Insignias Desbloqueadas (${earned.length} en total)`)
           .setDescription(lines || '*Sin insignias en esta página.*')
@@ -157,8 +157,8 @@ module.exports = {
         return `\`${i + 1}.\` ${b.icon || '🏅'} **${b.name}** — 🪙 \`${price.toLocaleString()} monedas\`\n> *${b.desc || 'Insignia exclusiva de la tienda'}*\n> Comando para comprar: \`&badges buy ${item.id}\``;
       }).join('\n\n');
 
-      const embed = new EmbedBuilder()
-        .setColor(0xF1C40F)
+      const embed = createEmbed()
+        .setColor(COLORS.economy)
         .setTitle('🛒 Tienda Diaria de Insignias')
         .setDescription(`¡Compra insignias exclusivas para tu perfil!\n\n${list}`)
         .setFooter({ text: 'Rotación automática diaria • Usa &badges buy <id>' })
@@ -293,8 +293,8 @@ module.exports = {
         return `${b.icon || '🏅'} **${b.name}** [ID: \`${b.id}\`] • ${rarityInfo.emoji} ${rarityInfo.name}\n> *${b.desc || 'Sin descripción'}*`;
       }).join('\n\n');
 
-      const embed = new EmbedBuilder()
-        .setColor(0x5865F2)
+      const embed = createEmbed()
+        .setColor(COLORS.primary)
         .setTitle('📚 Catálogo de Insignias')
         .setDescription(list)
         .setFooter({ text: `Mostrando ${Math.min(15, allBadges.length)} de ${allBadges.length} insignias` })

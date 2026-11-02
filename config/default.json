@@ -2,5 +2,6 @@
   "bumpReminder": {
     "enabled": false
   },
-  "roleXpBonuses": {}
+  "roleXpBonuses": {},
+  "streakDefaultTimezone": "America/Mexico_City"
 }

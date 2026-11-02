@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { createEmbed } = require('../../utils/ui');
+const { SlashCommandBuilder, } = require('discord.js');
 const { getBalance, getInventory } = require('../../services/economy').economyService;
 const { readLevels, getUserData, xpToNext, getUserRank } = require('../../services/level').levelService;
 
@@ -51,7 +52,7 @@ module.exports = {
       joinedAt = `<t:${joinedTs}:F> (<t:${joinedTs}:R>)`;
     }
 
-    let color = 0x5865F2;
+    let color = 0xA78BFA;
     if (member?.displayHexColor && member.displayHexColor !== '#000000') {
       color = parseInt(member.displayHexColor.replace('#', ''), 16);
     } else if (user.hexAccentColor) {
@@ -69,7 +70,7 @@ module.exports = {
     const rank = getUserRank(guild.id, user.id, levels, guild) || '?';
     const nextXp = xpToNext(lvlData.level);
 
-    const emb = new EmbedBuilder()
+    const emb = createEmbed()
       .setAuthor({ name: `Información de ${user.tag}`, iconURL: user.displayAvatarURL({ dynamic: true }) })
       .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 1024 }))
       .setColor(color)

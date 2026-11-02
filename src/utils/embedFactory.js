@@ -85,18 +85,7 @@ function splitTextEquitably(text, max = LIMITS.description) {
   return parts.filter((p, idx) => p.length > 0 || idx === 0);
 }
 
-const COLORS = {
-  primary: 0x5865f2,    // Blurple
-  blurple: 0x5865f2,    // Blurple
-  success: 0x2ecc71,    // Green
-  error: 0xe74c3c,      // Red
-  info: 0x3498db,       // Blue
-  warning: 0xf39c12,    // Orange
-  boost: 0xf47fff,      // Pink/Magenta
-  level: 0x9b59b6,      // Purple
-  economy: 0xf1c40f,    // Gold
-  neutral: 0x34495e,    // Dark gray
-};
+const { COLORS } = require('./ui');
 
 function toSafeString(value, fallback = '') {
   if (typeof value === 'string') return value;
@@ -133,14 +122,14 @@ function applyAuthor(embed, user) {
   return embed;
 }
 
-function createSuccessEmbed(title = 'Éxito', description = '') {
+function createSuccessEmbed(title = 'Listo', description = '') {
   const embed = new EmbedBuilder().setColor(COLORS.success).setTimestamp();
   applyTitle(embed, title);
   applyDescription(embed, description);
   return embed;
 }
 
-function createErrorEmbed(title = 'Error', description = '') {
+function createErrorEmbed(title = 'No se pudo completar', description = '') {
   const embed = new EmbedBuilder().setColor(COLORS.error).setTimestamp();
   applyTitle(embed, title);
   applyDescription(embed, description);
@@ -365,12 +354,12 @@ function getGuildId(target) {
 function buildNavRow(page, total, disabled = false) {
   const prev = new ButtonBuilder()
     .setCustomId('embed_prev')
-    .setLabel('◀')
+    .setLabel('Anterior').setEmoji('◀️')
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(disabled || page <= 0);
   const next = new ButtonBuilder()
     .setCustomId('embed_next')
-    .setLabel('▶')
+    .setLabel('Siguiente').setEmoji('▶️')
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(disabled || page >= total - 1);
   return new ActionRowBuilder().addComponents(prev, next);
