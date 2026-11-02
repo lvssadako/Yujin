@@ -83,8 +83,9 @@ for (const scenario of cases) {
           const amount = Number(scenario.amount);
           const interest = Math.ceil(amount * 0.05);
           const embed = replies[0].embeds[0].toJSON();
-          assert.equal(embed.author.name, '🏦 Préstamo Aprobado');
-          assert.equal(embed.color, 0x5865F2);
+          assert.equal(embed.author.name, 'Yujin · Préstamos');
+          assert.equal(embed.title, 'Préstamo aprobado');
+          assert.equal(embed.color, 0xA78BFA);
           assert.equal(embed.fields.length, 6);
           assert.equal(embed.fields[0].value, `> **${amount.toLocaleString()} 🪙**`);
           assert.equal(embed.fields[1].value, `> **${interest.toLocaleString()} 🪙** *(5%)*`);
@@ -109,7 +110,7 @@ test('alias &loan pedir y rechazo de contexto sin servidor', async t => {
   const f = fixture(t, 0, { withLoan: false });
   const replies = [];
   await invoke(f, 'prefix', '1000', payload => replies.push(payload), 'alias-delivery', 'pedir');
-  assert.equal(replies[0].embeds[0].toJSON().author.name, '🏦 Préstamo Aprobado');
+  assert.equal(replies[0].embeds[0].toJSON().author.name, 'Yujin · Préstamos');
   const command = f.load('src/commands/economy/loan.js');
   await command.executePrefix({ id: 'dm', guild: null, author: { id: f.user }, reply: payload => replies.push(payload) }, ['take', '1000']);
   assert.match(replies[1], /dentro de un servidor/);

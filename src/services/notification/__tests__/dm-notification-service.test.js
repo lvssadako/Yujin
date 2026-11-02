@@ -209,15 +209,15 @@ test('notificaciones embed builders and category resolution', () => {
 
   const statusEmbed = notificacionesCmd.buildStatusEmbed(mockGuild, mockUser, prefs);
   assert.ok(statusEmbed);
-  assert.match(statusEmbed.data.title, /ACTIVAS/i);
+  assert.equal(statusEmbed.data.title, 'Tus avisos, a tu manera');
 
   const offEmbed = notificacionesCmd.buildResultEmbed(mockGuild, mockUser, 'streaks', false, prefs);
   assert.ok(offEmbed);
-  assert.match(offEmbed.data.title, /Desactivadas/i);
+  assert.equal(offEmbed.data.title, 'Avisos desactivados');
 
   const onEmbed = notificacionesCmd.buildResultEmbed(mockGuild, mockUser, 'all', true, prefs);
   assert.ok(onEmbed);
-  assert.match(onEmbed.data.title, /Activadas/i);
+  assert.equal(onEmbed.data.title, 'Avisos activados');
 
   assert.equal(notificacionesCmd.resolveCategoryInput('racha'), 'streaks');
   assert.equal(notificacionesCmd.resolveCategoryInput('warns'), 'warns');
@@ -242,18 +242,18 @@ test('notificaciones executePrefix handles estado, off, and on', async () => {
   // 1. Estado
   await notificacionesCmd.executePrefix(mockMsg, ['estado']);
   assert.ok(replyPayload.embeds);
-  assert.match(replyPayload.embeds[0].data.title, /ACTIVAS|SILENCIADAS/);
+  assert.match(replyPayload.embeds[0].data.title, /^(Tus avisos, a tu manera|Mensajes directos pausados)$/);
 
   // 2. Desactivar categoría 'streaks'
   await notificacionesCmd.executePrefix(mockMsg, ['off', 'streaks']);
   assert.ok(replyPayload.embeds);
-  assert.match(replyPayload.embeds[0].data.title, /Desactivadas/);
+  assert.equal(replyPayload.embeds[0].data.title, 'Avisos desactivados');
   assert.equal(canSendDmNotification(testGuild.id, testAuthor.id, 'streaks'), false);
   assert.equal(canSendDmNotification(testGuild.id, testAuthor.id, 'warns'), true);
 
   // 3. Activar categoría 'streaks'
   await notificacionesCmd.executePrefix(mockMsg, ['on', 'streaks']);
   assert.ok(replyPayload.embeds);
-  assert.match(replyPayload.embeds[0].data.title, /Activadas/);
+  assert.equal(replyPayload.embeds[0].data.title, 'Avisos activados');
   assert.equal(canSendDmNotification(testGuild.id, testAuthor.id, 'streaks'), true);
 });
