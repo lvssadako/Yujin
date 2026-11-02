@@ -2,6 +2,7 @@ const logger = require('./logger');
 const fs = require('fs');
 const path = require('path');
 const { readJsonSafe, writeJsonAtomic } = require('./jsonStore');
+const { STREAK_ACTIVATION_DAYS, STREAK_PREFS_VERSION } = require('../constants/streakRules');
 
 const dataDir = path.join(__dirname, '..', '..', 'data');
 const profilePath = path.join(dataDir, 'profile.json');
@@ -39,6 +40,58 @@ function writeProfiles(obj) {
   } catch {}
 }
 
+/**
+ * Validación única para perfiles creados antes de que la racha exigiera
+ * STREAK_ACTIVATION_DAYS días. Solo quien YA tenía una racha activa (>= 5 días)
+ * conserva su configuración de avisos de racha por DM; al resto se le
+ * devuelve el valor por defecto (apagado) aunque los hubiera activado antes.
+ * Es idempotente: se marca con u.streakPrefsVersion.
+ * @returns {boolean} true si el perfil se modificó
+ */
+function applyStreakPrefsValidation(u) {
+  if (!u || typeof u !== 'object') return false;
+  if (Number(u.streakPrefsVersion) >= STREAK_PREFS_VERSION) return false;
+
+  const hadActiveStreak = !u.streakDisabled && (Number(u.streakDays) || 0) >= STREAK_ACTIVATION_DAYS;
+  if (!hadActiveStreak) {
+    delete u.streakAlertsDisabled;
+    if (u.dmNotifications && typeof u.dmNotifications === 'object') {
+      u.dmNotifications.streaks = false;
+    }
+  }
+
+  u.streakPrefsVersion = STREAK_PREFS_VERSION;
+  return true;
+}
+
+/**
+ * Aplica la validación a todos los perfiles guardados y persiste si hubo cambios.
+ * @returns {{ checked: number, migrated: number, kept: number, reset: number }}
+ */
+function migrateStreakPreferences() {
+  const profiles = readProfiles();
+  const result = { checked: 0, migrated: 0, kept: 0, reset: 0 };
+
+  for (const guildUsers of Object.values(profiles.users || {})) {
+    if (!guildUsers || typeof guildUsers !== 'object') continue;
+    for (const u of Object.values(guildUsers)) {
+      result.checked++;
+      const wasActive = u && !u.streakDisabled && (Number(u.streakDays) || 0) >= STREAK_ACTIVATION_DAYS;
+      if (applyStreakPrefsValidation(u)) {
+        result.migrated++;
+        if (wasActive) result.kept++;
+        else result.reset++;
+      }
+    }
+  }
+
+  if (result.migrated > 0) {
+    writeProfiles(profiles);
+    logger.info('[profileStore] Validación de preferencias de racha aplicada', result);
+  }
+  return result;
+}
+
 function ensureUser(profiles, guildId, userId) {
   if (!profiles.users[guildId]) profiles.users[guildId] = {};
   if (!profiles.users[guildId][userId]) {
@@ -59,6 +112,7 @@ function ensureUser(profiles, guildId, userId) {
   if (typeof u.dailyStreak !== 'number') u.dailyStreak = 0;
   if (typeof u.lastDailyDay !== 'number') u.lastDailyDay = 0;
   if (typeof u.lastStreakReminderDay !== 'number') u.lastStreakReminderDay = 0;
+  applyStreakPrefsValidation(u);
   if (!u.dmNotifications || typeof u.dmNotifications !== 'object') {
     u.dmNotifications = {
       all: true,
@@ -99,4 +153,11 @@ function ensureGlobalUser(profiles, userId) {
   return g;
 }
 
-module.exports = { readProfiles, writeProfiles, ensureUser, ensureGlobalUser };
+module.exports = {
+  readProfiles,
+  writeProfiles,
+  ensureUser,
+  ensureGlobalUser,
+  applyStreakPrefsValidation,
+  migrateStreakPreferences
+};

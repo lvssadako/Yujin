@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const { readProfiles, writeProfiles } = require('../utils/profileStore');
+const { readProfiles, writeProfiles, migrateStreakPreferences } = require('../utils/profileStore');
 const { getFlameTier, getLocalDayInfo, isStreakActive, areStreakAlertsDisabled } = require('./streak/streakService');
 const { canSendDmNotification, sendDmNotification } = require('./notification/dmNotificationService');
 const logger = require('../utils/logger');
@@ -77,6 +77,13 @@ async function checkStreaks() {
 
 function init(client) {
   clientRef = client;
+  // Antes de enviar cualquier recordatorio, validar qué usuarios ya tenían
+  // una racha de 5 días o más para conservar (o no) su configuración previa.
+  try {
+    migrateStreakPreferences();
+  } catch (err) {
+    logger.error('[streakReminder] Error validando preferencias de racha:', { error: err.message });
+  }
   intervalRef = setInterval(checkStreaks, 20 * 60 * 1000); // Chequea cada 20 minutos
   setTimeout(checkStreaks, 5000);
   logger.info('Sistema de alerta de rachas por DM iniciado.');
