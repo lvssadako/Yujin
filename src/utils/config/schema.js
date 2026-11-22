@@ -11,11 +11,20 @@ const ConfigSchema = z.object({
   levelUpChannelId: z.string().regex(/^\d+$/).optional(),
   botLogChannelId: z.string().regex(/^\d+$/).optional(),
   statusRoleId: z.string().regex(/^\d+$/).optional(),
+  coinEmoji: z.string().max(64).optional(),
+  shopRoles: z.array(z.object({
+    id: z.string().regex(/^[a-z0-9_]{3,32}$/),
+    name: z.string().min(1).max(40),
+    price: z.number().int().min(1).max(100000000),
+    roleId: z.string().regex(/^\d+$/),
+    days: z.number().int().min(0).max(365),
+    description: z.string().max(120).optional()
+  })).max(15).optional(),
   statusRoleTriggers: z.array(z.object({
-    field: z.enum(['status']),
-    includes: z.string(),
+    field: z.enum(['status', 'tag']),
+    includes: z.string().optional().default(''),
     roleId: z.string().regex(/^\d+$/)
-  })).optional(),
+  }).refine(t => t.field === 'tag' || t.includes.trim().length > 0, { message: 'Un trigger de estado requiere "includes"' })).optional(),
   levelRewards: z.record(z.string(), z.string().regex(/^\d+$/)).optional(),
   roleXpBonuses: z.record(
     z.string(),

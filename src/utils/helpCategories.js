@@ -80,6 +80,9 @@ const COMMAND_MAP = {
   levellistchannels: 'config',
   toproles: 'config',
   menuconfig: 'config',
+  statusrole: 'config',
+  coinicon: 'config',
+  shopadmin: 'config',
 
   // Utilidades y Comunidad
   help: 'utility',

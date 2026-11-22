@@ -5,6 +5,7 @@ const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { validateRoleForAssignment } = require('../../utils/roleValidation');
 const { validateChannelForSending } = require('../../utils/channelValidation');
 const { readConfig: readCentralConfig, writeConfig: writeCentralConfig } = require('../../utils/configCache');
+const { levelUpAllowedMentions } = require('../../utils/levelMentions');
 
 const dataDir = path.join(__dirname, '..', '..', '..', 'data');
 const levelsPath = path.join(dataDir, 'levels.json');
@@ -108,7 +109,7 @@ module.exports = {
             content += ` Ganó: ${mentions.join(', ')}`;
           }
           try {
-            if (notifyChannel) await notifyChannel.send({ content }).catch(()=>{});
+            if (notifyChannel) await notifyChannel.send({ content, allowedMentions: levelUpAllowedMentions(userId) }).catch(()=>{});
             else await interaction.followUp({ content, ephemeral: true }).catch(()=>{});
           } catch {}
         }

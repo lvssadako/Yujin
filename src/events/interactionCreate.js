@@ -47,7 +47,7 @@ module.exports = (client) => {
       // BOTONES
       if (interaction.isButton()) {
                 // Botón de compra de boost XP en /shop
-                if ((interaction.customId.startsWith('shop_buy_') || interaction.customId.startsWith('shop_page_'))) {
+                if ((interaction.customId.startsWith('shop_buy_') || interaction.customId.startsWith('shop_page_') || interaction.customId.startsWith('shop_cat_'))) {
                   const shop = require('../commands/economy/shop.js');
                   await shop.handleButton(interaction);
                   return;

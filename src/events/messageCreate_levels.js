@@ -13,6 +13,7 @@ const { shouldSendAutoMessage } = require('../utils/autoMessageGuard');
 const { recordMessageActivity } = require('../services/streak/streakService');
 const { sendDmNotification } = require('../services/notification/dmNotificationService');
 const { secureRandom, secureRandomInt, secureChoice } = require('../utils/cryptoRandom');
+const { levelUpAllowedMentions } = require('../utils/levelMentions');
 
 function xpToNext(level) {
   return Math.round(200 * Math.pow(level + 1, 1.4));
@@ -305,7 +306,7 @@ module.exports = (client) => {
               logger.info(`[levels] Enviando anuncio a canal: ${target.name || target.id}`);
               await target.send({
                 content: text,
-                allowedMentions: { parse: [], users: [userId] }
+                allowedMentions: levelUpAllowedMentions(userId)
               });
               messageWasSent = true;
               logger.info(`[levels] ✅ Mensaje de level-up enviado exitosamente`);

@@ -7,6 +7,7 @@ const { readLevels, writeLevels, ensureUserData } = require('../services/level')
 const { updateMissionProgress } = require('../utils/dailyMissions');
 const { addCoins } = require('../services/economy').economyService;
 const { secureRandomInt } = require('../utils/cryptoRandom');
+const { levelUpAllowedMentions } = require('../utils/levelMentions');
 
 function xpToNext(level) { return Math.round(200 * Math.pow(level + 1, 1.4)); }
 
@@ -170,7 +171,7 @@ module.exports = (client) => {
         try {
           await target.send({
             content: text,
-            allowedMentions: { users: [uid] }
+            allowedMentions: levelUpAllowedMentions(uid)
           });
         } catch (e) {
           logger.error('[levels reaction] Error enviando anuncio de level up:', e?.message || e);

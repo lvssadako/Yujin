@@ -5,6 +5,7 @@ const { handleLevelRoles } = require('../utils/levelRoles');
 const { updateMissionProgress } = require('../utils/dailyMissions');
 const { readConfig } = require('../utils/configCache');
 const { readLevels, writeLevels, ensureUserData, xpToNext } = require('../services/level').levelService;
+const { levelUpAllowedMentions } = require('../utils/levelMentions');
 
 
 function getRoleBonusPercent(cfg, member) {
@@ -172,7 +173,7 @@ async function awardVoice(guild, userId, member, channelId, sinceMs, untilMs = D
       }
 
       try {
-        await target.send({ content: text });
+        await target.send({ content: text, allowedMentions: levelUpAllowedMentions(userId) });
       } catch {}
     }
     

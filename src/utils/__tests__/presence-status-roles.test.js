@@ -111,7 +111,7 @@ test('handlePresenceUpdate adds role when member has target link', async () => {
     activities: [{ type: ActivityType.Custom, state: 'Visita discord.gg/lco para eventos' }]
   };
 
-  await handlePresenceUpdate(null, pres);
+  await handlePresenceUpdate(null, pres, { readConfig: () => ({ statusRoleId: roleId }) });
   assert.equal(addedRoleId, roleId);
 });
 
@@ -154,7 +154,7 @@ test('handlePresenceUpdate schedules delayed removal when link is missing', asyn
     activities: [{ type: ActivityType.Custom, state: 'No link here' }]
   };
 
-  await handlePresenceUpdate(null, pres);
+  await handlePresenceUpdate(null, pres, { readConfig: () => ({ statusRoleId: roleId }) });
   const removeKey = 'user-20:' + roleId;
   assert.equal(pendingRemove.has(removeKey), true);
 
@@ -169,7 +169,7 @@ test('handlePresenceUpdate schedules delayed removal when link is missing', asyn
 
   // bypass cooldown for test
   userCooldown.delete('user-20');
-  await handlePresenceUpdate(null, presWithLink);
+  await handlePresenceUpdate(null, presWithLink, { readConfig: () => ({ statusRoleId: roleId }) });
   assert.equal(pendingRemove.has(removeKey), false);
 });
 

@@ -4,11 +4,14 @@ const { readProfiles, migrateStreakPreferences } = require('../utils/profileStor
 const { getUserStreakStatus, markStreakReminderSent } = require('./streak/streakService');
 const { canSendDmNotification, sendDmNotification } = require('./notification/dmNotificationService');
 const logger = require('../utils/logger');
+const { STREAK_REMINDER_MIN_DAYS } = require('../constants/streakRules');
 let clientRef = null, intervalRef = null, startupTimer = null, checking = false, generation = 0;
 
 function eligible(status) {
-  // Solo rachas activas (>= STREAK_ACTIVATION_DAYS) reciben recordatorio.
-  return status.isActive && !status.streakDisabled && !status.isActiveToday &&
+  // Solo rachas EN CURSO de al menos STREAK_REMINDER_MIN_DAYS días: el usuario habló ayer
+  // (daysSinceActive === 1) y todavía no hoy. Quien nunca habló o ya perdió la racha no recibe nada.
+  const streakAlive = status.lastActiveDay > 0 && status.daysSinceActive === 1;
+  return streakAlive && status.streakDays >= STREAK_REMINDER_MIN_DAYS && !status.streakDisabled && !status.isActiveToday &&
     !status.alreadyReminded && !status.alertsDisabled && status.msRemaining > 0 && status.msRemaining <= 3 * 3600000;
 }
 async function checkStreaks() {
@@ -67,4 +70,4 @@ function stop() {
   if (startupTimer) clearTimeout(startupTimer);
   intervalRef = null; startupTimer = null; clientRef = null;
 }
-module.exports = { init, stop, checkStreaks };
+module.exports = { init, stop, checkStreaks, eligible };

@@ -2,6 +2,8 @@ const logger = require('../utils/logger');
 const { Events, ActivityType } = require('discord.js');
 const { readConfig } = require('../utils/configCache');
 const { validateRoleForAssignment } = require('../utils/roleValidation');
+const { buildStatusMatcher } = require('../services/presenceRoles/statusMatcher');
+const { createPresenceRoleSync } = require('../services/presenceRoles/presenceRoleSync');
 
 const userCooldown = new Map();
 const COOLDOWN_MS = 5000;
@@ -40,18 +42,14 @@ function resolveMemberTriggers(cfg) {
       }
     ];
   }
-  return triggers.filter(t => 
-    t && 
-    typeof t === 'object' && 
-    t.field === 'status' && 
-    typeof t.roleId === 'string' && 
-    t.roleId.trim() && 
-    typeof t.includes === 'string' && 
-    t.includes.trim()
-  );
+  return triggers.filter(t => {
+    if (!t || typeof t !== 'object' || typeof t.roleId !== 'string' || !t.roleId.trim()) return false;
+    if (t.field === 'tag') return true; // el rol por tag del servidor no necesita texto
+    return t.field === 'status' && typeof t.includes === 'string' && t.includes.trim().length > 0;
+  });
 }
 
-async function handlePresenceUpdate(_old, pres) {
+async function handlePresenceUpdate(_old, pres, deps = {}) {
   try {
     if (!pres || !pres.guild) return;
 
@@ -72,16 +70,15 @@ async function handlePresenceUpdate(_old, pres) {
     }
     if (!member || member.user?.bot) return;
 
-    const cfg = readConfig();
-    const triggers = resolveMemberTriggers(cfg);
+    const cfg = (deps.readConfig || readConfig)();
+    const triggers = resolveMemberTriggers(cfg).filter(t => t.field === 'status');
     if (!triggers.length) return;
 
     const custom = pres.activities?.find?.(a => a.type === ActivityType.Custom || a.type === 4);
     const customStatus = text(custom?.state || custom?.details).toLowerCase();
 
     for (const t of triggers) {
-      const searchText = text(t.includes).toLowerCase();
-      if (!searchText) continue;
+      const matches = buildStatusMatcher(t.includes);
 
       const validation = validateRoleForAssignment(pres.guild, t.roleId, 'presence status role');
       if (!validation.valid) {
@@ -89,7 +86,7 @@ async function handlePresenceUpdate(_old, pres) {
         continue;
       }
 
-      const hasText = customStatus.includes(searchText);
+      const hasText = matches(customStatus);
       const removeKey = `${member.id}:${t.roleId}`;
 
       if (hasText) {
@@ -132,7 +129,7 @@ async function handlePresenceUpdate(_old, pres) {
               const refreshedCustom = currentPres.activities?.find?.(a => a.type === ActivityType.Custom || a.type === 4);
               const refreshedStatus = text(refreshedCustom?.state || refreshedCustom?.details).toLowerCase();
 
-              if (!refreshedStatus.includes(searchText) && freshMember.roles.cache.has(t.roleId)) {
+              if (!matches(refreshedStatus) && freshMember.roles.cache.has(t.roleId)) {
                 await freshMember.roles.remove(t.roleId);
                 logger.info(`[presenceStatusRoles] Rol ${t.roleId} removido de ${freshMember.user?.tag || freshMember.id}`, {
                   userId: freshMember.id,
@@ -154,17 +151,28 @@ async function handlePresenceUpdate(_old, pres) {
   }
 }
 
+let stopSync = null;
+
 function stopPresenceStatusRoles() {
   for (const [key, timeout] of pendingRemove.entries()) {
     clearTimeout(timeout);
   }
   pendingRemove.clear();
   userCooldown.clear();
+  if (stopSync) { stopSync(); stopSync = null; }
 }
 
 function initPresenceStatusRoles(client) {
-  client.on(Events.PresenceUpdate, handlePresenceUpdate);
-  return { stop: stopPresenceStatusRoles };
+  client.on(Events.PresenceUpdate, (oldPresence, presence) => handlePresenceUpdate(oldPresence, presence));
+
+  // Tag del servidor y reconciliación al iniciar / cada 6 h.
+  const sync = createPresenceRoleSync({ readConfig, resolveTriggers: resolveMemberTriggers, validateRole: validateRoleForAssignment, logger });
+  client.on(Events.GuildMemberUpdate, (_old, member) => {
+    sync.syncMemberTag(member).catch(e => logger.warn('[presenceStatusRoles] Error sincronizando tag:', e?.message));
+  });
+  const begin = () => { if (!stopSync) stopSync = sync.start(client); };
+  if (client.isReady?.()) begin(); else client.once(Events.ClientReady, begin);
+  return { stop: stopPresenceStatusRoles, sync };
 }
 
 module.exports = Object.assign(initPresenceStatusRoles, {
