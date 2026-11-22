@@ -25,7 +25,25 @@ function createPaymentHandler(options) {
   const html = (res, status, body) => send(res, status, body, { 'Content-Type': 'text/html; charset=utf-8' });
   const json = (res, status, payload) => send(res, status, JSON.stringify(payload), { 'Content-Type': 'application/json' });
   const status = (res, code, title, message) => html(res, code, renderStatusPage({ brand, title, message }));
-  const clientKey = req => req.socket?.remoteAddress || 'unknown';
+  const trustProxyHops = Math.max(0, Math.floor(Number(options.trustProxyHops) || 0));
+  // Tras un proxy de confianza (p. ej. Azure) la IP real es la que ese proxy añadió al FINAL de X-Forwarded-For;
+  // las entradas de la izquierda las controla el cliente. Sin proxy de confianza se usa la IP del socket.
+  const clientKey = req => {
+    if (trustProxyHops > 0) {
+      const forwarded = String(req.headers['x-forwarded-for'] || '').split(',').map(s => s.trim()).filter(Boolean);
+      const hop = forwarded[forwarded.length - trustProxyHops];
+      if (hop && hop.length <= 64) return hop;
+    }
+    return req.socket?.remoteAddress || 'unknown';
+  };
+  // Un fallo inesperado (p. ej. almacén corrupto) responde 500 genérico en lugar de dejar la petición colgada.
+  const safe = (res, fn) => {
+    Promise.resolve().then(fn).catch(error => {
+      logger.error('[Pagos] Error inesperado en la petición', { error: error?.message });
+      if (!res.headersSent) json(res, 500, { error: 'Internal error' });
+    });
+  };
+  const decode = value => { try { return decodeURIComponent(value); } catch { return null; } };
 
   function readBody(req, res, max, onBody) {
     const chunks = [];
@@ -127,10 +145,21 @@ function createPaymentHandler(options) {
 
     const url = new URL(req.url, 'http://localhost');
     const sessionMatch = /^\/pay\/session\/([^/]+)$/.exec(route);
-    if (sessionMatch && req.method === 'POST') { req.resume(); handleSession(req, res, decodeURIComponent(sessionMatch[1])); return true; }
-    if (route === '/pay/return' && req.method === 'GET') { handleReturn(req, res, url); return true; }
+    if (sessionMatch && req.method === 'POST') {
+      req.resume();
+      const token = decode(sessionMatch[1]);
+      if (token === null) json(res, 400, { error: 'Bad request' });
+      else safe(res, () => handleSession(req, res, token));
+      return true;
+    }
+    if (route === '/pay/return' && req.method === 'GET') { safe(res, () => handleReturn(req, res, url)); return true; }
     const pageMatch = /^\/pay\/([^/]+)$/.exec(route);
-    if (pageMatch && req.method === 'GET') { handleCheckoutPage(req, res, decodeURIComponent(pageMatch[1])); return true; }
+    if (pageMatch && req.method === 'GET') {
+      const token = decode(pageMatch[1]);
+      if (token === null) status(res, 400, 'Solicitud inválida', 'El enlace de pago no es válido.');
+      else safe(res, () => handleCheckoutPage(req, res, token));
+      return true;
+    }
     json(res, 404, { error: 'Not found' });
     return true;
   }

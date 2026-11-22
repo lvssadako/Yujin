@@ -1,4 +1,17 @@
+const { PermissionFlagsBits } = require('discord.js');
 const logger = require('./logger');
+
+// Permisos que un rol repartido automáticamente (tienda, estado, etc.) nunca debe tener: serían una escalada de privilegios.
+const DANGEROUS_PERMISSIONS = [
+  'Administrator', 'ManageGuild', 'ManageRoles', 'ManageChannels', 'ManageWebhooks', 'BanMembers', 'KickMembers',
+  'ModerateMembers', 'MentionEveryone', 'ManageMessages', 'ManageNicknames', 'ManageGuildExpressions', 'ViewAuditLog'
+].map(name => PermissionFlagsBits[name]).filter(flag => flag !== undefined);
+
+function hasDangerousPermissions(role) {
+  const perms = role?.permissions;
+  if (!perms || typeof perms.has !== 'function') return false;
+  return DANGEROUS_PERMISSIONS.some(flag => perms.has(flag));
+}
 function canBotManageRole(guild, role) {
   if (!role || typeof role !== 'object') return false;
   if (!guild || typeof guild !== 'object') return false;
@@ -28,7 +41,7 @@ function canBotManageRole(guild, role) {
   return true;
 }
 
-function validateRoleForAssignment(guild, roleId, context = '') {
+function validateRoleForAssignment(guild, roleId, context = '', { rejectDangerous = false } = {}) {
   if (typeof roleId !== 'string' || !roleId.trim()) {
     return { valid: false, reason: 'Role ID is empty or invalid.' };
   }
@@ -43,6 +56,10 @@ function validateRoleForAssignment(guild, roleId, context = '') {
       valid: false, 
       reason: `Bot cannot manage role **${role.name}**. Ensure the role is below the bot's highest role and not managed.` 
     };
+  }
+
+  if (rejectDangerous && hasDangerousPermissions(role)) {
+    return { valid: false, reason: `Role **${role.name}** has administrative or moderation permissions and cannot be granted automatically.`, dangerous: true };
   }
 
   return { valid: true, reason: null, role };
@@ -65,6 +82,8 @@ function validateRolesForAssignment(guild, roleIds, context = '') {
 }
 
 module.exports = {
+  DANGEROUS_PERMISSIONS,
+  hasDangerousPermissions,
   canBotManageRole,
   validateRoleForAssignment,
   validateRolesForAssignment,

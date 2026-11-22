@@ -22,7 +22,7 @@ const stripeSdk = new Stripe('sk_test_dummy');
 
 const silent = { error() {}, warn() {}, info() {} };
 
-async function setup(t, { gatewayOverrides = {}, limiter } = {}) {
+async function setup(t, { gatewayOverrides = {}, limiter, handlerOptions = {} } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pay-http-'));
   const store = createOrderStore({ dir });
   const granted = []; const revoked = [];
@@ -42,7 +42,7 @@ async function setup(t, { gatewayOverrides = {}, limiter } = {}) {
   };
   const handler = createPaymentHandler({
     store, gateway, fulfillment, tokenSecret: TOKEN_SECRET, baseUrl: BASE, publishableKey: 'pk_test_x', logger: silent,
-    limiter: limiter || createRateLimiter({ limit: 1000, windowMs: 60000 })
+    limiter: limiter || createRateLimiter({ limit: 1000, windowMs: 60000 }), ...handlerOptions
   });
   const server = http.createServer((req, res) => { if (!handler.handle(req, res)) { res.writeHead(404); res.end('nf'); } });
   await new Promise(r => server.listen(0, '127.0.0.1', r));
@@ -239,4 +239,39 @@ test('reconciliador marca expirada una sesión caducada y tolera errores de Stri
   ctx.store.attachSession(o2.id, 'cs_test_zzz');
   const s = await reconcileOrders({ store: ctx.store, gateway: boom, fulfillment: ctx.fulfillment, logger: silent });
   assert.equal(s.errors, 1);
+});
+
+test('almacén corrupto: responde 500 genérico y no deja la petición colgada', async t => {
+  const ctx = await setup(t);
+  const { token } = await openOrder(ctx);
+  fs.writeFileSync(ctx.store.filePath, '{ corrupto');
+  for (const [method, url] of [['GET', `${ctx.base}/pay/${token}`], ['POST', `${ctx.base}/pay/session/${token}`]]) {
+    const r = await fetch(url, { method, headers: { Origin: BASE }, signal: AbortSignal.timeout(3000) });
+    assert.equal(r.status, 500, url);
+    const body = await r.text();
+    assert.doesNotMatch(body, /corrupto|Invalid|JSON|at /);
+  }
+});
+
+test('token con % mal formado: 400 sin lanzar', async t => {
+  const ctx = await setup(t);
+  assert.equal((await fetch(`${ctx.base}/pay/%E0%A4%A`)).status, 400);
+  assert.equal((await post(`${ctx.base}/pay/session/%E0%A4%A`, '', { Origin: BASE })).status, 400);
+});
+
+test('límite tras proxy: cuenta por la IP añadida al final de X-Forwarded-For y no por entradas falsificables', async t => {
+  const ctx = await setup(t, { limiter: createRateLimiter({ limit: 2, windowMs: 60000 }), handlerOptions: { trustProxyHops: 1 } });
+  const hit = ip => fetch(`${ctx.base}/pay/x`, { headers: { 'X-Forwarded-For': ip } });
+  // el cliente falsifica la izquierda; el proxy añade su IP real a la derecha
+  assert.equal((await hit('1.1.1.1, 9.9.9.9')).status, 403);
+  assert.equal((await hit('2.2.2.2, 9.9.9.9')).status, 403);
+  assert.equal((await hit('3.3.3.3, 9.9.9.9')).status, 429);
+  assert.equal((await hit('3.3.3.3, 8.8.8.8')).status, 403); // otra IP real: bucket distinto
+});
+
+test('sin proxy de confianza, X-Forwarded-For se ignora', async t => {
+  const ctx = await setup(t, { limiter: createRateLimiter({ limit: 2, windowMs: 60000 }) });
+  const hit = ip => fetch(`${ctx.base}/pay/x`, { headers: { 'X-Forwarded-For': ip } });
+  await hit('1.1.1.1'); await hit('2.2.2.2');
+  assert.equal((await hit('3.3.3.3')).status, 429);
 });

@@ -120,9 +120,14 @@ Bot integral de Discord para gestión comunitaria avanzada, diseñado con arquit
   - `/coinflip` (`&coinflip`): Cara o cruz con animación en tiempo real.
   - `/crash` (`&crash`): Multiplicador ascendente con retiro en tiempo real y selector de objetivo.
 - **Recompensas e Incentivos**:
-  - `/daily`: Recompensa diaria con multiplicador por racha y panel interactivo de misiones.
-  - Cofres misteriosos con insignias aleatorias (`/chest buy`, `/chest open`, `/chest balance`).
-  - Tienda de insignias y boosts (`/shop`, `/badgeshop`).
+  - `/daily`: Recompensa diaria con tarjeta visual, tracker semanal de racha, vista previa de la próxima recompensa y panel interactivo de misiones.
+  - Cofres misteriosos con insignias aleatorias (`/chest buy`, `/chest open`, `/chest balance`). Las insignias repetidas se canjean por monedas (`/chest canjear`) y hay garantía de rareza épica o mejor cada 30 cofres.
+  - Tienda de insignias y boosts (`/badgeshop`).
+- **🛍️ Tienda por categorías (`/shop`, `/buy`)**: Boosts y packs de XP, objetos de inventario, **roles temporales** que el staff configura (`/shopadmin rol-agregar|rol-quitar|lista`, vencen solos) y renovar misiones. Los roles con permisos de administración o moderación no pueden venderse.
+- **💎 Beneficios de Booster (`/boostperks`)**: XP +20 %, monedas +50 % (mensajes, `/work`, `/fish`), `/daily` +25 % y 10 % extra de descuento en la tienda. Ajustable en `config.boosterPerks` (`enabled`, `xpBonus`, `coinBonus`, `dailyBonus`, `shopDiscount`). Al dejar de boostear se retira el color exclusivo.
+- **🪙 Moneda con icono propio (`/coinicon`)**: `/coinicon subir` crea el emoji del servidor (o usa tu propia imagen) y reemplaza 🪙 en los mensajes del bot; `/coinicon restablecer` vuelve al emoji genérico.
+- **🎁 Rol de agradecimiento (`/statusrole`)**: `/statusrole estado @rol [enlace]` otorga un rol a quien lleve el enlace del servidor (o variantes equivalentes) en su estado, y `/statusrole tag @rol` a quien muestre el tag del servidor. Se retira al quitarlo, pero **nunca** por estar invisible.
+- **🖼️ Fondo de perfil propio (`/fondo`)**: Boosters y rachas de 360+ días lo usan gratis; el resto puede comprar el **Pase de Fondo** (pago único con Stripe, `/fondo comprar`). Gestión manual del staff con `/fondoadmin`.
 
 ---
 
@@ -186,6 +191,17 @@ CLIENT_ID=tu_application_client_id
 GUILD_ID=tu_server_guild_id
 DISABLE_HOT_RELOAD=false
 ```
+
+**Pagos con Stripe (opcional).** Sin estas variables los pagos quedan desactivados y `/fondo comprar` avisa que no están disponibles:
+```env
+STRIPE_SECRET_KEY=sk_live_o_sk_test_...
+STRIPE_PUBLISHABLE_KEY=pk_live_o_pk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+PAYMENT_LINK_SECRET=cadena_aleatoria_de_32_o_mas_caracteres
+PUBLIC_BASE_URL=https://pay.tudominio.com
+PAYMENT_TRUST_PROXY_HOPS=1
+```
+Apunta el webhook de Stripe a `PUBLIC_BASE_URL/webhook/stripe` con los eventos `checkout.session.*`, `charge.refunded` y `charge.dispute.created`. `PAYMENT_TRUST_PROXY_HOPS` es el número de proxies de confianza delante del bot (p. ej. Azure); con `0` el límite de peticiones usa la IP del socket.
 
 ### 3. Scripts Disponibles
 

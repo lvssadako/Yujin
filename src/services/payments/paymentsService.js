@@ -21,7 +21,9 @@ function readConfig(env = process.env) {
   const config = {
     secretKey: env.STRIPE_SECRET_KEY || '', publishableKey: env.STRIPE_PUBLISHABLE_KEY || '',
     webhookSecret: env.STRIPE_WEBHOOK_SECRET || '', tokenSecret: env.PAYMENT_LINK_SECRET || '',
-    baseUrl, brand: env.PAYMENT_BRAND_NAME || 'Yujin', refundPolicy: env.PAYMENT_REFUND_POLICY || undefined
+    baseUrl, brand: env.PAYMENT_BRAND_NAME || 'Yujin', refundPolicy: env.PAYMENT_REFUND_POLICY || undefined,
+    // Saltos de proxy de confianza para el límite de peticiones (0 = usar la IP del socket).
+    trustProxyHops: Math.min(5, Math.max(0, parseInt(env.PAYMENT_TRUST_PROXY_HOPS, 10) || 0))
   };
   config.enabled = Boolean(config.secretKey && /^pk_(test|live)_/.test(config.publishableKey) && config.webhookSecret &&
     config.tokenSecret.length >= 32 && secureBase);

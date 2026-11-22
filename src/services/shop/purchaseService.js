@@ -13,7 +13,7 @@ function createPurchaseService({ economy, grantBoost, leases, rerollMissions, mi
   async function precheck({ item, member, guild, userId, tz }) {
     if (item.kind === 'role') {
       if (!member) return 'No pude encontrarte en el servidor. Vuelve a intentarlo.';
-      if (!validateRole(guild, item.roleId, 'shop role').valid) return 'Ese rol no está disponible ahora mismo (el staff debe revisar su configuración). No se te cobró nada.';
+      if (!validateRole(guild, item.roleId, 'shop role', { rejectDangerous: true }).valid) return 'Ese rol no está disponible ahora mismo (el staff debe revisar su configuración). No se te cobró nada.';
       if (member.roles.cache.has(item.roleId) && item.days <= 0) return 'Ya tienes este rol de forma permanente.';
     }
     if (item.kind === 'reroll' && !missionsUntouched(guild, userId, tz)) {

@@ -96,7 +96,7 @@ test('dos schedulers en procesos distintos no duplican el intervalo de 24 horas'
 
 test('el adaptador JSON coordina sus escrituras sin perder las de otro proceso', async t => {
   const f = fixture(t);
-  f.copy('src/database/adapters/JsonAdapter.js');
+  f.copy('src/database/adapters/jsonAdapter.js');
   f.copy('src/database/adapters/baseAdapter.js');
   await together(['a', 'b'].map(prefix => okay(start(t, f, 'adapter', { prefix, count: 10 }))));
   const economy = f.raw('economy');

@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { createEmbed, COLORS } = require('../../utils/ui');
 const { readConfig, writeConfig } = require('../../utils/configCache');
-const { validateRoleForAssignment } = require('../../utils/roleValidation');
+const { validateRoleForAssignment, hasDangerousPermissions } = require('../../utils/roleValidation');
 const {
   DEFAULT_INVITE, setStatusTrigger, setTagTrigger, removeTriggersForRole, describeTriggers
 } = require('../../services/presenceRoles/triggerAdmin');
@@ -21,6 +21,7 @@ function run(guild, member, sub, role, text) {
     writeConfig(cfg => ({ ...cfg, statusRoleTriggers: result.triggers }));
     return { content: result.removed ? `✅ Se quitaron ${result.removed} regla(s) de ${role}. Quien ya lo tiene lo conserva hasta que se le retire manualmente.` : 'ℹ️ Ese rol no tenía reglas.' };
   }
+  if (hasDangerousPermissions(role)) return { content: '❌ Ese rol tiene permisos de administración o moderación; por seguridad no se puede otorgar automáticamente.' };
   const check = validateRoleForAssignment(guild, role.id, 'statusrole command');
   if (!check.valid) return { content: `❌ No puedo gestionar ese rol: debe estar **por debajo** del rol del bot y no ser un rol de integración.` };
   const result = sub === 'tag' ? setTagTrigger(current, role.id) : setStatusTrigger(current, role.id, text || DEFAULT_INVITE);

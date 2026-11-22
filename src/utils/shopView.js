@@ -7,6 +7,12 @@ const PAGE_SIZE = 8;
 const RARITY_COLOR = { common: 0x5ac8fa, rare: 0x7b61ff, epic: 0xffd166, legendary: 0xff7a59 };
 const RARITY_LABEL = { common: '⚪ Común', rare: '🔵 Rara', epic: '🟣 Épica', legendary: '🟠 Legendaria' };
 
+// Quita solo emojis/símbolos iniciales ("🛡️ Escudo" → "Escudo"); "Boost 1h" se conserva completo.
+function buttonLabel(name) {
+  const text = String(name || '');
+  return text.replace(/^[^\p{L}\p{N}]+/u, '').trim() || text;
+}
+
 function benefitText(item) {
   switch (item.kind) {
     case 'bundle': return '📦 ' + (item.included?.length || 0) + ' boosts incluidos';
@@ -47,7 +53,7 @@ function buildCatalogView(catalog, userData, discountFor, priceFor, requestedPag
   const components = [];
   for (let index = 0; index < items.length; index += 4) {
     components.push(new ActionRowBuilder().addComponents(items.slice(index, index + 4).map(item =>
-      new ButtonBuilder().setCustomId(('shop_buy_' + item.id).slice(0, 100)).setLabel(clip(item.name.replace(/^\S+\s/u, '') || item.name, 35)).setStyle(ButtonStyle.Primary))));
+      new ButtonBuilder().setCustomId(('shop_buy_' + item.id).slice(0, 100)).setLabel(clip(buttonLabel(item.name), 35)).setStyle(ButtonStyle.Primary))));
   }
   const nav = [];
   for (const [key, meta] of Object.entries(CATEGORIES)) {
@@ -67,4 +73,4 @@ function buildPurchaseEmbed(result) {
     .addFields(...result.fields).setTimestamp();
 }
 
-module.exports = { buildCatalogView, buildPurchaseEmbed, benefitText, PAGE_SIZE };
+module.exports = { buildCatalogView, buildPurchaseEmbed, benefitText, buttonLabel, PAGE_SIZE };

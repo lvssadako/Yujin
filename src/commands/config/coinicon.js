@@ -1,7 +1,7 @@
 const path = require('node:path');
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { createEmbed, COLORS } = require('../../utils/ui');
-const { readConfig, writeConfig } = require('../../utils/configCache');
+const { writeConfig } = require('../../utils/configCache');
 const { DEFAULT_COIN, isValidCoinEmoji, getCoinEmoji, invalidateCoinEmoji } = require('../../utils/coinEmoji');
 const logger = require('../../utils/logger');
 
@@ -105,4 +105,3 @@ module.exports = {
   }
 };
 
-module.exports.__test = { run, sanitizeName, readConfig };

@@ -42,6 +42,7 @@ module.exports = {
   },
 
   async handleButton(interaction) {
+    if (!interaction.guild || !interaction.guildId) return interaction.reply({ content: 'La tienda solo funciona dentro de un servidor.', ephemeral: true });
     const id = interaction.customId;
     const own = id.match(/^shop_(?:cat|page)_(\d{17,20})_/)?.[1];
     if (own && own !== interaction.user.id) return interaction.reply({ content: 'Abre /shop o &shop para explorar tu propia tienda.', flags: 64 });

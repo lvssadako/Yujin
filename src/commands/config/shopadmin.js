@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { createEmbed, COLORS } = require('../../utils/ui');
 const { readConfig, writeConfig } = require('../../utils/configCache');
-const { validateRoleForAssignment } = require('../../utils/roleValidation');
+const { validateRoleForAssignment, hasDangerousPermissions } = require('../../utils/roleValidation');
 const { addShopRole, removeShopRole, describeShopRoles } = require('../../services/shop/shopRolesAdmin');
 
 const canManage = m => m?.permissions?.has?.(PermissionFlagsBits.Administrator) || m?.permissions?.has?.(PermissionFlagsBits.ManageRoles);
@@ -19,6 +19,9 @@ function run(guild, member, sub, opts) {
   }
   if (sub === 'rol-agregar') {
     if (!opts.role) return { content: '❌ Indica un rol.' };
+    if (hasDangerousPermissions(opts.role)) {
+      return { content: '❌ Ese rol tiene permisos de administración o moderación; por seguridad no se puede vender en la tienda.' };
+    }
     if (!validateRoleForAssignment(guild, opts.role.id, 'shopadmin').valid) {
       return { content: '❌ No puedo gestionar ese rol: debe estar **por debajo** del rol del bot y no ser un rol de integración.' };
     }

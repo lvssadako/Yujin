@@ -182,3 +182,53 @@ test('vista: categorías, paginación y límites de componentes', () => {
   assert.equal(roles.items.length, 1);
   assert.match(JSON.stringify(roles.embed.toJSON()), /Color VIP/);
 });
+
+// ---- Parches de auditoría ----
+const { buttonLabel } = require('../../../utils/shopView');
+const { MAX_ITEM_ID_LENGTH } = require('../shopCatalog');
+
+test('botón de la tienda: solo se quita el emoji inicial, nunca la primera palabra', () => {
+  assert.equal(buttonLabel('🛡️ Escudo Anti-Robo'), 'Escudo Anti-Robo');
+  assert.equal(buttonLabel('Boost 1h'), 'Boost 1h');
+  assert.equal(buttonLabel('Pack XP 3h'), 'Pack XP 3h');
+  assert.equal(buttonLabel('🎭 Color VIP'), 'Color VIP');
+  assert.equal(buttonLabel('⭐ ✨ Oferta'), 'Oferta');
+  assert.equal(buttonLabel('🔥'), '🔥'); // solo emoji: se conserva
+  assert.equal(buttonLabel(''), '');
+});
+
+test('catálogo: los productos con id demasiado largo se descartan (el botón no cabría en 100 caracteres)', () => {
+  const long = 'x'.repeat(MAX_ITEM_ID_LENGTH + 1);
+  const ok = 'y'.repeat(MAX_ITEM_ID_LENGTH);
+  const catalog = buildCatalog({ xpBoosts: { [long]: { name: 'Largo', price: 10, multiplier: 2, durationMs: 1000 }, [ok]: { name: 'Justo', price: 10, multiplier: 2, durationMs: 1000 } } });
+  assert.equal(findItem(catalog, long), null);
+  assert.ok(findItem(catalog, ok));
+  const view = buildCatalogView(catalog, { streakDays: 0 }, getDiscountForUser, getFinalPrice, 0, U, 'boosts');
+  for (const row of view.components) for (const b of row.components) assert.ok(b.data.custom_id.length <= 100);
+});
+
+test('compra de rol: exige que el rol no sea peligroso (se valida al comprar, no solo al configurar)', async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'shop-')); t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  let received = null; let wallet = 10000;
+  const svc = createPurchaseService({
+    economy: { getBalance: () => ({ coins: wallet }), subtractCoins: (g, u, n) => { wallet -= n; return true; }, addCoins: (g, u, n) => { wallet += n; }, addItem() {} },
+    grantBoost() {}, leases: createRoleLeaseStore({ dir }), rerollMissions() {}, missionsUntouched: () => true,
+    validateRole: (guild, roleId, ctx, options) => { received = options; return { valid: !options?.rejectDangerous }; }
+  });
+  const catalog = buildCatalog(cfg);
+  const member = { id: U, roles: { cache: new Map(), add: async () => {} } };
+  const r = await svc.purchase({ guild: { id: G }, member, userId: U, item: findItem(catalog, 'role_vip_color'), catalog, cfg, userData: {} });
+  assert.deepEqual(received, { rejectDangerous: true });
+  assert.equal(r.ok, false);
+  assert.equal(wallet, 10000); // no se cobró
+});
+
+test('botones de la tienda fuera de un servidor responden sin lanzar', async () => {
+  const shop = require('../../../commands/economy/shop');
+  const replies = [];
+  for (const customId of ['shop_buy_escudo', 'shop_cat_222222222222222222_items', 'shop_page_222222222222222222_all_1']) {
+    await shop.handleButton({ customId, guild: null, guildId: null, user: { id: '222222222222222222' }, reply: async p => replies.push(p) });
+  }
+  assert.equal(replies.length, 3);
+  for (const r of replies) assert.match(r.content, /solo funciona dentro de un servidor/);
+});

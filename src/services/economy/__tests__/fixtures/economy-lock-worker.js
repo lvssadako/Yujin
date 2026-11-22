@@ -20,7 +20,7 @@ if (action === 'pay') {
   const loans = load('src/services/economy/loanService.js');
   loans.applyInterestTick(options.guild, options.user, { force: false, now: options.now });
 } else if (action === 'adapter') {
-  const Adapter = load('src/database/adapters/JsonAdapter.js');
+  const Adapter = load('src/database/adapters/jsonAdapter.js');
   const adapter = new Adapter({ dataDir });
   // set es async por contrato, pero su sección de IO no contiene await.
   Promise.all(Array.from({ length: options.count }, (_, i) => adapter.set('economy', `${options.prefix}-${i}`, i)))

@@ -31,6 +31,7 @@ const PROTECTED_DEFAULTS = {
   ]
 };
 
+const MAX_ITEM_ID_LENGTH = 91;
 const num = (v, fallback = 0) => (Number.isFinite(Number(v)) ? Number(v) : fallback);
 
 function buildCatalog(cfg = {}) {
@@ -59,8 +60,9 @@ function buildCatalog(cfg = {}) {
   }
   for (const item of UTILITY_ITEMS) catalog.push({ ...item, category: 'utility', discountPercent: 0, featured: false });
   // ids duplicados (config + integrados): gana el primero
+  // Los botones usan custom_id = "shop_buy_" + id y Discord admite 100 caracteres: ids más largos no se podrían comprar.
   const seen = new Set();
-  return catalog.filter(item => item.id && !seen.has(item.id) && seen.add(item.id));
+  return catalog.filter(item => item.id && String(item.id).length <= MAX_ITEM_ID_LENGTH && !seen.has(item.id) && seen.add(item.id));
 }
 
 function filterByCategory(catalog, category) {
@@ -79,4 +81,4 @@ function getFinalPrice(item, userData, extraPct = 0) {
 
 const findItem = (catalog, id) => catalog.find(item => item.id === id) || null;
 
-module.exports = { CATEGORIES, INVENTORY_ITEMS, UTILITY_ITEMS, buildCatalog, filterByCategory, getDiscountForUser, getFinalPrice, findItem };
+module.exports = { MAX_ITEM_ID_LENGTH, CATEGORIES, INVENTORY_ITEMS, UTILITY_ITEMS, buildCatalog, filterByCategory, getDiscountForUser, getFinalPrice, findItem };
