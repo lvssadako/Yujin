@@ -121,3 +121,86 @@ test('administración de reglas: reemplaza, limita y quita', () => {
   assert.equal(setStatusTrigger(full, '999999', 'abc').ok, false);
   assert.equal(removeTriggersForRole(r.triggers, '300000').removed, 1);
 });
+
+// ---- Varias reglas para el MISMO rol (caso "Diplomacia"): una regla que no coincide no debe quitar el rol ----
+const { groupTriggersByRole, decideRole } = require('../roleDecision');
+const presenceEvent = require('../../../events/presenceStatusRoles');
+
+test('decideRole: cualquiera de las reglas del rol lo conserva', () => {
+  const group = groupTriggersByRole([
+    { field: 'status', includes: 'discord.gg/lco', roleId: 'R' }, { field: 'status', includes: 'discord.com/invite/lco', roleId: 'R' }
+  ]).get('R');
+  assert.equal(decideRole(group, { text: 'ven a discord.gg/lco', visible: true }), true);
+  assert.equal(decideRole(group, { text: 'discord.com/invite/lco', visible: true }), true);
+  assert.equal(decideRole(group, { text: 'sin enlace', visible: true }), false);
+  assert.equal(decideRole(group, { text: '', visible: false }), null); // offline/invisible: no se sabe
+});
+
+test('decideRole: enlace O tag para el mismo rol', () => {
+  const group = groupTriggersByRole([{ field: 'status', includes: '.gg/lco', roleId: 'R' }, { field: 'tag', roleId: 'R' }]).get('R');
+  const tagged = { primaryGuild: { identityGuildId: 'g1', identityEnabled: true } };
+  assert.equal(decideRole(group, { text: 'nada', visible: true, user: tagged, guildId: 'g1' }), true); // tag sin enlace
+  assert.equal(decideRole(group, { text: '.gg/lco', visible: true, user: {}, guildId: 'g1' }), true);  // enlace sin tag
+  assert.equal(decideRole(group, { text: 'nada', visible: true, user: {}, guildId: 'g1' }), false);
+  assert.equal(decideRole(group, { text: '', visible: false, user: {}, guildId: 'g1' }), null);
+  const tagOnly = groupTriggersByRole([{ field: 'tag', roleId: 'T' }]).get('T');
+  assert.equal(decideRole(tagOnly, { visible: false, user: {}, guildId: 'g1' }), false); // el tag no depende de la presencia
+});
+
+function presenceHarness(roleId, hasRole) {
+  const removed = [];
+  const roleObj = { id: roleId, name: 'Diplomacia', managed: false, comparePositionTo: () => -1 };
+  const member = { id: 'user-' + Math.random(), user: { bot: false, tag: 'x#1' },
+    roles: { cache: new Map(hasRole ? [[roleId, roleObj]] : []), add: async () => {}, remove: async id => removed.push(id) } };
+  const guild = { id: 'g1', client: { user: { id: 'bot' } },
+    members: { cache: new Map([['bot', { roles: { highest: {} } }], [member.id, member]]), fetch: async () => member },
+    roles: { cache: new Map([[roleId, roleObj]]), everyone: { id: '@everyone' } } };
+  return { member, guild, removed };
+}
+const cfgTwoLinks = roleId => ({ statusRoleTriggers: [
+  { field: 'status', includes: 'discord.gg/lco', roleId }, { field: 'status', includes: 'discord.com/invite/lco', roleId }] });
+
+test('presencia: con dos reglas para el mismo rol y el enlace presente NO se programa la remoción', async () => {
+  presenceEvent.stopPresenceStatusRoles();
+  const { member, guild } = presenceHarness('900000000000000009', true);
+  const pres = { status: 'online', guild, userId: member.id, member, activities: [{ type: ActivityType.Custom, state: 'discord.gg/lco' }] };
+  await presenceEvent.handlePresenceUpdate(null, pres, { readConfig: () => cfgTwoLinks('900000000000000009') });
+  assert.equal(presenceEvent.pendingRemove.size, 0);
+  presenceEvent.stopPresenceStatusRoles();
+});
+
+test('presencia: sin ninguno de los enlaces sí se programa una sola remoción, y se cancela si vuelve', async () => {
+  presenceEvent.stopPresenceStatusRoles();
+  const roleId = '900000000000000009';
+  const { member, guild } = presenceHarness(roleId, true);
+  const base = { status: 'online', guild, userId: member.id, member };
+  await presenceEvent.handlePresenceUpdate(null, { ...base, activities: [{ type: ActivityType.Custom, state: 'hola' }] }, { readConfig: () => cfgTwoLinks(roleId) });
+  assert.equal(presenceEvent.pendingRemove.size, 1);
+  presenceEvent.userCooldown.delete(member.id);
+  await presenceEvent.handlePresenceUpdate(null, { ...base, activities: [{ type: ActivityType.Custom, state: 'https://discord.com/invite/lco' }] }, { readConfig: () => cfgTwoLinks(roleId) });
+  assert.equal(presenceEvent.pendingRemove.size, 0);
+  presenceEvent.stopPresenceStatusRoles();
+});
+
+test('sync: dos reglas del mismo rol no lo quitan si una coincide', async () => {
+  const roleId = '900000000000000009';
+  const s = sync([{ field: 'status', includes: 'discord.gg/lco', roleId }, { field: 'status', includes: 'discord.com/invite/lco', roleId }]);
+  const m = member({ roles: [roleId] });
+  assert.equal(await s.syncMemberStatus(m, presence('online', 'discord.com/invite/lco')), 0);
+  assert.equal(m.roles.cache.has(roleId), true);
+  assert.equal(await s.syncMemberStatus(m, presence('online', 'otra cosa')), 1);
+  assert.equal(m.roles.cache.has(roleId), false);
+});
+
+test('sync: quien tiene el tag conserva el rol aunque su estado no tenga el enlace', async () => {
+  const roleId = '900000000000000009';
+  const s = sync([{ field: 'status', includes: '.gg/lco', roleId }, { field: 'tag', roleId }]);
+  const m = member({ roles: [roleId], tag: { identityGuildId: 'g1', identityEnabled: true } });
+  assert.equal(await s.syncMemberStatus(m, presence('online', 'sin enlace')), 0);
+  assert.equal(m.roles.cache.has(roleId), true);
+  m.user.primaryGuild = null; // quita el tag mientras está invisible: no se retira el rol por estado
+  assert.equal(await s.syncMemberTag(m), 0);
+  m.presence = presence('online', 'sin enlace');
+  assert.equal(await s.syncMemberTag(m), 1);
+  assert.equal(m.roles.cache.has(roleId), false);
+});

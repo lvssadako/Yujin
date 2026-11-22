@@ -4,8 +4,10 @@ const { getInventory, addCoins, getBalance } = require('../../services/economy')
 const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
 
 const { secureRandom, secureRandomInt } = require('../../utils/cryptoRandom');
+const { perksFor, withBonus } = require('../../services/boost/boosterPerks');
+const { readConfig } = require('../../utils/configCache');
 
-async function handleFish(guildId, userId) {
+async function handleFish(guildId, userId, coinBonus = 0) {
   const inv = getInventory(guildId, userId);
   if (!inv['cana'] || inv['cana'] < 1) {
     return { error: '❌ ¡No tienes una **🎣 Caña de Pescar**! Cómprala en la tienda con `/buy`.' };
@@ -64,6 +66,7 @@ async function handleFish(guildId, userId) {
 
   if (reward > 0) {
     reward = Math.max(1, Math.floor(reward * incomeMultiplier));
+    if (coinBonus > 0) reward = withBonus(reward, coinBonus);
     addCoins(guildId, userId, reward);
   }
   
@@ -96,12 +99,12 @@ module.exports = {
     .setName('fish')
     .setDescription('Ve a pescar y gana monedas (Requiere Caña de Pescar) (Cooldown: 1h).'),
   async execute(interaction) {
-    const result = await handleFish(interaction.guildId, interaction.user.id);
+    const result = await handleFish(interaction.guildId, interaction.user.id, perksFor(interaction.member, readConfig()).coinBonus);
     if (result.error) return interaction.reply({ content: result.error, ephemeral: true });
     await interaction.reply({ embeds: [result.embed] });
   },
   async executePrefix(message) {
-    const result = await handleFish(message.guild.id, message.author.id);
+    const result = await handleFish(message.guild.id, message.author.id, perksFor(message.member, readConfig()).coinBonus);
     if (result.error) return message.reply(result.error);
     await message.reply({ embeds: [result.embed] });
   }

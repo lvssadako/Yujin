@@ -2,7 +2,7 @@ const logger = require('../utils/logger');
 const { Events, ActivityType } = require('discord.js');
 const { readConfig } = require('../utils/configCache');
 const { validateRoleForAssignment } = require('../utils/roleValidation');
-const { buildStatusMatcher } = require('../services/presenceRoles/statusMatcher');
+const { groupTriggersByRole, decideRole } = require('../services/presenceRoles/roleDecision');
 const { createPresenceRoleSync } = require('../services/presenceRoles/presenceRoleSync');
 
 const userCooldown = new Map();
@@ -71,45 +71,46 @@ async function handlePresenceUpdate(_old, pres, deps = {}) {
     if (!member || member.user?.bot) return;
 
     const cfg = (deps.readConfig || readConfig)();
-    const triggers = resolveMemberTriggers(cfg).filter(t => t.field === 'status');
-    if (!triggers.length) return;
+    const triggers = resolveMemberTriggers(cfg);
+    if (!triggers.some(t => t.field === 'status')) return;
 
     const custom = pres.activities?.find?.(a => a.type === ActivityType.Custom || a.type === 4);
     const customStatus = text(custom?.state || custom?.details).toLowerCase();
 
-    for (const t of triggers) {
-      const matches = buildStatusMatcher(t.includes);
+    // Una sola decisión por ROL: se conserva si cualquiera de sus reglas (enlaces o tag) se cumple.
+    for (const [roleId, group] of groupTriggersByRole(triggers)) {
+      if (!group.status.length) continue; // los roles solo por tag se sincronizan en presenceRoleSync
 
-      const validation = validateRoleForAssignment(pres.guild, t.roleId, 'presence status role');
+      const validation = validateRoleForAssignment(pres.guild, roleId, 'presence status role');
       if (!validation.valid) {
-        logger.warn(`[presenceStatusRoles] Invalid role ${t.roleId}: ${validation.reason}`);
+        logger.warn(`[presenceStatusRoles] Invalid role ${roleId}: ${validation.reason}`);
         continue;
       }
 
-      const hasText = matches(customStatus);
-      const removeKey = `${member.id}:${t.roleId}`;
+      const shouldHave = decideRole(group, { text: customStatus, visible: true, user: member.user, guildId: pres.guild.id });
+      const removeKey = `${member.id}:${roleId}`;
 
-      if (hasText) {
+      if (shouldHave) {
         // Cancelar remoción pendiente si el usuario recuperó el texto
         if (pendingRemove.has(removeKey)) {
           clearTimeout(pendingRemove.get(removeKey));
           pendingRemove.delete(removeKey);
         }
-        if (!member.roles.cache.has(t.roleId)) {
+        if (!member.roles.cache.has(roleId)) {
           try {
-            await member.roles.add(t.roleId);
-            logger.info(`[presenceStatusRoles] Rol ${t.roleId} otorgado a ${member.user?.tag || member.id}`, {
+            await member.roles.add(roleId);
+            logger.info(`[presenceStatusRoles] Rol ${roleId} otorgado a ${member.user?.tag || member.id}`, {
               userId: member.id,
-              roleId: t.roleId,
+              roleId,
               guildId: pres.guild.id
             });
           } catch (err) {
-            logger.warn(`[presenceStatusRoles] Error al añadir rol ${t.roleId} a ${member.id}:`, err?.message);
+            logger.warn(`[presenceStatusRoles] Error al añadir rol ${roleId} a ${member.id}:`, err?.message);
           }
         }
-      } else {
-        // Si no tiene el texto y tiene el rol, programar remoción con tiempo de gracia
-        if (member.roles.cache.has(t.roleId) && !pendingRemove.has(removeKey)) {
+      } else if (shouldHave === false) {
+        // Si ninguna regla se cumple y tiene el rol, programar remoción con tiempo de gracia
+        if (member.roles.cache.has(roleId) && !pendingRemove.has(removeKey)) {
           const timeout = setTimeout(async () => {
             try {
               pendingRemove.delete(removeKey);
@@ -128,17 +129,18 @@ async function handlePresenceUpdate(_old, pres, deps = {}) {
 
               const refreshedCustom = currentPres.activities?.find?.(a => a.type === ActivityType.Custom || a.type === 4);
               const refreshedStatus = text(refreshedCustom?.state || refreshedCustom?.details).toLowerCase();
+              const stillNot = decideRole(group, { text: refreshedStatus, visible: true, user: freshMember.user, guildId: pres.guild.id }) === false;
 
-              if (!matches(refreshedStatus) && freshMember.roles.cache.has(t.roleId)) {
-                await freshMember.roles.remove(t.roleId);
-                logger.info(`[presenceStatusRoles] Rol ${t.roleId} removido de ${freshMember.user?.tag || freshMember.id}`, {
+              if (stillNot && freshMember.roles.cache.has(roleId)) {
+                await freshMember.roles.remove(roleId);
+                logger.info(`[presenceStatusRoles] Rol ${roleId} removido de ${freshMember.user?.tag || freshMember.id}`, {
                   userId: freshMember.id,
-                  roleId: t.roleId,
+                  roleId,
                   guildId: pres.guild.id
                 });
               }
             } catch (err) {
-              logger.warn(`[presenceStatusRoles] Error al remover rol ${t.roleId} de ${member.id}:`, err?.message);
+              logger.warn(`[presenceStatusRoles] Error al remover rol ${roleId} de ${member.id}:`, err?.message);
             }
           }, REMOVE_DELAY_MS);
 

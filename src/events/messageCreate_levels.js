@@ -14,6 +14,7 @@ const { recordMessageActivity } = require('../services/streak/streakService');
 const { sendDmNotification } = require('../services/notification/dmNotificationService');
 const { secureRandom, secureRandomInt, secureChoice } = require('../utils/cryptoRandom');
 const { levelUpAllowedMentions } = require('../utils/levelMentions');
+const { perksFor, withBonus } = require('../services/boost/boosterPerks');
 
 function xpToNext(level) {
   return Math.round(200 * Math.pow(level + 1, 1.4));
@@ -139,7 +140,8 @@ module.exports = (client) => {
         // Boosts activos
         const boostMultiplier = getXpMultiplier(guildId, userId);
         const roleMultiplier = 1 + totalBonusDecimal;
-        const totalMultiplier = roleMultiplier * boostMultiplier;
+        const perks = perksFor(member, cfg);
+        const totalMultiplier = roleMultiplier * boostMultiplier * (1 + perks.xpBonus);
         let gained = Math.round(base * totalMultiplier);
 
         // Límite diario
@@ -180,9 +182,7 @@ module.exports = (client) => {
 
           // Monedas cuando hay XP
           const baseCoins = secureRandomInt(1, 3);
-          const boosterRole = message.guild?.roles?.premiumSubscriberRole;
-          const isBooster = member?.premiumSince || (boosterRole && member?.roles?.cache?.has(boosterRole.id));
-          const coinsEarned = isBooster ? Math.floor(baseCoins * 1.5) : baseCoins;
+          const coinsEarned = withBonus(baseCoins, perks.coinBonus);
           addCoins(guildId, userId, coinsEarned);
           if (leveledUpCount > 0) addCoins(guildId, userId, 100 * leveledUpCount);
 
@@ -191,6 +191,7 @@ module.exports = (client) => {
             `[levels] ${message.author.tag} +${gained} XP (base ${base}` +
             `${bonusPct > 0 ? ` +${bonusPct}% roles` : ''}` +
             `${boostMultiplier > 1 ? ` ×${boostMultiplier.toFixed(2)} boost` : ''}` +
+            `${perks.xpBonus > 0 ? ` +${Math.round(perks.xpBonus * 100)}% booster` : ''}` +
             ` = ×${totalMultiplier.toFixed(2)})`
           );
 

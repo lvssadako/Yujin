@@ -17,7 +17,7 @@ function benefitText(item) {
   }
 }
 
-function buildCatalogView(catalog, userData, discountFor, priceFor, requestedPage = 0, ownerId = '', category = 'all') {
+function buildCatalogView(catalog, userData, discountFor, priceFor, requestedPage = 0, ownerId = '', category = 'all', options = {}) {
   const cat = CATEGORIES[category] ? category : 'all';
   const list = filterByCategory(catalog, cat);
   const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
@@ -28,7 +28,8 @@ function buildCatalogView(catalog, userData, discountFor, priceFor, requestedPag
   const embed = createEmbed(COLORS.economy).setAuthor({ name: 'Yujin ♥ · Tienda' })
     .setTitle(CATEGORIES[cat].emoji + ' ' + (cat === 'all' ? 'Un impulso para tu próxima meta' : CATEGORIES[cat].label))
     .setDescription('Gasta tus monedas 🪙 en boosts, objetos, roles y utilidades. Elige una categoría y pulsa el producto que quieras.\n' +
-      (discountActive ? '🔥 **Descuento por racha activo: 10 %.**' : 'Consigue una racha de actividad de ' + STREAK_ACTIVATION_DAYS + ' días para activar el descuento del 10 %.'))
+      (discountActive ? '🔥 **Descuento por racha activo: 10 %.**' : 'Consigue una racha de actividad de ' + STREAK_ACTIVATION_DAYS + ' días para activar el descuento del 10 %.') +
+      (options.boosterDiscount > 0 ? '\n💎 **Beneficio de Booster: -' + options.boosterDiscount + ' % extra** (los descuentos se suman hasta un máximo de 45 %).' : ''))
     .setFooter({ text: 'Precios para quien abrió la tienda · Página ' + (page + 1) + ' de ' + pages + ' · ' + list.length + ' productos' });
 
   for (const item of items) {

@@ -1,5 +1,5 @@
 const { ActivityType } = require('discord.js');
-const { buildStatusMatcher, hasServerTag } = require('./statusMatcher');
+const { groupTriggersByRole, decideRole } = require('./roleDecision');
 
 const SWEEP_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const CONFIG_TTL_MS = 15 * 1000;
@@ -40,26 +40,28 @@ function createPresenceRoleSync({ readConfig, resolveTriggers, validateRole, log
     }
   }
 
-  /** Tag del servidor: evaluable en cualquier momento (no depende de la presencia). */
-  async function syncMemberTag(member) {
+  /** Evalúa cada rol una sola vez con todas sus reglas (enlace O tag). Devuelve cuántos roles cambió. */
+  async function syncMember(member, presence = null, only = null) {
     if (!member || member.user?.bot) return 0;
+    const visible = Boolean(presence && presence.status !== 'offline' && presence.status !== 'invisible');
+    const text = visible ? customText(presence.activities) : '';
     let changed = 0;
-    for (const t of triggers().filter(x => x.field === 'tag')) {
-      if (await setRole(member.guild, member, t.roleId, hasServerTag(member.user, member.guild.id), 'tag del servidor')) changed += 1;
+    for (const [roleId, group] of groupTriggersByRole(triggers())) {
+      if (only === 'tag' && !group.tag) continue;
+      if (only === 'status' && !group.status.length) continue;
+      const shouldHave = decideRole(group, { text, visible, user: member.user, guildId: member.guild.id });
+      if (shouldHave === null) continue; // sin presencia visible no hay evidencia de que quitara el enlace
+      const why = group.tag && group.status.length ? 'enlace en el estado o tag del servidor' : group.tag ? 'tag del servidor' : 'enlace en el estado';
+      if (await setRole(member.guild, member, roleId, shouldHave, why)) changed += 1;
     }
     return changed;
   }
 
+  /** Tag del servidor: cambia con el perfil, no con la presencia. */
+  const syncMemberTag = member => syncMember(member, member?.presence || null, 'tag');
+
   /** Enlace en el estado: solo con presencia visible (online/idle/dnd). */
-  async function syncMemberStatus(member, presence) {
-    if (!member || member.user?.bot || !presence || presence.status === 'offline' || presence.status === 'invisible') return 0;
-    const text = customText(presence.activities);
-    let changed = 0;
-    for (const t of triggers().filter(x => x.field === 'status')) {
-      if (await setRole(member.guild, member, t.roleId, buildStatusMatcher(t.includes)(text), 'enlace en el estado')) changed += 1;
-    }
-    return changed;
-  }
+  const syncMemberStatus = (member, presence) => syncMember(member, presence, 'status');
 
   /** Reconciliación completa (al iniciar y cada 6 h): corrige lo ocurrido con el bot apagado. */
   async function reconcileGuild(guild) {

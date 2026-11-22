@@ -54,6 +54,7 @@ const COMMAND_MAP = {
   profile: 'level',
   profileset: 'level',
   fondo: 'level',
+  boostperks: 'boost',
   badge: 'level',
   leaderboard: 'level',
   streak: 'level',

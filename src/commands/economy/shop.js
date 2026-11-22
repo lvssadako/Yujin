@@ -4,19 +4,21 @@ const { readProfiles, ensureUser } = require('../../utils/profileStore');
 const { buildCatalog, getDiscountForUser, getFinalPrice, findItem, CATEGORIES } = require('../../services/shop/shopCatalog');
 const { getPurchaseService } = require('../../services/shop/purchaseService');
 const { buildCatalogView, buildPurchaseEmbed } = require('../../utils/shopView');
+const { perksFor } = require('../../services/boost/boosterPerks');
 
 const timezoneOf = cfg => cfg.timezone || 0;
 
-function view(cfg, userData, page, ownerId, category) {
+function view(cfg, userData, page, ownerId, category, member) {
   const catalog = buildCatalog(cfg);
-  return { catalog, ...buildCatalogView(catalog, userData, getDiscountForUser, getFinalPrice, page, ownerId, category) };
+  const extra = perksFor(member, cfg).shopDiscount;
+  return { catalog, ...buildCatalogView(catalog, userData, (i, u) => getDiscountForUser(i, u, extra), (i, u) => getFinalPrice(i, u, extra), page, ownerId, category, { boosterDiscount: extra }) };
 }
 
 async function runPurchase({ guild, userId, member, itemId }) {
   const cfg = readConfig();
   const userData = ensureUser(readProfiles(), guild.id, userId);
   const catalog = buildCatalog(cfg);
-  const result = await getPurchaseService().purchase({ guild, member, userId, item: findItem(catalog, itemId), catalog, cfg, userData, tz: timezoneOf(cfg) });
+  const result = await getPurchaseService().purchase({ guild, member, userId, item: findItem(catalog, itemId), catalog, cfg, userData, tz: timezoneOf(cfg), extraDiscount: perksFor(member, cfg).shopDiscount });
   return result.ok ? { embed: buildPurchaseEmbed(result) } : { error: result.error };
 }
 
@@ -35,7 +37,7 @@ module.exports = {
       return result.error ? interaction.reply({ content: result.error, ephemeral: true }) : interaction.reply({ embeds: [result.embed], ephemeral: true });
     }
     const userData = ensureUser(readProfiles(), interaction.guildId, interaction.user.id);
-    const { embed, components } = view(readConfig(), userData, 0, interaction.user.id, 'all');
+    const { embed, components } = view(readConfig(), userData, 0, interaction.user.id, 'all', interaction.member);
     return interaction.reply({ embeds: [embed], components });
   },
 
@@ -47,14 +49,14 @@ module.exports = {
     const userData = ensureUser(readProfiles(), interaction.guildId, interaction.user.id);
     if (id.startsWith('shop_cat_')) {
       const category = id.split('_').pop();
-      const v = view(readConfig(), userData, 0, interaction.user.id, CATEGORIES[category] ? category : 'all');
+      const v = view(readConfig(), userData, 0, interaction.user.id, CATEGORIES[category] ? category : 'all', interaction.member);
       return interaction.update({ embeds: [v.embed], components: v.components });
     }
     if (id.startsWith('shop_page_')) {
       // shop_page_<owner>_<categoria>_<página>   (formato anterior: shop_page_<owner>_<página>)
       const match = /^shop_page_(\d{17,20})_(?:([a-z]+)_)?(-?\d+)$/.exec(id);
       if (!match) return interaction.reply({ content: 'Abre /shop o &shop para explorar tu propia tienda.', flags: 64 });
-      const v = view(readConfig(), userData, Number(match[3]), interaction.user.id, match[2] || 'all');
+      const v = view(readConfig(), userData, Number(match[3]), interaction.user.id, match[2] || 'all', interaction.member);
       return interaction.update({ embeds: [v.embed], components: v.components });
     }
     const result = await runPurchase({ guild: interaction.guild, userId: interaction.user.id, member: interaction.member, itemId: id.replace('shop_buy_', '') });
@@ -68,7 +70,7 @@ module.exports = {
       return result.error ? message.reply(result.error) : message.reply({ embeds: [result.embed] });
     }
     const userData = ensureUser(readProfiles(), message.guild.id, message.author.id);
-    const { embed, components } = view(readConfig(), userData, 0, message.author.id, 'all');
+    const { embed, components } = view(readConfig(), userData, 0, message.author.id, 'all', message.member);
     return message.reply({ embeds: [embed], components });
   },
 

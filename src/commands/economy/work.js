@@ -12,8 +12,10 @@ const MESSAGES = [
 ];
 
 const { secureRandomInt, secureChoice } = require('../../utils/cryptoRandom');
+const { perksFor, withBonus } = require('../../services/boost/boosterPerks');
+const { readConfig } = require('../../utils/configCache');
 
-async function handleWork(guildId, userId) {
+async function handleWork(guildId, userId, coinBonus = 0) {
   const profiles = readProfiles();
   const user = ensureUser(profiles, guildId, userId);
   
@@ -42,6 +44,8 @@ async function handleWork(guildId, userId) {
 
   let coins = secureRandomInt(100, 400);
   coins = Math.max(1, Math.floor(coins * incomeMultiplier));
+  // Beneficio de Booster: se aplica sobre el ingreso ya penalizado por préstamo (la mora sigue contando).
+  if (coinBonus > 0) coins = withBonus(coins, coinBonus);
 
   user.lastWork = now;
   writeProfiles(profiles);
@@ -78,12 +82,12 @@ module.exports = {
     .setName('work')
     .setDescription('Trabaja para ganar monedas (Cooldown: 4h).'),
   async execute(interaction) {
-    const result = await handleWork(interaction.guildId, interaction.user.id);
+    const result = await handleWork(interaction.guildId, interaction.user.id, perksFor(interaction.member, readConfig()).coinBonus);
     if (result.error) return interaction.reply({ content: result.error, ephemeral: true });
     await interaction.reply({ embeds: [result.embed] });
   },
   async executePrefix(message) {
-    const result = await handleWork(message.guild.id, message.author.id);
+    const result = await handleWork(message.guild.id, message.author.id, perksFor(message.member, readConfig()).coinBonus);
     if (result.error) return message.reply(result.error);
     await message.reply({ embeds: [result.embed] });
   }

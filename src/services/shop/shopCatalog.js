@@ -67,13 +67,14 @@ function filterByCategory(catalog, category) {
   return category === 'all' || !CATEGORIES[category] ? catalog : catalog.filter(i => i.category === category);
 }
 
-function getDiscountForUser(item, userData) {
+// extraPct: descuento adicional (p. ej. beneficio de Booster). Todo se acumula con tope de 45 %.
+function getDiscountForUser(item, userData, extraPct = 0) {
   const streakDiscount = isStreakActive(userData?.streakDays) ? 10 : 0;
-  return Math.min(45, Math.max(0, num(item.discountPercent) + streakDiscount));
+  return Math.min(45, Math.max(0, num(item.discountPercent) + streakDiscount + Math.max(0, num(extraPct))));
 }
 
-function getFinalPrice(item, userData) {
-  return Math.max(0, Math.round(num(item.price) * (1 - getDiscountForUser(item, userData) / 100)));
+function getFinalPrice(item, userData, extraPct = 0) {
+  return Math.max(0, Math.round(num(item.price) * (1 - getDiscountForUser(item, userData, extraPct) / 100)));
 }
 
 const findItem = (catalog, id) => catalog.find(item => item.id === id) || null;

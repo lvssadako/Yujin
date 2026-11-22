@@ -22,9 +22,9 @@ function createPurchaseService({ economy, grantBoost, leases, rerollMissions, mi
     return null;
   }
 
-  async function deliver({ item, guild, member, userId, catalog, cfg, tz, price, userData }) {
+  async function deliver({ item, guild, member, userId, catalog, cfg, tz, price, userData, extraDiscount = 0 }) {
     const guildId = guild.id;
-    const priceText = `${fmt(price)} 🪙${getDiscountForUser(item, userData) > 0 ? ` (-${getDiscountForUser(item, userData)}%)` : ''}`;
+    const priceText = `${fmt(price)} 🪙${getDiscountForUser(item, userData, extraDiscount) > 0 ? ` (-${getDiscountForUser(item, userData, extraDiscount)}%)` : ''}`;
     switch (item.kind) {
       case 'bundle': {
         let granted = 0;
@@ -55,16 +55,16 @@ function createPurchaseService({ economy, grantBoost, leases, rerollMissions, mi
     }
   }
 
-  async function purchase({ guild, member, userId, item, catalog, cfg = {}, userData = {}, tz = 0 }) {
+  async function purchase({ guild, member, userId, item, catalog, cfg = {}, userData = {}, tz = 0, extraDiscount = 0 }) {
     if (!item) return fail('No encontré ese producto. Abre /shop para consultar los IDs disponibles.');
-    const price = getFinalPrice(item, userData);
+    const price = getFinalPrice(item, userData, extraDiscount);
     if (!Number.isSafeInteger(price) || price < 0) return fail('Este producto no está disponible por ahora.');
     const blocked = await precheck({ item, member, guild, userId, tz });
     if (blocked) return fail(blocked);
     if (economy.getBalance(guild.id, userId).coins < price) return fail(`No tienes suficientes monedas en la billetera (necesitas **${fmt(price)} 🪙**). Consulta /balance o retira con /bank withdraw.`);
     if (!economy.subtractCoins(guild.id, userId, price)) return fail('No pude completar la compra. Revisa tu saldo antes de intentarlo de nuevo.');
     try {
-      const result = await deliver({ item, guild, member, userId, catalog, cfg, tz, price, userData });
+      const result = await deliver({ item, guild, member, userId, catalog, cfg, tz, price, userData, extraDiscount });
       return { ok: true, price, rarity: item.rarity, ...result };
     } catch (error) {
       economy.addCoins(guild.id, userId, price); // la entrega falló: se devuelve el dinero

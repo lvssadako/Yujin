@@ -12,6 +12,13 @@ const ConfigSchema = z.object({
   botLogChannelId: z.string().regex(/^\d+$/).optional(),
   statusRoleId: z.string().regex(/^\d+$/).optional(),
   coinEmoji: z.string().max(64).optional(),
+  boosterPerks: z.object({
+    enabled: z.boolean().optional(),
+    xpBonus: z.number().min(0).max(2).optional(),
+    coinBonus: z.number().min(0).max(3).optional(),
+    dailyBonus: z.number().min(0).max(3).optional(),
+    shopDiscount: z.number().min(0).max(45).optional()
+  }).optional(),
   shopRoles: z.array(z.object({
     id: z.string().regex(/^[a-z0-9_]{3,32}$/),
     name: z.string().min(1).max(40),

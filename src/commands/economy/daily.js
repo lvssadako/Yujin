@@ -10,10 +10,14 @@ const { buildDailyCardAttachment } = require('../../services/image/dailyCard');
 const logger = require('../../utils/logger');
 
 const { buildDailyEmbed, previewDailyReward, weekTrackerText } = require('../../utils/dailyView');
+const { perksFor, withBonus } = require('../../services/boost/boosterPerks');
 const { formatNumber, clip } = require('../../utils/ui');
 
 const dayOf = (tz, now = Date.now()) => Math.floor((now + tz * 3600000) / 86400000);
 const endOfDayTs = (tz, now = Date.now()) => Math.floor(((dayOf(tz, now) + 1) * 86400000 - tz * 3600000) / 1000);
+
+// Recompensa base del día; los Boosters reciben un extra (config.boosterPerks.dailyBonus) sobre la base.
+const dailyBase = (interaction, cfg) => withBonus(cfg.dailyCoins || 250, perksFor(interaction.member, cfg).dailyBonus);
 
 // Construye todo el panel (embed + tarjeta + botones) a partir del estado actual.
 async function renderPanel(interaction, cfg, tz) {
@@ -21,7 +25,8 @@ async function renderPanel(interaction, cfg, tz) {
   const today = dayOf(tz);
   const profile = ensureUser(readProfiles(), guildId, userId);
   const canClaim = (profile.lastDailyDay || 0) !== today;
-  const preview = previewDailyReward({ streak: profile.dailyStreak || 0, lastDailyDay: profile.lastDailyDay || 0, today, base: cfg.dailyCoins || 250 });
+  const base = dailyBase(interaction, cfg);
+  const preview = previewDailyReward({ streak: profile.dailyStreak || 0, lastDailyDay: profile.lastDailyDay || 0, today, base });
   const missions = getDaily(interaction.guild, userId, tz);
   const balance = getBalance(guildId, userId);
 
@@ -78,7 +83,7 @@ module.exports = {
 
         if (i.customId === 'daily_claim') {
           const result = dailyRewardService.claimDaily({
-            guildId: interaction.guildId, userId: interaction.user.id, day: dayOf(tz), base: cfg.dailyCoins || 250
+            guildId: interaction.guildId, userId: interaction.user.id, day: dayOf(tz), base: dailyBase(interaction, cfg)
           });
           if (!result.success) {
             await answer({ content: 'Ya cobraste la recompensa de hoy. Vuelve después de la próxima renovación.', flags: 64 });

@@ -6,6 +6,7 @@ const { updateMissionProgress } = require('../utils/dailyMissions');
 const { readConfig } = require('../utils/configCache');
 const { readLevels, writeLevels, ensureUserData, xpToNext } = require('../services/level').levelService;
 const { levelUpAllowedMentions } = require('../utils/levelMentions');
+const { perksFor } = require('../services/boost/boosterPerks');
 
 
 function getRoleBonusPercent(cfg, member) {
@@ -88,7 +89,8 @@ async function awardVoice(guild, userId, member, channelId, sinceMs, untilMs = D
     }
   }
 
-  const gained = Math.max(0, Math.round(basePerMin * (elapsedSec / 60) * chanMult * roleMult * activityMult));
+  const boosterMult = 1 + perksFor(member, cfg).xpBonus;
+  const gained = Math.max(0, Math.round(basePerMin * (elapsedSec / 60) * chanMult * roleMult * boosterMult * activityMult));
   const elapsedMs = elapsedSec * 1000;
 
   const oldLevel = data.level;

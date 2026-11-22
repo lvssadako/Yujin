@@ -81,6 +81,12 @@ module.exports = (client) => {
           await interaction.showModal(modal);
           return;
         }
+        // Botón de canjear insignias repetidas
+        if (interaction.customId === 'chest_dupes') {
+          const { handleChestDupes } = require('../commands/economy/chest.js');
+          await handleChestDupes(interaction, true);
+          return;
+        }
         // Botón cerrar
         if (interaction.customId === 'chest_close') {
           await interaction.update({ content: 'Cofre cerrado.', embeds: [], components: [] });

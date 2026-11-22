@@ -8,6 +8,7 @@ const { updateMissionProgress } = require('../utils/dailyMissions');
 const { addCoins } = require('../services/economy').economyService;
 const { secureRandomInt } = require('../utils/cryptoRandom');
 const { levelUpAllowedMentions } = require('../utils/levelMentions');
+const { perksFor } = require('../services/boost/boosterPerks');
 
 function xpToNext(level) { return Math.round(200 * Math.pow(level + 1, 1.4)); }
 
@@ -73,7 +74,7 @@ module.exports = (client) => {
         }
       }
 
-      const multiplier = 1 + totalBonusDecimal;
+      const multiplier = (1 + totalBonusDecimal) * (1 + perksFor(member, cfg).xpBonus);
       const gained = Math.round(base * multiplier);
 
       const levels = readLevels();
