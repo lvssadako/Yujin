@@ -4,23 +4,14 @@ const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBu
 const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
 const { normalizeExternalImageUrl } = require('../../utils/urlSafety');
 const { THEME_PRESETS, WALLPAPER_PRESETS } = require('../../constants/profileThemes');
-const { readLevels, ensureUserData } = require('../../services/level').levelService;
-
-function canUseCustomUrl(member, userLevelData, userStreak) {
-  const boosterRole = member.guild.roles.premiumSubscriberRole;
-  const isBooster = Boolean(member.premiumSince) || (boosterRole && member.roles.cache.has(boosterRole.id));
-  const hasLevel = (userLevelData?.level || 0) >= 5;
-  const hasStreak = (userStreak || 0) >= 7;
-  return isBooster || hasLevel || hasStreak;
-}
+const { getProfileBackgroundService, lockedMessage } = require('../../services/profile/profileBackgroundService');
+const { REQUIRED_STREAK_DAYS } = require('../../services/profile/backgroundAccess');
 
 function buildCustomizationPanel(guildId, userId, member) {
   const profiles = readProfiles();
   const user = ensureUser(profiles, guildId, userId);
-  const levels = readLevels();
-  const lvlData = ensureUserData(levels, guildId, userId);
-
-  const isUnlocked = canUseCustomUrl(member, lvlData, user.streakDays);
+  const access = getProfileBackgroundService().getAccess(member);
+  const isUnlocked = access.allowed;
   const serverName = member?.displayName || member?.user?.displayName || member?.user?.username || 'Usuario';
 
   const embed = createEmbed()
@@ -56,8 +47,8 @@ function buildCustomizationPanel(guildId, userId, member) {
       {
         name: '🔓 Estado de Desbloqueo (Fondo URL)',
         value: isUnlocked
-          ? '✅ **Desbloqueado** (Eres Booster o tienes Nivel 5+ / Racha 7+)'
-          : '🔒 **Bloqueado** (Requiere Booster del Servidor, Nivel 5 o Racha de 7 días)',
+          ? `✅ **Desbloqueado** (${{ booster: 'Eres Booster', streak: `Racha de ${REQUIRED_STREAK_DAYS}+ días`, pass: 'Pase de Fondo comprado' }[access.reason]})`
+          : `🔒 **Bloqueado** (Booster, racha de ${REQUIRED_STREAK_DAYS}+ días o Pase de Fondo: \`/fondo comprar\`)`,
         inline: false
       }
     )
@@ -186,8 +177,7 @@ module.exports = {
 
     const profiles = readProfiles();
     const user = ensureUser(profiles, interaction.guildId, interaction.user.id);
-    const levels = readLevels();
-    const lvlData = ensureUserData(levels, interaction.guildId, interaction.user.id);
+    const bgService = getProfileBackgroundService();
 
     const title = interaction.options.getString('titulo');
     const theme = interaction.options.getString('tema');
@@ -198,6 +188,13 @@ module.exports = {
     const opacity = interaction.options.getInteger('opacidad');
 
     const changes = [];
+
+    // Validar el fondo por URL (formato y acceso) antes de guardar cualquier cambio.
+    if (bgUrl && !bgPreset) {
+      const checked = bgService.validateUrl(bgUrl);
+      if (!checked.ok) return interaction.editReply(`❌ ${checked.error}`);
+      if (!bgService.getAccess(interaction.member).allowed) return interaction.editReply(lockedMessage());
+    }
 
     if (title !== null) {
       user.title = title || '';
@@ -230,30 +227,6 @@ module.exports = {
       }
     }
 
-    const { saveUserProfileBackground, deleteUserProfileBackground } = require('../../services/image/imageService');
-
-    if (bgPreset) {
-      if (bgPreset === 'none') {
-        user.bgUrl = '';
-        await deleteUserProfileBackground(interaction.guildId, interaction.user.id);
-        changes.push('🖼️ **Fondo:** Eliminado (Fondo oscuro por defecto).');
-      } else if (WALLPAPER_PRESETS[bgPreset]) {
-        user.bgUrl = WALLPAPER_PRESETS[bgPreset].url;
-        await saveUserProfileBackground(interaction.guildId, interaction.user.id, user.bgUrl);
-        changes.push(`🖼️ **Fondo:** ${WALLPAPER_PRESETS[bgPreset].name}`);
-      }
-    } else if (bgUrl) {
-      if (!canUseCustomUrl(interaction.member, lvlData, user.streakDays)) {
-        return interaction.editReply('🔒 **Acceso Denegado:** Los fondos personalizados por URL requieren ser **Booster**, tener **Nivel 5+** o una **Racha de 7+ días**.');
-      }
-      const saveResult = await saveUserProfileBackground(interaction.guildId, interaction.user.id, bgUrl);
-      if (!saveResult.ok) {
-        return interaction.editReply(`❌ Error con la URL de fondo: ${saveResult.error || 'No se pudo procesar la imagen.'}`);
-      }
-      user.bgUrl = bgUrl.trim();
-      changes.push(`🖼️ **Fondo URL:** Guardado y verificado con éxito (${Math.round((saveResult.size || 0) / 1024)} KB).`);
-    }
-
     if (opacity !== null) {
       user.bgOpacity = opacity / 100;
       changes.push(`👁️ **Opacidad:** ${opacity}%`);
@@ -261,9 +234,23 @@ module.exports = {
 
     writeProfiles(profiles);
 
+    // El servicio de fondos lee y escribe el perfil por su cuenta: se ejecuta tras el guardado anterior.
+    if (bgPreset) {
+      const result = await bgService.setPreset(interaction.guildId, interaction.user.id, bgPreset);
+      changes.push(result.ok
+        ? (result.name ? `🖼️ **Fondo:** ${result.name}` : '🖼️ **Fondo:** Eliminado (Fondo oscuro por defecto).')
+        : `⚠️ **Fondo:** ${result.error}`);
+    } else if (bgUrl) {
+      const result = await bgService.setCustomUrl(interaction.member, bgUrl);
+      changes.push(result.ok
+        ? `🖼️ **Fondo URL:** Guardado y verificado con éxito (${Math.round((result.size || 0) / 1024)} KB).`
+        : `⚠️ **Fondo URL:** ${result.error}`);
+    }
+
+    const freshUser = ensureUser(readProfiles(), interaction.guildId, interaction.user.id);
     const embed = createEmbed()
       .setAuthor({ name: '✅ Perfil Actualizado con Éxito' })
-      .setColor(user.accent || '#57F287')
+      .setColor(freshUser.accent || '#57F287')
       .setDescription(`Tus preferencias de perfil han sido guardadas:\n\n${changes.join('\n')}`)
       .setFooter({ text: 'Usa /profile para ver tu tarjeta actualizada' })
       .setTimestamp();
@@ -280,9 +267,7 @@ module.exports = {
     const sub = (args[0] || '').toLowerCase();
     const profiles = readProfiles();
     const user = ensureUser(profiles, message.guild.id, message.author.id);
-    const levels = readLevels();
-    const lvlData = ensureUserData(levels, message.guild.id, message.author.id);
-    const { saveUserProfileBackground, deleteUserProfileBackground } = require('../../services/image/imageService');
+    const bgService = getProfileBackgroundService();
 
     if (sub === 'titulo' || sub === 'title') {
       const title = args.slice(1).join(' ').slice(0, 32);
@@ -304,20 +289,17 @@ module.exports = {
       writeProfiles(profiles);
       return message.reply(`✅ Color de barra actualizado a \`${user.barColor || 'default'}\``);
     } else if (sub === 'fondo' || sub === 'bg') {
-      const bgUrl = args[1];
-      if (!bgUrl || bgUrl === 'none' || bgUrl === 'quitar') {
-        user.bgUrl = '';
-        await deleteUserProfileBackground(message.guild.id, message.author.id);
-        writeProfiles(profiles);
+      const target = args[1];
+      if (!target || target === 'none' || target === 'quitar') {
+        await bgService.setPreset(message.guild.id, message.author.id, 'none');
         return message.reply('✅ Fondo eliminado (restablecido a oscuro por defecto).');
       }
-      if (!canUseCustomUrl(message.member, lvlData, user.streakDays)) {
-        return message.reply('🔒 Fondos personalizados por URL requieren ser **Booster**, tener **Nivel 5+** o una **Racha de 7+ días**.');
+      if (Object.prototype.hasOwnProperty.call(WALLPAPER_PRESETS, target)) {
+        const preset = await bgService.setPreset(message.guild.id, message.author.id, target);
+        return message.reply(preset.ok ? `✅ Fondo cambiado a ${preset.name}.` : `❌ ${preset.error}`);
       }
-      const saveResult = await saveUserProfileBackground(message.guild.id, message.author.id, bgUrl);
-      if (!saveResult.ok) return message.reply(`❌ Error con la imagen: ${saveResult.error}`);
-      user.bgUrl = bgUrl.trim();
-      writeProfiles(profiles);
+      const result = await bgService.setCustomUrl(message.member, target);
+      if (!result.ok) return message.reply(result.code === 'locked' ? result.error : `❌ ${result.error}`);
       return message.reply('✅ Fondo guardado y verificado con éxito.');
     } else {
       const panel = buildCustomizationPanel(message.guild.id, message.author.id, message.member);

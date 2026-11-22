@@ -151,6 +151,13 @@ try {
 require('./events/bumpTimersLoader')(client);
 require('./services/giveaways/giveawayManager').init(client);
 
+// Pagos (Stripe): debe iniciarse antes del servidor HTTP, que le delega /pay y /webhook/stripe
+try {
+  require('./services/payments/paymentsService').init(client);
+} catch (e) {
+  logger.error('Error inicializando el servicio de pagos', { error: e.message });
+}
+
 // Servidor de Webhooks y Healthcheck para Azure y despliegues automáticos de GitHub
 try {
   require('./services/webhook/githubWebhookService').init(client);

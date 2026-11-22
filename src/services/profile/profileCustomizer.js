@@ -7,19 +7,10 @@ const {
   EmbedBuilder
 } = require('discord.js');
 const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
-const { normalizeExternalImageUrl } = require('../../utils/urlSafety');
+const { getProfileBackgroundService, lockedMessage } = require('./profileBackgroundService');
 const { THEME_PRESETS, WALLPAPER_PRESETS } = require('../../constants/profileThemes');
-const { readLevels, ensureUserData } = require('../../services/level').levelService;
 const { buildCustomizationPanel } = require('../../commands/profile/profileset');
 const logger = require('../../utils/logger');
-
-function canUseCustomUrl(member, userLevelData, userStreak) {
-  const boosterRole = member.guild.roles.premiumSubscriberRole;
-  const isBooster = Boolean(member.premiumSince) || (boosterRole && member.roles.cache.has(boosterRole.id));
-  const hasLevel = (userLevelData?.level || 0) >= 5;
-  const hasStreak = (userStreak || 0) >= 7;
-  return isBooster || hasLevel || hasStreak;
-}
 
 async function handleProfileInteraction(interaction) {
   const guildId = interaction.guildId;
@@ -46,26 +37,11 @@ async function handleProfileInteraction(interaction) {
     }
   }
 
-  // 3. Select Menu: Fondo preset
+  // 3. Select Menu: Fondo preset (gratis para todos)
   if (interaction.isStringSelectMenu() && interaction.customId === 'profile_select_bg') {
-    const selected = interaction.values[0];
-    const profiles = readProfiles();
-    const user = ensureUser(profiles, guildId, userId);
-    const { saveUserProfileBackground, deleteUserProfileBackground } = require('../image/imageService');
-
-    if (selected === 'bg_preset_none') {
-      user.bgUrl = '';
-      await deleteUserProfileBackground(guildId, userId);
-    } else {
-      const presetId = selected.replace('bg_preset_', '');
-      const wallpaper = WALLPAPER_PRESETS[presetId];
-      if (wallpaper) {
-        user.bgUrl = wallpaper.url;
-        await saveUserProfileBackground(guildId, userId, wallpaper.url);
-      }
-    }
-
-    writeProfiles(profiles);
+    const presetId = interaction.values[0].replace('bg_preset_', '');
+    const result = await getProfileBackgroundService().setPreset(guildId, userId, presetId);
+    if (!result.ok) return interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });
     const panel = buildCustomizationPanel(guildId, userId, member);
     return interaction.update({ embeds: [panel.embed], components: panel.components });
   }
@@ -140,14 +116,9 @@ async function handleProfileInteraction(interaction) {
   if (interaction.isButton() && interaction.customId === 'profile_btn_custom_bg') {
     const profiles = readProfiles();
     const user = ensureUser(profiles, guildId, userId);
-    const levels = readLevels();
-    const lvlData = ensureUserData(levels, guildId, userId);
 
-    if (!canUseCustomUrl(member, lvlData, user.streakDays)) {
-      return interaction.reply({
-        content: '🔒 **Acceso Bloqueado:** Los fondos por URL personalizada requieren ser **Booster**, tener **Nivel 5+** o una **Racha de 7+ días**.\n*¡Puedes usar los wallpapers de la galería predefinida sin restricciones!*',
-        ephemeral: true
-      });
+    if (!getProfileBackgroundService().getAccess(member).allowed) {
+      return interaction.reply({ content: lockedMessage(), ephemeral: true });
     }
 
     const modal = new ModalBuilder()
@@ -246,29 +217,20 @@ async function handleProfileInteraction(interaction) {
 
     if (interaction.customId === 'profile_modal_bg_url') {
       const url = interaction.fields.getTextInputValue('url_input').trim();
-      const profiles = readProfiles();
-      const user = ensureUser(profiles, guildId, userId);
-      const { saveUserProfileBackground, deleteUserProfileBackground } = require('../image/imageService');
+      const service = getProfileBackgroundService();
 
       if (!url) {
-        user.bgUrl = '';
-        await deleteUserProfileBackground(guildId, userId);
-        writeProfiles(profiles);
+        await service.setPreset(guildId, userId, 'none');
         const panel = buildCustomizationPanel(guildId, userId, member);
         return interaction.reply({ content: '🖼️ Fondo eliminado (Fondo oscuro por defecto).', embeds: [panel.embed], components: panel.components, ephemeral: true });
       }
 
       await interaction.deferReply({ ephemeral: true });
+      const result = await service.setCustomUrl(member, url);
+      if (!result.ok) return interaction.editReply({ content: result.code === 'locked' ? result.error : `❌ Error al cargar la imagen: ${result.error}` });
 
-      const saveResult = await saveUserProfileBackground(guildId, userId, url);
-      if (!saveResult.ok) {
-        return interaction.editReply({ content: `❌ Error al cargar la imagen: ${saveResult.error || 'URL no válida.'}` });
-      }
-
-      user.bgUrl = url;
-      writeProfiles(profiles);
       const panel = buildCustomizationPanel(guildId, userId, member);
-      return interaction.editReply({ content: `✅ Fondo personalizado verificado y guardado con éxito (${Math.round((saveResult.size || 0) / 1024)} KB).`, embeds: [panel.embed], components: panel.components });
+      return interaction.editReply({ content: `✅ Fondo personalizado verificado y guardado con éxito (${Math.round((result.size || 0) / 1024)} KB).`, embeds: [panel.embed], components: panel.components });
     }
   }
 
