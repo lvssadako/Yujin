@@ -6,6 +6,9 @@ const { getBalance, removeCoins } = require('../../services/economy/index').econ
 const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
 const { updateMissionProgress } = require('../../utils/dailyMissions');
 const { rollBadge, RARITIES } = require('../../utils/badgeRoller');
+const { addCoins } = require('../../services/economy/index').economyService;
+const chestRewards = require('../../services/chest/chestRewards');
+const { formatNumber } = require('../../utils/ui');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -30,6 +33,9 @@ module.exports = {
         .setMaxValue(10)
         .setRequired(false)))
     .addSubcommand(s => s
+      .setName('canjear')
+      .setDescription('Canjea tus insignias repetidas por monedas (conservas una de cada una)'))
+    .addSubcommand(s => s
       .setName('balance')
       .setDescription('Ver tus cofres y monedas')),
 
@@ -50,9 +56,14 @@ module.exports = {
           { name: '🪙 Monedas', value: String(coins), inline: true },
           { name: '💎 Gemas', value: String(gems || 0), inline: true }
         )
-        .setFooter({ text: 'Usa /chest buy para comprar cofres' })
+        .setFooter({ text: 'Usa /chest buy para comprar cofres · /chest canjear cambia repetidas por monedas' })
         .setTimestamp();
       return interaction.editReply({ embeds: [embed] });
+    }
+
+    if (sub === 'canjear') {
+      await interaction.deferReply();
+      return await handleChestDupes(interaction, false);
     }
 
     if (sub === 'buy') {
@@ -100,8 +111,11 @@ module.exports = {
         return message.reply('❌ Especifica una cantidad válida (1-10).');
       }
       await module.exports.execute(fakeInteraction);
+    } else if (sub === 'canjear' || sub === 'exchange') {
+      fakeInteraction.options.getSubcommand = () => 'canjear';
+      await module.exports.execute(fakeInteraction);
     } else {
-      return message.reply('❌ Subcomando no reconocido. Usa: balance, buy, open');
+      return message.reply('❌ Subcomando no reconocido. Usa: balance, buy, open, canjear');
     }
   }
 };
@@ -131,11 +145,15 @@ async function handleChestOpen(interaction, cantidad, isButton = false, useReply
     const newBadges = [];
     const duplicates = [];
 
+    let pityTriggered = 0;
     for (let i = 0; i < cantidad; i++) {
       if (!removeChest(guildId, userId)) break;
-      const badge = rollBadge(profiles);
+      const forced = chestRewards.shouldForcePity(user);
+      const badge = rollBadge(profiles, forced ? { minRarity: chestRewards.PITY_MIN_RARITY } : {});
       if (!badge) continue;
       results.push(badge);
+      if (forced && chestRewards.isHighRarity(badge.rarity)) pityTriggered += 1;
+      chestRewards.registerOpen(user, badge);
 
       if (!badge.id) continue;
 
@@ -189,11 +207,16 @@ async function handleChestOpen(interaction, cantidad, isButton = false, useReply
     }
     embed.setDescription(desc);
 
+    const dupValue = chestRewards.previewDuplicates(user, profiles.badges).coins;
     embed.addFields(
       { name: '✨ Nuevos', value: String(newBadges.length), inline: true },
       { name: '⚠️ Duplicados', value: String(duplicates.length), inline: true },
       { name: '📊 Total', value: String(results.length), inline: true }
     );
+    if (dupValue > 0) embed.addFields({ name: '♻️ Repetidas canjeables', value: `**${formatNumber(dupValue)} 🪙** con /chest canjear`, inline: false });
+    if (pityTriggered) embed.addFields({ name: '🍀 ¡Garantía activada!', value: 'Tu cofre garantizado salió épico o mejor.', inline: false });
+    const pity = chestRewards.pityCount(user);
+    embed.setFooter({ text: `Cofres restantes: ${getChestCount(guildId, userId)} · Garantía épica: ${pity}/${chestRewards.PITY_THRESHOLD}` });
 
     // Botones bonitos y funcionales
     const openMoreId = `chest_open_more_${cantidad}`;
@@ -209,6 +232,12 @@ async function handleChestOpen(interaction, cantidad, isButton = false, useReply
         .setLabel('Comprar más cofres')
         .setStyle(ButtonStyle.Success)
         .setEmoji('🪙'),
+      new ButtonBuilder()
+        .setCustomId('chest_dupes')
+        .setLabel('Canjear repetidas')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('♻️')
+        .setDisabled(dupValue <= 0),
       new ButtonBuilder()
         .setCustomId('chest_close')
         .setLabel('Cerrar')
@@ -255,5 +284,35 @@ async function handleChestBuy(interaction, amount, useEditReply = false) {
   return interaction.reply({ content: msg, ephemeral: true });
 }
 
+// --- Canje de insignias repetidas por monedas ---
+async function handleChestDupes(interaction, isButton = false) {
+  const guildId = interaction.guildId;
+  const userId = interaction.user.id;
+  const profiles = readProfiles();
+  const user = ensureUser(profiles, guildId, userId);
+  user.badgeStacks = user.badgeStacks || {};
+  const { coins, items } = chestRewards.convertDuplicates(user, profiles.badges);
+
+  if (!items.length) {
+    const msg = '♻️ No tienes insignias repetidas para canjear. Cada copia extra que consigas en cofres se podrá cambiar por monedas.';
+    return isButton ? interaction.reply({ content: msg, ephemeral: true }) : interaction.editReply(msg);
+  }
+  writeProfiles(profiles); // primero el perfil (queda 1 copia de cada una), luego las monedas
+  addCoins(guildId, userId, coins);
+
+  const lines = items.slice(0, 15).map(i => `${i.icon || '🏅'} **${i.name}** ×${i.copies} → **+${formatNumber(i.value)} 🪙**`);
+  if (items.length > 15) lines.push(`… y ${items.length - 15} más.`);
+  const embed = createEmbed()
+    .setColor(0x6EE7B7)
+    .setAuthor({ name: '♻️ Repetidas canjeadas' })
+    .setDescription(lines.join('\n'))
+    .addFields({ name: '💰 Total recibido', value: `**+${formatNumber(coins)} 🪙**`, inline: true })
+    .setFooter({ text: 'Conservaste una copia de cada insignia. Las que intercambias con otros jugadores no se tocan.' })
+    .setTimestamp();
+  return isButton ? interaction.reply({ embeds: [embed], ephemeral: true }) : interaction.editReply({ embeds: [embed] });
+}
+
 module.exports.handleChestOpen = handleChestOpen;
+module.exports.handleChestBuy = handleChestBuy;
+module.exports.handleChestDupes = handleChestDupes;
 module.exports.handleChestBuy = handleChestBuy;

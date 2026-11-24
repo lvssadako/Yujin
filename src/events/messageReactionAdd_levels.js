@@ -7,8 +7,11 @@ const { readLevels, writeLevels, ensureUserData } = require('../services/level')
 const { updateMissionProgress } = require('../utils/dailyMissions');
 const { addCoins } = require('../services/economy').economyService;
 const { secureRandomInt } = require('../utils/cryptoRandom');
+const { levelUpAllowedMentions } = require('../utils/levelMentions');
+const { perksFor } = require('../services/boost/boosterPerks');
+const { levelUpCoinReward } = require('../services/economy/levelEconomy');
 
-function xpToNext(level) { return Math.round(200 * Math.pow(level + 1, 1.4)); }
+const { xpToNext } = require('../constants/levelCurve');
 
 function resolveLevelUpCfg(cfg) {
   const group = cfg.levelUp || cfg.levels || {};
@@ -72,7 +75,7 @@ module.exports = (client) => {
         }
       }
 
-      const multiplier = 1 + totalBonusDecimal;
+      const multiplier = (1 + totalBonusDecimal) * (1 + perksFor(member, cfg).xpBonus);
       const gained = Math.round(base * multiplier);
 
       const levels = readLevels();
@@ -98,7 +101,7 @@ module.exports = (client) => {
 
       // Premio de monedas por nivel
       if (leveledUpCount > 0) {
-        addCoins(message.guildId, user.id, 1000 * leveledUpCount);
+        addCoins(message.guildId, user.id, levelUpCoinReward(data.level, leveledUpCount, cfg));
       }
 
       await writeLevels(levels);
@@ -170,7 +173,7 @@ module.exports = (client) => {
         try {
           await target.send({
             content: text,
-            allowedMentions: { users: [uid] }
+            allowedMentions: levelUpAllowedMentions(uid)
           });
         } catch (e) {
           logger.error('[levels reaction] Error enviando anuncio de level up:', e?.message || e);

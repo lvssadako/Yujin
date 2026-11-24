@@ -12,8 +12,11 @@ const MESSAGES = [
 ];
 
 const { secureRandomInt, secureChoice } = require('../../utils/cryptoRandom');
+const { perksFor, withBonus } = require('../../services/boost/boosterPerks');
+const { readConfig } = require('../../utils/configCache');
+const { money, withActor, cooldownField } = require('../../utils/economyView');
 
-async function handleWork(guildId, userId) {
+async function handleWork(guildId, userId, coinBonus = 0, discordUser = null) {
   const profiles = readProfiles();
   const user = ensureUser(profiles, guildId, userId);
   
@@ -42,6 +45,9 @@ async function handleWork(guildId, userId) {
 
   let coins = secureRandomInt(100, 400);
   coins = Math.max(1, Math.floor(coins * incomeMultiplier));
+  // Beneficio de Booster: se aplica sobre el ingreso ya penalizado por préstamo (la mora sigue contando).
+  const beforeBonus = coins;
+  if (coinBonus > 0) coins = withBonus(coins, coinBonus);
 
   user.lastWork = now;
   writeProfiles(profiles);
@@ -50,15 +56,18 @@ async function handleWork(guildId, userId) {
   const msg = (secureChoice(MESSAGES) || MESSAGES[0]).replace('{coins}', coins);
   const bal = getBalance(guildId, userId);
   
-  const embed = createEmbed()
-    .setColor(incomeMultiplier < 1 ? 0xFBBF24 : 0x6EE7B7)
-    .setAuthor({ name: '💼 Trabajo Completado' })
+  const embed = withActor(createEmbed(incomeMultiplier < 1 ? 0xFBBF24 : 0x6EE7B7), discordUser, '💼 Jornada completada')
+    .setDescription(msg)
     .addFields(
-      { name: '💰 Ganancias', value: `> ${msg}`, inline: false },
-      { name: '👛 Nuevo Balance', value: `> **${bal.coins} 🪙**`, inline: false }
+      { name: '💰 Ganaste', value: `+${money(coins)}`, inline: true },
+      { name: '👛 Billetera', value: money(bal.coins), inline: true },
+      cooldownField('Próximo turno', now + cooldown)
     )
-    .setFooter({ text: 'Vuelve en 4 horas para trabajar de nuevo' })
+    .setFooter({ text: 'El trabajo se renueva cada 4 horas' })
     .setTimestamp();
+  if (coins > beforeBonus) {
+    embed.addFields({ name: '💎 Bonus de Booster', value: `+${money(coins - beforeBonus)}`, inline: true });
+  }
 
   if (penaltyLevel >= 2) {
     const penDescs = ['', '', 'Ingresos al 50% por préstamo en mora', 'Ingresos al 25% por préstamo en mora grave'];
@@ -78,12 +87,12 @@ module.exports = {
     .setName('work')
     .setDescription('Trabaja para ganar monedas (Cooldown: 4h).'),
   async execute(interaction) {
-    const result = await handleWork(interaction.guildId, interaction.user.id);
+    const result = await handleWork(interaction.guildId, interaction.user.id, perksFor(interaction.member, readConfig()).coinBonus, interaction.user);
     if (result.error) return interaction.reply({ content: result.error, ephemeral: true });
     await interaction.reply({ embeds: [result.embed] });
   },
   async executePrefix(message) {
-    const result = await handleWork(message.guild.id, message.author.id);
+    const result = await handleWork(message.guild.id, message.author.id, perksFor(message.member, readConfig()).coinBonus, message.author);
     if (result.error) return message.reply(result.error);
     await message.reply({ embeds: [result.embed] });
   }

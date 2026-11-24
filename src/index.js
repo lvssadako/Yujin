@@ -97,6 +97,13 @@ client.once(Events.ClientReady, async () => {
     logger.error('Error en backup diario de economía', { error: err.message, stack: err.stack });
   }
 
+  // Barrido horario de roles comprados en la tienda que ya vencieron
+  try {
+    require('./services/shop/shopRuntime').init(client, logger);
+  } catch (err) {
+    logger.error('Error iniciando el barrido de roles de la tienda', { error: err.message });
+  }
+
   // Iniciar scheduler de intereses de préstamos
   try {
     const { startLoanInterestScheduler } = require('./services/economy/loanScheduler');
@@ -150,6 +157,20 @@ try {
 // Cargar y reprogramar timers de bump pendientes
 require('./events/bumpTimersLoader')(client);
 require('./services/giveaways/giveawayManager').init(client);
+
+// Moneda con icono propio: reemplaza 🪙 por el emoji configurado en todos los mensajes salientes
+try {
+  require('./utils/coinEmoji').installCoinRewriter();
+} catch (e) {
+  logger.error('Error instalando el icono de la moneda', { error: e.message });
+}
+
+// Pagos (Stripe): debe iniciarse antes del servidor HTTP, que le delega /pay y /webhook/stripe
+try {
+  require('./services/payments/paymentsService').init(client);
+} catch (e) {
+  logger.error('Error inicializando el servicio de pagos', { error: e.message });
+}
 
 // Servidor de Webhooks y Healthcheck para Azure y despliegues automáticos de GitHub
 try {
@@ -241,6 +262,21 @@ try {
   logger.error('Error cargando boost tracker', { error: e.message, stack: e.stack });
 }
 
+// Fondo propio de Booster (guardar/restaurar) y misión de tiempo con el rol del estado
+try {
+  require('./events/guildMemberUpdate_boostRestore')(client);
+  require('./events/guildMemberUpdate_roleTime')(client);
+} catch (e) {
+  logger.error('Error cargando eventos de boost y tiempo con rol', { error: e.message, stack: e.stack });
+}
+
+// Colores exclusivos de Booster: se retiran al dejar de boostear
+try {
+  require('./events/guildMemberUpdate_boosterColors')(client);
+} catch (e) {
+  logger.error('Error cargando limpieza de colores de booster', { error: e.message, stack: e.stack });
+}
+
 // Graceful Shutdown
 let isShuttingDown = false;
 async function gracefulShutdown(signal) {
@@ -250,6 +286,9 @@ async function gracefulShutdown(signal) {
 
   try {
     if (stopEconomyBackupFn) stopEconomyBackupFn();
+    try { require('./events/guildMemberUpdate_boosterColors').stop(); } catch {}
+    try { require('./services/shop/shopRuntime').shutdown(); } catch {}
+    try { require('./events/guildMemberUpdate_roleTime').stop(); } catch {}
     await require('./events/voiceStateUpdate_levels').stopVoiceSessions();
   } catch (error) { logger.error('Error al guardar sesiones de voz', { error: error.message }); }
 

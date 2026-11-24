@@ -36,7 +36,7 @@ async function deployAndReload(client, branch) {
 // Independent server factory: tests inject both state and the entire deployment.
 function createWebhookServer(options) {
   const { secret, branch = 'refactor/structure', repository, store, deploy, logger = { error() {} },
-    maxPayloadBytes = MAX_PAYLOAD_BYTES } = options;
+    maxPayloadBytes = MAX_PAYLOAD_BYTES, extraHandler } = options;
   if (!store || typeof deploy !== 'function') throw new Error('Missing webhook dependencies');
   let activeJob = Promise.resolve();
   const respond = (res, status, payload) => {
@@ -47,6 +47,11 @@ function createWebhookServer(options) {
   const instance = http.createServer((req, res) => {
     const route = (req.url.split('?')[0] || '/').toLowerCase().replace(/\/+$/, '') || '/';
     req.on('error', () => {});
+    // Rutas de otros servicios (pagos) comparten el puerto; devuelven true si atendieron la petición.
+    if (typeof extraHandler === 'function') {
+      try { if (extraHandler(req, res)) return; }
+      catch { return respond(res, 500, { error: 'Internal error' }); }
+    }
     if ((req.method === 'GET' || req.method === 'HEAD') && (HEALTH_PATHS.has(route) || WEBHOOK_PATHS.has(route))) {
       return respond(res, 200, { status: 'online' });
     }
@@ -139,6 +144,7 @@ function init(client, options = {}) {
     repository: options.repository ?? process.env.GITHUB_REPOSITORY,
     store: options.store || createDeliveryStore(options.stateDir || path.join(__dirname, '..', '..', '..', 'data', 'webhook')),
     deploy: options.deploy || (target => deployAndReload(client, target)),
+    extraHandler: options.extraHandler ?? ((req, res) => require('../payments/paymentsService').handleHttp(req, res)),
     logger
   });
   const current = server;

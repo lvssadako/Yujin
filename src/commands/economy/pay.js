@@ -60,7 +60,7 @@ module.exports = {
     const destinatario = interaction.options.getUser('destinatario');
     const cantidad = interaction.options.getInteger('cantidad');
     
-    const result = await handleTransfer(interaction.guildId, interaction.user.id, destinatario, cantidad);
+    const result = await handleTransfer(interaction.guildId, interaction.user.id, destinatario, cantidad, interaction.user);
     if (result.error) return interaction.editReply({ content: result.error });
     return interaction.editReply({ embeds: [result.embed] });
   },
@@ -76,7 +76,7 @@ module.exports = {
       return message.reply('❌ Uso: `&pay @usuario <cantidad>` o `&pay <cantidad> @usuario`');
     }
     
-    const result = await handleTransfer(message.guild.id, message.author.id, targetUser, cantidad);
+    const result = await handleTransfer(message.guild.id, message.author.id, targetUser, cantidad, message.author);
     if (result.error) return message.reply(result.error);
     return message.reply({ embeds: [result.embed] });
   }

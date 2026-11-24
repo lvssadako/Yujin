@@ -5,6 +5,7 @@ const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { validateRoleForAssignment } = require('../../utils/roleValidation');
 const { validateChannelForSending } = require('../../utils/channelValidation');
 const { readConfig: readCentralConfig, writeConfig: writeCentralConfig } = require('../../utils/configCache');
+const { levelUpAllowedMentions } = require('../../utils/levelMentions');
 
 const dataDir = path.join(__dirname, '..', '..', '..', 'data');
 const levelsPath = path.join(dataDir, 'levels.json');
@@ -16,7 +17,7 @@ function writeLevels(obj) { fs.writeFileSync(levelsPath, JSON.stringify(obj, nul
 function readCfg() { return readCentralConfig(); }
 function writeCfg(obj) { return writeCentralConfig(obj); }
 
-function xpToNext(level) { return Math.round(200 * Math.pow(level + 1, 1.4)); }
+const { xpToNext } = require('../../constants/levelCurve');
 function totalXpFromLevel(level, xpProgress) {
   let total = 0;
   for (let l = 0; l < level; l++) total += xpToNext(l);
@@ -108,7 +109,7 @@ module.exports = {
             content += ` Ganó: ${mentions.join(', ')}`;
           }
           try {
-            if (notifyChannel) await notifyChannel.send({ content }).catch(()=>{});
+            if (notifyChannel) await notifyChannel.send({ content, allowedMentions: levelUpAllowedMentions(userId) }).catch(()=>{});
             else await interaction.followUp({ content, ephemeral: true }).catch(()=>{});
           } catch {}
         }

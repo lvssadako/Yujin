@@ -5,6 +5,10 @@ const { handleLevelRoles } = require('../utils/levelRoles');
 const { updateMissionProgress } = require('../utils/dailyMissions');
 const { readConfig } = require('../utils/configCache');
 const { readLevels, writeLevels, ensureUserData, xpToNext } = require('../services/level').levelService;
+const { levelUpAllowedMentions } = require('../utils/levelMentions');
+const { perksFor, withBonus } = require('../services/boost/boosterPerks');
+const { levelUpCoinReward, voiceCoinReward } = require('../services/economy/levelEconomy');
+const { addCoins } = require('../services/economy').economyService;
 
 
 function getRoleBonusPercent(cfg, member) {
@@ -87,7 +91,8 @@ async function awardVoice(guild, userId, member, channelId, sinceMs, untilMs = D
     }
   }
 
-  const gained = Math.max(0, Math.round(basePerMin * (elapsedSec / 60) * chanMult * roleMult * activityMult));
+  const boosterMult = 1 + perksFor(member, cfg).xpBonus;
+  const gained = Math.max(0, Math.round(basePerMin * (elapsedSec / 60) * chanMult * roleMult * boosterMult * activityMult));
   const elapsedMs = elapsedSec * 1000;
 
   const oldLevel = data.level;
@@ -106,13 +111,19 @@ async function awardVoice(guild, userId, member, channelId, sinceMs, untilMs = D
   }
 
   let leveledUp = false;
+  let levelsGained = 0;
   while (data.xp >= xpToNext(data.level)) {
     data.xp -= xpToNext(data.level);
     data.level += 1;
     leveledUp = true;
+    levelsGained += 1;
   }
 
   writeLevels(levels);
+  // La voz también paga monedas (antes solo daba XP): escalada por la actividad y con el bonus de Booster.
+  const voiceCoins = withBonus(voiceCoinReward(elapsedSec, activityMult, cfg), perksFor(member, cfg).coinBonus);
+  const levelCoins = levelsGained > 0 ? levelUpCoinReward(data.level, levelsGained, cfg) : 0;
+  if (voiceCoins + levelCoins > 0) addCoins(guild.id, userId, voiceCoins + levelCoins);
   // Mission errors must not replay an interval whose XP/time is already persisted.
   try {
     updateMissionProgress(guild, userId, 'voice', elapsedSec / 60);
@@ -172,7 +183,7 @@ async function awardVoice(guild, userId, member, channelId, sinceMs, untilMs = D
       }
 
       try {
-        await target.send({ content: text });
+        await target.send({ content: text, allowedMentions: levelUpAllowedMentions(userId) });
       } catch {}
     }
     

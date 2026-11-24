@@ -47,7 +47,7 @@ module.exports = (client) => {
       // BOTONES
       if (interaction.isButton()) {
                 // Botón de compra de boost XP en /shop
-                if ((interaction.customId.startsWith('shop_buy_') || interaction.customId.startsWith('shop_page_'))) {
+                if ((interaction.customId.startsWith('shop_buy_') || interaction.customId.startsWith('shop_page_') || interaction.customId.startsWith('shop_cat_'))) {
                   const shop = require('../commands/economy/shop.js');
                   await shop.handleButton(interaction);
                   return;
@@ -79,6 +79,12 @@ module.exports = (client) => {
   .setRequired(true);
           modal.addComponents(new ActionRowBuilder().addComponents(input));
           await interaction.showModal(modal);
+          return;
+        }
+        // Botón de canjear insignias repetidas
+        if (interaction.customId === 'chest_dupes') {
+          const { handleChestDupes } = require('../commands/economy/chest.js');
+          await handleChestDupes(interaction, true);
           return;
         }
         // Botón cerrar

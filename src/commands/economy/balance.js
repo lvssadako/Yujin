@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { createEmbed, formatNumber, clip } = require('../../utils/ui');
+const { createEmbed, formatNumber, clip, COLORS } = require('../../utils/ui');
 const { getBalance, getInventory } = require('../../services/economy').economyService;
 
 async function renderBalance(guildId, target) {
@@ -7,20 +7,24 @@ async function renderBalance(guildId, target) {
   const inventory = Object.entries(getInventory(guildId, target.id));
   const items = inventory.slice(0, 15).map(([item, count]) => '• ' + clip(item, 36) + ' × ' + formatNumber(count));
   if (inventory.length > 15) items.push('… y ' + (inventory.length - 15) + ' objetos más.');
-  const embed = createEmbed().setAuthor({ name: 'Yujin ♥ · Economía', iconURL: target.displayAvatarURL() })
-    .setTitle(clip('Cuenta de ' + (target.displayName || target.globalName || target.username), 256))
+  const total = balance.coins + balance.bank;
+  const safePct = total > 0 ? Math.round((balance.bank / total) * 100) : 0;
+  const embed = createEmbed(COLORS.economy).setAuthor({ name: 'Yujin ♥ · Economía', iconURL: target.displayAvatarURL() })
+    .setTitle(clip('💰 Cuenta de ' + (target.displayName || target.globalName || target.username), 256))
+    .setThumbnail(target.displayAvatarURL())
+    .setDescription('## ' + formatNumber(total) + ' 🪙\n' + (total > 0 ? '🏦 **' + safePct + '%** de tu dinero está a salvo en el banco.' : 'Aún no tienes monedas: prueba `/daily`, `/work` o `/fish`.'))
     .addFields(
-      { name: 'Billetera', value: '**' + formatNumber(balance.coins) + '** monedas', inline: true },
-      { name: 'Banco', value: '**' + formatNumber(balance.bank) + '** monedas', inline: true },
-      { name: 'Total', value: '**' + formatNumber(balance.coins + balance.bank) + '** monedas', inline: true },
-      { name: 'Inventario', value: items.join('\n') || 'Tu mochila está vacía. Explora `/shop` o `/buy` para conseguir objetos.', inline: false }
+      { name: '👛 Billetera', value: '**' + formatNumber(balance.coins) + '** 🪙', inline: true },
+      { name: '🏦 Banco', value: '**' + formatNumber(balance.bank) + '** 🪙', inline: true },
+      { name: '💎 Gemas', value: '**' + formatNumber(balance.gems || 0) + '**', inline: true },
+      { name: '🎒 Inventario', value: items.join('\n') || 'Tu mochila está vacía. Explora `/shop` o `/buy` para conseguir objetos.', inline: false }
     ).setFooter({ text: 'Guarda monedas con /bank deposit · Explora /shop y /buy' });
   const { getLoan, MAX_DEBT_MULTIPLIER } = require('../../services/economy/loanService');
   const loan = getLoan(guildId, target.id);
   if (loan?.active) {
     const penalty = ['Sin penalización', 'Advertencia', 'Ingresos de trabajo y pesca al 50%', 'Ingresos de trabajo y pesca al 25%'];
     const capped = loan.balance >= Math.floor(loan.principal * MAX_DEBT_MULTIPLIER);
-    embed.addFields({ name: 'Préstamo activo', value: '**' + formatNumber(loan.balance) + ' monedas** de deuda' + (capped ? ' · Tope alcanzado' : '') + '\nInterés diario: ' + (loan.interestRate * 100).toFixed(0) + '% · ' + (penalty[loan.penaltyLevel] || penalty[0]) + '\nConsulta `/loan status` o realiza un pago con `/loan repay`.', inline: false });
+    embed.addFields({ name: '📉 Préstamo activo', value: '**' + formatNumber(loan.balance) + ' monedas** de deuda' + (capped ? ' · Tope alcanzado' : '') + '\nInterés diario: ' + (loan.interestRate * 100).toFixed(0) + '% · ' + (penalty[loan.penaltyLevel] || penalty[0]) + '\nConsulta `/loan status` o realiza un pago con `/loan repay`.', inline: false });
   }
   return embed;
 }

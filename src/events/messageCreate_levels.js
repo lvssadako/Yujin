@@ -13,10 +13,11 @@ const { shouldSendAutoMessage } = require('../utils/autoMessageGuard');
 const { recordMessageActivity } = require('../services/streak/streakService');
 const { sendDmNotification } = require('../services/notification/dmNotificationService');
 const { secureRandom, secureRandomInt, secureChoice } = require('../utils/cryptoRandom');
+const { levelUpAllowedMentions } = require('../utils/levelMentions');
+const { perksFor, withBonus } = require('../services/boost/boosterPerks');
+const { levelUpCoinReward } = require('../services/economy/levelEconomy');
 
-function xpToNext(level) {
-  return Math.round(200 * Math.pow(level + 1, 1.4));
-}
+const { xpToNext } = require('../constants/levelCurve');
 
 function resolveLevelUpCfg(cfg) {
   const group = cfg.levelUp || cfg.levels || {};
@@ -138,7 +139,8 @@ module.exports = (client) => {
         // Boosts activos
         const boostMultiplier = getXpMultiplier(guildId, userId);
         const roleMultiplier = 1 + totalBonusDecimal;
-        const totalMultiplier = roleMultiplier * boostMultiplier;
+        const perks = perksFor(member, cfg);
+        const totalMultiplier = roleMultiplier * boostMultiplier * (1 + perks.xpBonus);
         let gained = Math.round(base * totalMultiplier);
 
         // Límite diario
@@ -179,17 +181,16 @@ module.exports = (client) => {
 
           // Monedas cuando hay XP
           const baseCoins = secureRandomInt(1, 3);
-          const boosterRole = message.guild?.roles?.premiumSubscriberRole;
-          const isBooster = member?.premiumSince || (boosterRole && member?.roles?.cache?.has(boosterRole.id));
-          const coinsEarned = isBooster ? Math.floor(baseCoins * 1.5) : baseCoins;
+          const coinsEarned = withBonus(baseCoins, perks.coinBonus);
           addCoins(guildId, userId, coinsEarned);
-          if (leveledUpCount > 0) addCoins(guildId, userId, 100 * leveledUpCount);
+          if (leveledUpCount > 0) addCoins(guildId, userId, levelUpCoinReward(data.level, leveledUpCount, cfg));
 
           const bonusPct = Math.round(totalBonusDecimal * 100);
           logger.info(
             `[levels] ${message.author.tag} +${gained} XP (base ${base}` +
             `${bonusPct > 0 ? ` +${bonusPct}% roles` : ''}` +
             `${boostMultiplier > 1 ? ` ×${boostMultiplier.toFixed(2)} boost` : ''}` +
+            `${perks.xpBonus > 0 ? ` +${Math.round(perks.xpBonus * 100)}% booster` : ''}` +
             ` = ×${totalMultiplier.toFixed(2)})`
           );
 
@@ -305,7 +306,7 @@ module.exports = (client) => {
               logger.info(`[levels] Enviando anuncio a canal: ${target.name || target.id}`);
               await target.send({
                 content: text,
-                allowedMentions: { parse: [], users: [userId] }
+                allowedMentions: levelUpAllowedMentions(userId)
               });
               messageWasSent = true;
               logger.info(`[levels] ✅ Mensaje de level-up enviado exitosamente`);

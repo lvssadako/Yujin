@@ -1,82 +1,41 @@
 const logger = require('../utils/logger');
 const { Events } = require('discord.js');
-const { readProfiles, writeProfiles, ensureUser } = require('../utils/profileStore');
+const profileStore = require('../utils/profileStore');
 const { sendDmNotification } = require('../services/notification/dmNotificationService');
+const { createBoosterProfileService } = require('../services/boost/boosterProfileService');
 
+// Al dejar de boostear se guarda y retira el fondo propio (si no hay otro acceso); si vuelve, se restaura.
+// El agradecimiento por el primer boost ya lo envía boostTracker: aquí solo se avisa lo del fondo.
 module.exports = (client) => {
+  const service = createBoosterProfileService({
+    readProfiles: profileStore.readProfiles,
+    writeProfiles: profileStore.writeProfiles,
+    ensureUser: profileStore.ensureUser,
+    accessFor: (member, user) => require('../services/profile/profileBackgroundService').getProfileBackgroundService().accessFor(member, user),
+    imageService: require('../services/image/imageService')
+  });
+
   client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
     try {
-      const wasBooster = Boolean(oldMember.premiumSince);
+      if (!newMember?.guild || newMember.user?.bot) return;
       const isBooster = Boolean(newMember.premiumSince);
+      const knownOld = Boolean(oldMember) && !oldMember.partial;
+      const wasBooster = knownOld && Boolean(oldMember.premiumSince);
+      const notify = content => sendDmNotification(newMember.user, {
+        guildId: newMember.guild.id, guildName: newMember.guild.name, category: 'boosts', content
+      });
 
-      // Solo actuar si cambió el estado de boost
-      if (wasBooster === isBooster) return;
-
-      const profiles = readProfiles();
-      const user = ensureUser(profiles, newMember.guild.id, newMember.id);
-
-      // Perdió el boost
-      if (wasBooster && !isBooster) {
-        logger.info(`[boostRestore] ${newMember.user.tag} perdió boost, guardando perfil personalizado`);
-        
-        // Guardar la configuración actual en un backup
-        user.boosterBackup = {
-          title: user.title || '',
-          accent: user.accent || '#e94560',
-          bgUrl: user.bgUrl || '',
-          bgOpacity: user.bgOpacity || 0.7,
-          equippedBadges: user.equippedBadges || []
-        };
-
-        // Resetear a valores por defecto
-        user.title = '';
-        user.accent = '#e94560';
-        user.bgUrl = '';
-        user.bgOpacity = 0.7;
-        user.equippedBadges = [];
-
-        writeProfiles(profiles);
-        
-        // Notificar al usuario con sendDmNotification
-        await sendDmNotification(newMember.user, {
-          guildId: newMember.guild.id,
-          guildName: newMember.guild.name,
-          category: 'boosts',
-          content: `💔 Has dejado de boostear **${newMember.guild.name}**. Tu perfil personalizado ha sido guardado y se restaurará si vuelves a boostear.`
-        });
-      }
-
-      // Ganó/recuperó el boost
-      if (!wasBooster && isBooster) {
-        logger.info(`[boostRestore] ${newMember.user.tag} ganó boost`);
-        
-        // Restaurar backup si existe
-        if (user.boosterBackup) {
-          logger.info(`[boostRestore] Restaurando perfil personalizado de ${newMember.user.tag}`);
-          
-          user.title = user.boosterBackup.title || '';
-          user.accent = user.boosterBackup.accent || '#e94560';
-          user.bgUrl = user.boosterBackup.bgUrl || '';
-          user.bgOpacity = user.boosterBackup.bgOpacity || 0.7;
-          user.equippedBadges = user.boosterBackup.equippedBadges || [];
-
-          writeProfiles(profiles);
-
-          // Notificar al usuario
-          await sendDmNotification(newMember.user, {
-            guildId: newMember.guild.id,
-            guildName: newMember.guild.name,
-            category: 'boosts',
-            content: `🚀 ¡Bienvenido de vuelta, Booster! Tu perfil personalizado en **${newMember.guild.name}** ha sido restaurado.`
-          });
-        } else {
-          // Primer boost, no hay backup
-          await sendDmNotification(newMember.user, {
-            guildId: newMember.guild.id,
-            guildName: newMember.guild.name,
-            category: 'boosts',
-            content: `🎉 ¡Gracias por boostear **${newMember.guild.name}**! Ahora puedes personalizar tu perfil con \`/profileset\`.`
-          });
+      if (isBooster && !wasBooster) {
+        const { restored } = service.onBoostGained(newMember);
+        if (restored) {
+          logger.info(`[boostRestore] Fondo restaurado a ${newMember.user.tag}`);
+          await notify(`🚀 ¡Bienvenido de vuelta, Booster! Tu fondo de perfil personalizado en **${newMember.guild.name}** fue restaurado.`);
+        }
+      } else if (!isBooster && wasBooster) {
+        const { cleared } = await service.onBoostLost(newMember);
+        if (cleared) {
+          logger.info(`[boostRestore] Fondo guardado y retirado a ${newMember.user.tag}`);
+          await notify(`💔 Dejaste de boostear **${newMember.guild.name}**: tu fondo de perfil personalizado se guardó y ya no se muestra. Se restaurará si vuelves a boostear, o puedes conservarlo con el Pase de Fondo (\`/fondo comprar\`).`);
         }
       }
     } catch (err) {

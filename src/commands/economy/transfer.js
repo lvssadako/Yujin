@@ -1,11 +1,12 @@
-const { createEmbed } = require('../../utils/ui');
+const { createEmbed, COLORS } = require('../../utils/ui');
+const { money, withActor, moved } = require('../../utils/economyView');
 const { SlashCommandBuilder, } = require('discord.js');
 const { getBalance, addCoins, removeCoins } = require('../../services/economy/index').economyService;
 const { getLoan, recordLoanTransfer } = require('../../services/economy/loanService');
 const { penalizeXp } = require('../../services/level/index').levelService;
 const { readProfiles, writeProfiles } = require('../../utils/profileStore');
 
-async function handleTransfer(guildId, userId, targetUser, cantidad) {
+async function handleTransfer(guildId, userId, targetUser, cantidad, discordUser = null) {
   if (!targetUser || targetUser.id === userId) {
     return { error: '❌ Debes elegir a otro usuario como destinatario (no puedes transferirte a ti mismo).' };
   }
@@ -16,6 +17,7 @@ async function handleTransfer(guildId, userId, targetUser, cantidad) {
     return { error: '❌ La cantidad debe ser un número entero mayor a 0.' };
   }
   const { coins } = getBalance(guildId, userId);
+  const walletBefore = coins;
   if (coins < cantidad) {
     return { error: `❌ Fondos insuficientes. Tienes **${coins.toLocaleString()} 🪙** en tu billetera.` };
   }
@@ -51,12 +53,12 @@ async function handleTransfer(guildId, userId, targetUser, cantidad) {
     };
   }
   
-  const embed = createEmbed()
-    .setColor(loanWarning ? 0xFEE75C : 0x43b581)
-    .setAuthor({ name: loanWarning ? '⚠️ Transferencia Realizada con Advertencia' : '💸 Transferencia Realizada' })
+  const embed = withActor(createEmbed(loanWarning ? 0xFEE75C : COLORS.success), discordUser,
+    loanWarning ? '⚠️ Transferencia con advertencia' : '💸 Transferencia realizada')
+    .setDescription(`Enviaste ${money(cantidad)} a <@${targetUser.id}>.`)
     .addFields(
-      { name: '📤 Monto Enviado', value: `> **${cantidad.toLocaleString()} 🪙** a <@${targetUser.id}>`, inline: true },
-      { name: '👛 Tu Nuevo Balance', value: `> **${bal.toLocaleString()} 🪙**`, inline: true }
+      { name: '👛 Tu billetera', value: moved(walletBefore, bal), inline: true },
+      { name: '🎁 Destinatario', value: `<@${targetUser.id}>`, inline: true }
     )
     .setFooter({ text: loanWarning ? 'Transferencia sujeta a penalización de préstamo' : 'Transferencia exitosa' })
     .setTimestamp();
@@ -137,7 +139,7 @@ module.exports = {
     const destinatario = interaction.options.getUser('destinatario');
     const cantidad = interaction.options.getInteger('cantidad');
     
-    const result = await handleTransfer(interaction.guildId, interaction.user.id, destinatario, cantidad);
+    const result = await handleTransfer(interaction.guildId, interaction.user.id, destinatario, cantidad, interaction.user);
     if (result.error) return interaction.editReply({ content: result.error });
     return interaction.editReply({ embeds: [result.embed] });
   },
@@ -153,7 +155,7 @@ module.exports = {
       return message.reply('❌ Uso: `&transfer @usuario <cantidad>` o `&transfer <cantidad> @usuario`');
     }
     
-    const result = await handleTransfer(message.guild.id, message.author.id, targetUser, cantidad);
+    const result = await handleTransfer(message.guild.id, message.author.id, targetUser, cantidad, message.author);
     if (result.error) return message.reply(result.error);
     return message.reply({ embeds: [result.embed] });
   }

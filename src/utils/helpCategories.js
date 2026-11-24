@@ -7,6 +7,7 @@ const COMMAND_MAP = {
   reload: 'dev',
   restart: 'dev',
   resetloan: 'dev',
+  fondoadmin: 'dev',
   testboost: 'dev',
   testbutton: 'dev',
   testsecurity: 'dev',
@@ -52,6 +53,8 @@ const COMMAND_MAP = {
   level: 'level',
   profile: 'level',
   profileset: 'level',
+  fondo: 'level',
+  boostperks: 'boost',
   badge: 'level',
   leaderboard: 'level',
   streak: 'level',
@@ -78,6 +81,9 @@ const COMMAND_MAP = {
   levellistchannels: 'config',
   toproles: 'config',
   menuconfig: 'config',
+  statusrole: 'config',
+  coinicon: 'config',
+  shopadmin: 'config',
 
   // Utilidades y Comunidad
   help: 'utility',
