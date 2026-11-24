@@ -1,33 +1,27 @@
-const logger = require('../utils/logger');
 const { Events } = require('discord.js');
+const logger = require('../utils/logger');
 const { readConfig } = require('../utils/configCache');
-const { setStart, popElapsedMinutes, clearTimer } = require('../utils/roleTimeStore');
+const roleTimeStore = require('../utils/roleTimeStore');
 const { updateMissionProgress } = require('../utils/dailyMissions');
+const { createRoleTimeTracker } = require('../services/presenceRoles/roleTimeTracker');
 
-module.exports = (client) => {
-  client.on(Events.GuildMemberUpdate, async (oldM, newM) => {
-    try {
-      const cfg = readConfig();
-      const roleId = cfg.statusRoleId || cfg.status?.roleId;
-      if (!roleId) return;
-      if (newM.guild.roles.cache.get(roleId) == null) return;
+let stopTicker = null;
 
-      const had = oldM?.roles?.cache?.has(roleId);
-      const has = newM?.roles?.cache?.has(roleId);
-
-      // Rol agregado → iniciar contador
-      if (!had && has) {
-        setStart(newM.guild.id, newM.id, roleId, Date.now());
-        return;
-      }
-      // Rol removido → sumar minutos transcurridos y limpiar
-      if (had && !has) {
-        const mins = popElapsedMinutes(newM.guild.id, newM.id, roleId, Date.now());
-        if (mins > 0) updateMissionProgress(newM.guild, newM.id, 'role_time', mins);
-        clearTimer(newM.guild.id, newM.id, roleId);
-      }
-    } catch (e) {
-      logger.warn('[role_time] Error:', e?.message);
-    }
+// Misión diaria "lleva el enlace del servidor en tu estado": cuenta el tiempo con el rol de estado.
+function register(client) {
+  const tracker = createRoleTimeTracker({ store: roleTimeStore, readConfig, updateMissionProgress, logger });
+  client.on(Events.GuildMemberUpdate, (oldMember, newMember) => {
+    try { tracker.handleMemberUpdate(oldMember, newMember); }
+    catch (e) { logger.warn('[role_time] Error:', e?.message); }
   });
-};
+  const begin = async () => {
+    // Para saber quién ya tiene el rol al iniciar hay que tener los miembros en caché.
+    for (const guild of client.guilds.cache.values()) await guild.members.fetch().catch(() => {});
+    if (!stopTicker) stopTicker = tracker.start(client);
+  };
+  if (client.isReady?.()) begin(); else client.once(Events.ClientReady, begin);
+  return tracker;
+}
+
+register.stop = () => { if (stopTicker) { stopTicker(); stopTicker = null; } };
+module.exports = register;

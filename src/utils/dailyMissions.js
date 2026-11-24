@@ -4,6 +4,7 @@ const path = require('path');
 const { readConfig } = require('./configCache');
 const { readJsonSafe, writeJsonAtomic } = require('./jsonStore');
 const { secureRandom } = require('./cryptoRandom');
+const { statusRoleIds } = require('../services/presenceRoles/statusRoleIds');
 
 const dataDir = path.join(__dirname, '..', '..', 'data');
 const filePath = path.join(dataDir, 'daily_missions.json');
@@ -56,7 +57,8 @@ function baseTemplates(guild) {
   ];
   
   // Misión de rol (peso medio)
-  const statusRoleId = cfg.statusRoleId || cfg.status?.roleId;
+  // Rol heredado o el primer rol de estado configurado con /statusrole.
+  const statusRoleId = statusRoleIds(cfg)[0];
   if (statusRoleId && guild?.roles?.cache?.has?.(statusRoleId)) {
     list.push({
       id: 'd_role_180',

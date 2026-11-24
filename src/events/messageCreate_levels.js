@@ -15,10 +15,9 @@ const { sendDmNotification } = require('../services/notification/dmNotificationS
 const { secureRandom, secureRandomInt, secureChoice } = require('../utils/cryptoRandom');
 const { levelUpAllowedMentions } = require('../utils/levelMentions');
 const { perksFor, withBonus } = require('../services/boost/boosterPerks');
+const { levelUpCoinReward } = require('../services/economy/levelEconomy');
 
-function xpToNext(level) {
-  return Math.round(200 * Math.pow(level + 1, 1.4));
-}
+const { xpToNext } = require('../constants/levelCurve');
 
 function resolveLevelUpCfg(cfg) {
   const group = cfg.levelUp || cfg.levels || {};
@@ -184,7 +183,7 @@ module.exports = (client) => {
           const baseCoins = secureRandomInt(1, 3);
           const coinsEarned = withBonus(baseCoins, perks.coinBonus);
           addCoins(guildId, userId, coinsEarned);
-          if (leveledUpCount > 0) addCoins(guildId, userId, 100 * leveledUpCount);
+          if (leveledUpCount > 0) addCoins(guildId, userId, levelUpCoinReward(data.level, leveledUpCount, cfg));
 
           const bonusPct = Math.round(totalBonusDecimal * 100);
           logger.info(

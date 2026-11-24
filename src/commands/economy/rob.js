@@ -2,8 +2,9 @@ const { createEmbed, COLORS } = require('../../utils/ui');
 const { SlashCommandBuilder, } = require('discord.js');
 const { getBalance, addCoins, removeCoins, getInventory, removeItem } = require('../../services/economy/index').economyService;
 const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profileStore');
+const { money, withActor, cooldownField } = require('../../utils/economyView');
 
-async function handleRob(guildId, userId, targetUser) {
+async function handleRob(guildId, userId, targetUser, discordUser = null) {
   if (targetUser.bot || targetUser.id === userId) {
     return { error: '❌ No puedes robarte a ti mismo ni a un bot.' };
   }
@@ -34,12 +35,11 @@ async function handleRob(guildId, userId, targetUser) {
     const fine = 500;
     removeCoins(guildId, userId, fine);
     
-    const embed = createEmbed()
-      .setColor(COLORS.error)
-      .setAuthor({ name: '🛡️ Robo Bloqueado' })
+    const embed = withActor(createEmbed(COLORS.error), discordUser, '🛡️ Robo bloqueado')
+      .setDescription(`Intentaste robar a **${targetUser.tag || targetUser.username}**, pero tenía un **Escudo Anti-Robo**. Tu ataque falló y su escudo se rompió.`)
       .addFields(
-        { name: '📝 Resumen', value: `> ¡Intentaste robar a **${targetUser.tag || targetUser.username}** pero tenía un **Escudo Anti-Robo**!\n> Tu ataque fue bloqueado y su escudo se rompió.`, inline: false },
-        { name: '⚖️ Multa Pagada', value: `> **${fine} 🪙**`, inline: false }
+        { name: '⚖️ Multa', value: `-${money(fine)}`, inline: true },
+        cooldownField('Próximo intento', now + cooldown)
       )
       .setFooter({ text: 'Ten cuidado con las defensas ajenas' })
       .setTimestamp();
@@ -55,14 +55,14 @@ const { secureRandom } = require('../../utils/cryptoRandom');
     removeCoins(guildId, targetUser.id, stolen);
     addCoins(guildId, userId, stolen);
     
-    const embed = createEmbed()
-      .setColor(COLORS.success)
-      .setAuthor({ name: '🥷 Robo Exitoso' })
+    const embed = withActor(createEmbed(COLORS.success), discordUser, '🥷 Robo exitoso')
+      .setDescription(`Le quitaste ${money(stolen)} a **${targetUser.tag || targetUser.username}** sin que te detectaran.`)
       .addFields(
-        { name: '💰 Botín Obtenido', value: `> Lograste robarle **${stolen} 🪙** a **${targetUser.tag || targetUser.username}** sin ser detectado.`, inline: false },
-        { name: '👛 Tu Nuevo Balance', value: `> **${getBalance(guildId, userId).coins} 🪙**`, inline: false }
+        { name: '💰 Botín', value: `+${money(stolen)}`, inline: true },
+        { name: '👛 Tu billetera', value: money(getBalance(guildId, userId).coins), inline: true },
+        cooldownField('Próximo golpe', now + cooldown)
       )
-      .setFooter({ text: 'No dejes que te atrapen' })
+      .setFooter({ text: 'Guarda tu dinero en el banco: /bank deposit' })
       .setTimestamp();
       
     return { embed };
@@ -70,12 +70,11 @@ const { secureRandom } = require('../../utils/cryptoRandom');
     const fine = 250;
     removeCoins(guildId, userId, fine);
     
-    const embed = createEmbed()
-      .setColor(COLORS.error)
-      .setAuthor({ name: '🚨 Robo Fallido' })
+    const embed = withActor(createEmbed(COLORS.error), discordUser, '🚨 Robo fallido')
+      .setDescription(`¡La policía te atrapó intentando robar a **${targetUser.tag || targetUser.username}**!`)
       .addFields(
-        { name: '⚖️ Consecuencias', value: `> ¡Te atrapó la policía intentando robar a **${targetUser.tag || targetUser.username}**!`, inline: false },
-        { name: '💸 Multa Pagada', value: `> **${fine} 🪙**`, inline: false }
+        { name: '💸 Multa', value: `-${money(fine)}`, inline: true },
+        cooldownField('Próximo intento', now + cooldown)
       )
       .setFooter({ text: 'El crimen no siempre paga' })
       .setTimestamp();
@@ -91,14 +90,14 @@ module.exports = {
     .addUserOption(opt => opt.setName('victima').setDescription('Usuario a robar').setRequired(true)),
   async execute(interaction) {
     const target = interaction.options.getUser('victima');
-    const result = await handleRob(interaction.guildId, interaction.user.id, target);
+    const result = await handleRob(interaction.guildId, interaction.user.id, target, interaction.user);
     if (result.error) return interaction.reply({ content: result.error, ephemeral: true });
     await interaction.reply({ embeds: [result.embed] });
   },
   async executePrefix(message) {
     const target = message.mentions.users.first();
     if (!target) return message.reply('❌ Debes mencionar a un usuario para robar (ej: `&rob @usuario`).');
-    const result = await handleRob(message.guild.id, message.author.id, target);
+    const result = await handleRob(message.guild.id, message.author.id, target, message.author);
     if (result.error) return message.reply(result.error);
     await message.reply({ embeds: [result.embed] });
   }

@@ -262,6 +262,14 @@ try {
   logger.error('Error cargando boost tracker', { error: e.message, stack: e.stack });
 }
 
+// Fondo propio de Booster (guardar/restaurar) y misión de tiempo con el rol del estado
+try {
+  require('./events/guildMemberUpdate_boostRestore')(client);
+  require('./events/guildMemberUpdate_roleTime')(client);
+} catch (e) {
+  logger.error('Error cargando eventos de boost y tiempo con rol', { error: e.message, stack: e.stack });
+}
+
 // Colores exclusivos de Booster: se retiran al dejar de boostear
 try {
   require('./events/guildMemberUpdate_boosterColors')(client);
@@ -280,6 +288,7 @@ async function gracefulShutdown(signal) {
     if (stopEconomyBackupFn) stopEconomyBackupFn();
     try { require('./events/guildMemberUpdate_boosterColors').stop(); } catch {}
     try { require('./services/shop/shopRuntime').shutdown(); } catch {}
+    try { require('./events/guildMemberUpdate_roleTime').stop(); } catch {}
     await require('./events/voiceStateUpdate_levels').stopVoiceSessions();
   } catch (error) { logger.error('Error al guardar sesiones de voz', { error: error.message }); }
 

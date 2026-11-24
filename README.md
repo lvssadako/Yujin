@@ -124,6 +124,9 @@ Bot integral de Discord para gestión comunitaria avanzada, diseñado con arquit
   - Cofres misteriosos con insignias aleatorias (`/chest buy`, `/chest open`, `/chest balance`). Las insignias repetidas se canjean por monedas (`/chest canjear`) y hay garantía de rareza épica o mejor cada 30 cofres.
   - Tienda de insignias y boosts (`/badgeshop`).
 - **🛍️ Tienda por categorías (`/shop`, `/buy`)**: Boosts y packs de XP, objetos de inventario, **roles temporales** que el staff configura (`/shopadmin rol-agregar|rol-quitar|lista`, vencen solos) y renovar misiones. Los roles con permisos de administración o moderación no pueden venderse.
+- **📈 Monedas por nivel y por voz**: Subir de nivel paga lo mismo por mensajes, reacciones y voz (`base + perLevel × nivel`, con tope; por defecto 100 + 10 por nivel, máx. 1,000) y la voz ahora también paga monedas (3 por minuto activo, reducidas si estás sordo/solo; el Booster suma su bonus). Ajustable en `config.levelUpCoins` (`base`, `perLevel`, `max`) y `config.voiceCoinsPerMinute`. La curva de XP vive en `src/constants/levelCurve.js`.
+- **🎯 Misión "enlace en el estado"**: el tiempo con el rol de estado se acredita cada 10 minutos mientras lo conservas (antes solo al perderlo y el evento no se cargaba, así que la misión no se podía completar). Reconoce los roles de `/statusrole`.
+- **🔁 Fondo propio y Boosters**: al dejar de boostear se guarda y retira el fondo con imagen propia (si no tienes Pase ni racha de 360 días); si vuelves, se restaura. Título, colores y galería no se tocan.
 - **💎 Beneficios de Booster (`/boostperks`)**: XP +20 %, monedas +50 % (mensajes, `/work`, `/fish`), `/daily` +25 % y 10 % extra de descuento en la tienda. Ajustable en `config.boosterPerks` (`enabled`, `xpBonus`, `coinBonus`, `dailyBonus`, `shopDiscount`). Al dejar de boostear se retira el color exclusivo.
 - **🪙 Moneda con icono propio (`/coinicon`)**: `/coinicon subir` crea el emoji del servidor (o usa tu propia imagen) y reemplaza 🪙 en los mensajes del bot; `/coinicon restablecer` vuelve al emoji genérico.
 - **🎁 Rol de agradecimiento (`/statusrole`)**: `/statusrole estado @rol [enlace]` otorga un rol a quien lleve el enlace del servidor (o variantes equivalentes) en su estado, y `/statusrole tag @rol` a quien muestre el tag del servidor. Se retira al quitarlo, pero **nunca** por estar invisible.
@@ -223,6 +226,7 @@ Apunta el webhook de Stripe a `PUBLIC_BASE_URL/webhook/stripe` con los eventos `
 ## 🧪 Pruebas Automatizadas
 
 El proyecto utiliza el test runner nativo de Node.js (`node --test`), garantizando validaciones de:
+- Compatibilidad con el diario de pagos de préstamos v1: el fixture `src/services/economy/__tests__/fixtures/legacy-loan-payment-v1.json` se genera con `node scripts/generateLegacyLoanFixture.js` (ejecuta el servicio real hasta dejar un pago pendiente; **no** son datos de producción).
 - Carga y recarga en caliente de comandos y watchers (`commandLoader`).
 - Filtro estricto de archivos para evitar reinicios por JSONs o temporales (`shouldTriggerHotReload`).
 - Sincronización hash SHA-256 de comandos con Discord API (`syncSlashCommands`).

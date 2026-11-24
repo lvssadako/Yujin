@@ -12,6 +12,12 @@ const ConfigSchema = z.object({
   botLogChannelId: z.string().regex(/^\d+$/).optional(),
   statusRoleId: z.string().regex(/^\d+$/).optional(),
   coinEmoji: z.string().max(64).optional(),
+  levelUpCoins: z.object({
+    base: z.number().min(0).max(100000).optional(),
+    perLevel: z.number().min(0).max(10000).optional(),
+    max: z.number().min(0).max(1000000).optional()
+  }).optional(),
+  voiceCoinsPerMinute: z.number().min(0).max(20).optional(),
   boosterPerks: z.object({
     enabled: z.boolean().optional(),
     xpBonus: z.number().min(0).max(2).optional(),

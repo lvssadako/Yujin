@@ -112,9 +112,7 @@ function getUserRank(guildId, userId, levels, guild = null) {
   return idx >= 0 ? idx + 1 : null;
 }
 
-function xpToNext(level) {
-  return Math.round(200 * Math.pow(level + 1, 1.4));
-}
+const { xpToNext } = require('../constants/levelCurve');
 
 function getXpMultiplier(guildId, userId) {
   const profiles = readProfiles();

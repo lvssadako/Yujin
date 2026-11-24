@@ -6,8 +6,9 @@ const { readProfiles, writeProfiles, ensureUser } = require('../../utils/profile
 const { secureRandom, secureRandomInt } = require('../../utils/cryptoRandom');
 const { perksFor, withBonus } = require('../../services/boost/boosterPerks');
 const { readConfig } = require('../../utils/configCache');
+const { money, withActor, cooldownField } = require('../../utils/economyView');
 
-async function handleFish(guildId, userId, coinBonus = 0) {
+async function handleFish(guildId, userId, coinBonus = 0, discordUser = null) {
   const inv = getInventory(guildId, userId);
   if (!inv['cana'] || inv['cana'] < 1) {
     return { error: '❌ ¡No tienes una **🎣 Caña de Pescar**! Cómprala en la tienda con `/buy`.' };
@@ -52,35 +53,42 @@ async function handleFish(guildId, userId, coinBonus = 0) {
     color = 0x94A3B8;
   } else if (rand < 0.6) {
     reward = secureRandomInt(50, 150);
-    msg = `> ¡Pescaste un pez común! Lo vendiste por **${reward} 🪙**. 🐟`;
+    msg = `> ¡Pescaste un pez común! Lo vendiste por **{reward} 🪙**. 🐟`;
     color = 0x6EE7B7;
   } else if (rand < 0.9) {
     reward = secureRandomInt(150, 350);
-    msg = `> ¡Atrapaste un pez raro! Lo vendiste por **${reward} 🪙**. 🐠`;
+    msg = `> ¡Atrapaste un pez raro! Lo vendiste por **{reward} 🪙**. 🐠`;
     color = 0xA78BFA;
   } else {
     reward = secureRandomInt(500, 1000);
-    msg = `> ¡INCREÍBLE! Pescaste un **Tiburón Dorado**. Lo vendiste por **${reward} 🪙**. 🦈✨`;
+    msg = `> ¡INCREÍBLE! Pescaste un **Tiburón Dorado**. Lo vendiste por **{reward} 🪙**. 🦈✨`;
     color = 0xE9C46A;
   }
 
+  let beforeBonus = 0;
   if (reward > 0) {
     reward = Math.max(1, Math.floor(reward * incomeMultiplier));
+    beforeBonus = reward;
     if (coinBonus > 0) reward = withBonus(reward, coinBonus);
     addCoins(guildId, userId, reward);
   }
+  // El mensaje muestra lo que de verdad se acreditó (tras penalización por mora y bonus), no el valor base.
+  msg = msg.replace('{reward}', reward.toLocaleString('es-MX'));
   
   const bal = getBalance(guildId, userId);
   
-  const embed = createEmbed()
-    .setColor(penaltyLevel >= 2 ? 0xFBBF24 : color)
-    .setAuthor({ name: '🎣 Día de Pesca' })
+  const embed = withActor(createEmbed(penaltyLevel >= 2 ? 0xFBBF24 : color), discordUser, '🎣 Día de pesca')
+    .setDescription(msg.replace(/^>\s*/, ''))
     .addFields(
-      { name: '🎣 Resultado', value: msg, inline: false },
-      { name: '👛 Balance Actual', value: `> **${bal.coins} 🪙**`, inline: false }
+      { name: '💰 Ganaste', value: reward > 0 ? `+${money(reward)}` : 'Nada esta vez', inline: true },
+      { name: '👛 Billetera', value: money(bal.coins), inline: true },
+      cooldownField('Próxima pesca', now + cooldown)
     )
-    .setFooter({ text: 'Los peces regresarán en 1 hora' })
+    .setFooter({ text: 'Los peces regresan cada hora' })
     .setTimestamp();
+  if (reward > beforeBonus && beforeBonus > 0) {
+    embed.addFields({ name: '💎 Bonus de Booster', value: `+${money(reward - beforeBonus)}`, inline: true });
+  }
 
   if (penaltyLevel >= 2) {
     const penDescs = ['', '', 'Ingresos al 50% por préstamo en mora', 'Ingresos al 25% por préstamo en mora grave'];
@@ -99,12 +107,12 @@ module.exports = {
     .setName('fish')
     .setDescription('Ve a pescar y gana monedas (Requiere Caña de Pescar) (Cooldown: 1h).'),
   async execute(interaction) {
-    const result = await handleFish(interaction.guildId, interaction.user.id, perksFor(interaction.member, readConfig()).coinBonus);
+    const result = await handleFish(interaction.guildId, interaction.user.id, perksFor(interaction.member, readConfig()).coinBonus, interaction.user);
     if (result.error) return interaction.reply({ content: result.error, ephemeral: true });
     await interaction.reply({ embeds: [result.embed] });
   },
   async executePrefix(message) {
-    const result = await handleFish(message.guild.id, message.author.id, perksFor(message.member, readConfig()).coinBonus);
+    const result = await handleFish(message.guild.id, message.author.id, perksFor(message.member, readConfig()).coinBonus, message.author);
     if (result.error) return message.reply(result.error);
     await message.reply({ embeds: [result.embed] });
   }

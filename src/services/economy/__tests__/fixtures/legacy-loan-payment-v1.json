@@ -1,0 +1,147 @@
+{
+  "_note": "Generado por scripts/generateLegacyLoanFixture.js con el servicio de pagos actual (formato v1). No son datos de producción.",
+  "request": {
+    "guildId": "synthetic-guild",
+    "userId": "synthetic-user",
+    "source": "slash",
+    "deliveryId": "delivery-1",
+    "amount": "400"
+  },
+  "completedRequest": {
+    "guildId": "synthetic-guild",
+    "userId": "synthetic-other-user",
+    "source": "slash",
+    "deliveryId": "delivery-completed",
+    "amount": "100"
+  },
+  "economy": {
+    "guilds": {
+      "synthetic-guild": {
+        "synthetic-user": {
+          "coins": 5000,
+          "gems": 0,
+          "bank": 0,
+          "inventory": {}
+        },
+        "synthetic-other-user": {
+          "coins": 1900,
+          "gems": 0,
+          "bank": 0,
+          "inventory": {}
+        }
+      }
+    },
+    "_loanPaymentRevision": "54bfd459-00c8-4d63-ac0f-b6b53ef75d3a"
+  },
+  "loans": {
+    "guilds": {
+      "synthetic-guild": {
+        "synthetic-user": {
+          "active": true,
+          "principal": 1000,
+          "initialInterest": 50,
+          "balance": 1050,
+          "interestRate": 0.05,
+          "createdAt": 1795553604488,
+          "lastInterestTick": 1795553604488,
+          "penaltyLevel": 0,
+          "tickCount": 0,
+          "transferredWithActiveLoan": 0,
+          "xpPenaltyApplied": 0
+        },
+        "synthetic-other-user": {
+          "active": true,
+          "principal": 1000,
+          "initialInterest": 50,
+          "balance": 950,
+          "interestRate": 0.05,
+          "createdAt": 1795553604491,
+          "lastInterestTick": 1795553604491,
+          "penaltyLevel": 0,
+          "tickCount": 0,
+          "transferredWithActiveLoan": 0,
+          "xpPenaltyApplied": 0
+        }
+      }
+    },
+    "_loanPaymentRevision": "4bddff2b-6019-4224-94d4-94015ce40a51"
+  },
+  "journal": {
+    "version": 1,
+    "receipts": {
+      "ebdda973d3b237bc7894c42b7268cc3fa836c9d743ad66f5885a70d3ed09e1b3": {
+        "fingerprint": "100",
+        "result": {
+          "success": true,
+          "paid": 100,
+          "remaining": 950,
+          "cleared": false,
+          "penaltyLevel": 0,
+          "coins": 1900
+        }
+      }
+    },
+    "pending": {
+      "key": "3037dcfd8588c834ee3a61b03953892b15413175bf4d605aa634d494247d54e1",
+      "fingerprint": "400",
+      "guildId": "synthetic-guild",
+      "userId": "synthetic-user",
+      "result": {
+        "success": true,
+        "paid": 400,
+        "remaining": 650,
+        "cleared": false,
+        "penaltyLevel": 0,
+        "coins": 4600
+      },
+      "economy": {
+        "beforeRevision": "54bfd459-00c8-4d63-ac0f-b6b53ef75d3a",
+        "afterRevision": "28dc54cd-1b57-40e3-8b52-e47c455e0a28",
+        "fileExisted": true,
+        "before": {
+          "coins": 5000,
+          "gems": 0,
+          "bank": 0,
+          "inventory": {}
+        },
+        "after": {
+          "coins": 4600,
+          "gems": 0,
+          "bank": 0,
+          "inventory": {}
+        }
+      },
+      "loans": {
+        "beforeRevision": "4bddff2b-6019-4224-94d4-94015ce40a51",
+        "afterRevision": "493d3a6d-d0a5-4641-8ced-64370206edfb",
+        "fileExisted": true,
+        "before": {
+          "active": true,
+          "principal": 1000,
+          "initialInterest": 50,
+          "balance": 1050,
+          "interestRate": 0.05,
+          "createdAt": 1795553604488,
+          "lastInterestTick": 1795553604488,
+          "penaltyLevel": 0,
+          "tickCount": 0,
+          "transferredWithActiveLoan": 0,
+          "xpPenaltyApplied": 0
+        },
+        "after": {
+          "active": true,
+          "principal": 1000,
+          "initialInterest": 50,
+          "balance": 650,
+          "interestRate": 0.05,
+          "createdAt": 1795553604488,
+          "lastInterestTick": 1795553604488,
+          "penaltyLevel": 0,
+          "tickCount": 0,
+          "transferredWithActiveLoan": 0,
+          "xpPenaltyApplied": 0
+        }
+      }
+    }
+  }
+}

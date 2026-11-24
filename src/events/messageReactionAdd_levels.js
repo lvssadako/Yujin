@@ -9,8 +9,9 @@ const { addCoins } = require('../services/economy').economyService;
 const { secureRandomInt } = require('../utils/cryptoRandom');
 const { levelUpAllowedMentions } = require('../utils/levelMentions');
 const { perksFor } = require('../services/boost/boosterPerks');
+const { levelUpCoinReward } = require('../services/economy/levelEconomy');
 
-function xpToNext(level) { return Math.round(200 * Math.pow(level + 1, 1.4)); }
+const { xpToNext } = require('../constants/levelCurve');
 
 function resolveLevelUpCfg(cfg) {
   const group = cfg.levelUp || cfg.levels || {};
@@ -100,7 +101,7 @@ module.exports = (client) => {
 
       // Premio de monedas por nivel
       if (leveledUpCount > 0) {
-        addCoins(message.guildId, user.id, 1000 * leveledUpCount);
+        addCoins(message.guildId, user.id, levelUpCoinReward(data.level, leveledUpCount, cfg));
       }
 
       await writeLevels(levels);

@@ -17,7 +17,7 @@ function writeLevels(obj) { fs.writeFileSync(levelsPath, JSON.stringify(obj, nul
 function readCfg() { return readCentralConfig(); }
 function writeCfg(obj) { return writeCentralConfig(obj); }
 
-function xpToNext(level) { return Math.round(200 * Math.pow(level + 1, 1.4)); }
+const { xpToNext } = require('../../constants/levelCurve');
 function totalXpFromLevel(level, xpProgress) {
   let total = 0;
   for (let l = 0; l < level; l++) total += xpToNext(l);
